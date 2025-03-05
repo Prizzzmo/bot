@@ -145,15 +145,27 @@ def button_handler(update, context):
             filtered_topics = []
             for line in topics.split('\n'):
                 line = line.strip()
-                if line and ('.' in line or ':' in line):
-                    # Извлекаем текст темы после номера или двоеточия
-                    parts = line.split('.', 1) if '.' in line else line.split(':', 1)
-                    if len(parts) > 1:
-                        filtered_topics.append(parts[1].strip())
-
-            # Если после фильтрации не осталось тем, берем исходные строки
-            if not filtered_topics:
-                filtered_topics = [line.strip() for line in topics.split('\n') if line.strip()]
+                if line:
+                    # Извлекаем текст темы после номера или двоеточия, если они есть
+                    if ('.' in line or ':' in line):
+                        parts = line.split('.', 1) if '.' in line else line.split(':', 1)
+                        if len(parts) > 1:
+                            topic_text = parts[1].strip()
+                            if topic_text:  # Проверяем, что текст темы не пустой
+                                filtered_topics.append(topic_text)
+                    # Если нет стандартного разделителя, проверяем наличие номера в начале
+                    elif line[0].isdigit() and len(line) > 1:
+                        # Ищем первый не цифровой и не разделительный символ
+                        i = 1
+                        while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
+                            i += 1
+                        if i < len(line):
+                            topic_text = line[i:].strip()
+                            if topic_text:  # Проверяем, что текст темы не пустой
+                                filtered_topics.append(topic_text)
+                    # Если все остальные методы не сработали, берем строку как есть
+                    elif len(line) > 1:
+                        filtered_topics.append(line)
 
             # Ограничиваем до 30 тем
             filtered_topics = filtered_topics[:30]
@@ -163,9 +175,14 @@ def button_handler(update, context):
 
             # Создаем красивые кнопки с темами
             for i, topic in enumerate(filtered_topics, 1):
-                # Ограничиваем длину темы в кнопке
-                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
-                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+                # Проверяем, что тема не пустая
+                if topic and len(topic.strip()) > 0:
+                    # Ограничиваем длину темы в кнопке
+                    display_topic = topic[:30] + '...' if len(topic) > 30 else topic
+                    keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+                else:
+                    # Если тема пустая, добавляем заполнитель
+                    keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
 
             # Добавляем только кнопку для ввода своей темы
             bottom_row = [InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
@@ -221,15 +238,27 @@ def button_handler(update, context):
             filtered_topics = []
             for line in topics.split('\n'):
                 line = line.strip()
-                if line and ('.' in line or ':' in line):
-                    # Извлекаем текст темы после номера или двоеточия
-                    parts = line.split('.', 1) if '.' in line else line.split(':', 1)
-                    if len(parts) > 1:
-                        filtered_topics.append(parts[1].strip())
-
-            # Если после фильтрации не осталось тем, берем исходные строки
-            if not filtered_topics:
-                filtered_topics = [line.strip() for line in topics.split('\n') if line.strip()]
+                if line:
+                    # Извлекаем текст темы после номера или двоеточия, если они есть
+                    if ('.' in line or ':' in line):
+                        parts = line.split('.', 1) if '.' in line else line.split(':', 1)
+                        if len(parts) > 1:
+                            topic_text = parts[1].strip()
+                            if topic_text:  # Проверяем, что текст темы не пустой
+                                filtered_topics.append(topic_text)
+                    # Если нет стандартного разделителя, проверяем наличие номера в начале
+                    elif line[0].isdigit() and len(line) > 1:
+                        # Ищем первый не цифровой и не разделительный символ
+                        i = 1
+                        while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
+                            i += 1
+                        if i < len(line):
+                            topic_text = line[i:].strip()
+                            if topic_text:  # Проверяем, что текст темы не пустой
+                                filtered_topics.append(topic_text)
+                    # Если все остальные методы не сработали, берем строку как есть
+                    elif len(line) > 1:
+                        filtered_topics.append(line)
 
             # Ограничиваем до 30 тем
             filtered_topics = filtered_topics[:30]
@@ -239,9 +268,14 @@ def button_handler(update, context):
 
             # Создаем красивые кнопки с темами
             for i, topic in enumerate(filtered_topics, 1):
-                # Ограничиваем длину темы в кнопке
-                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
-                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+                # Проверяем, что тема не пустая
+                if topic and len(topic.strip()) > 0:
+                    # Ограничиваем длину темы в кнопке
+                    display_topic = topic[:30] + '...' if len(topic) > 30 else topic
+                    keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+                else:
+                    # Если тема пустая, добавляем заполнитель
+                    keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
 
             # Добавляем только кнопку для ввода своей темы
             bottom_row = [InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
