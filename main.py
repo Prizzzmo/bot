@@ -167,8 +167,9 @@ def button_handler(update, context):
                 display_topic = topic[:30] + '...' if len(topic) > 30 else topic
                 keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
 
-            # Добавляем кнопки навигации и ввода своей темы
+            # Добавляем кнопки навигации, другие темы и ввода своей темы
             bottom_row = [InlineKeyboardButton("« Назад", callback_data='back_to_menu'),
+                          InlineKeyboardButton("Другие темы", callback_data='more_topics'),
                           InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
             keyboard.append(bottom_row)
 
@@ -208,6 +209,54 @@ def button_handler(update, context):
         query.edit_message_text(part2)
         query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
         return TOPIC
+    elif query.data == 'more_topics':
+        # Генерируем новый список тем с помощью ИИ
+        prompt = "Составь список из 7 дополнительных тем по истории России, которые могут быть интересны для изучения. Выбери темы, отличные от стандартных. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
+        try:
+            query.edit_message_text("Загружаю дополнительные темы истории России...")
+            topics = ask_grok(prompt)
+
+            # Очищаем и форматируем полученные темы
+            filtered_topics = []
+            for line in topics.split('\n'):
+                line = line.strip()
+                if line and ('.' in line or ':' in line):
+                    # Извлекаем текст темы после номера или двоеточия
+                    parts = line.split('.', 1) if '.' in line else line.split(':', 1)
+                    if len(parts) > 1:
+                        filtered_topics.append(parts[1].strip())
+
+            # Если после фильтрации не осталось тем, берем исходные строки
+            if not filtered_topics:
+                filtered_topics = [line.strip() for line in topics.split('\n') if line.strip()]
+
+            # Ограничиваем до 7 тем для улучшения читаемости
+            filtered_topics = filtered_topics[:7]
+
+            context.user_data['topics'] = filtered_topics
+            keyboard = []
+
+            # Создаем красивые кнопки с темами
+            for i, topic in enumerate(filtered_topics, 1):
+                # Ограничиваем длину темы в кнопке
+                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
+                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+
+            # Добавляем кнопки навигации, другие темы и ввода своей темы
+            bottom_row = [InlineKeyboardButton("« Назад", callback_data='back_to_menu'),
+                          InlineKeyboardButton("Основные темы", callback_data='topic'),
+                          InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
+            keyboard.append(bottom_row)
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(
+                "📚 *Дополнительные темы по истории России*\n\nВыберите тему для изучения или введите свою:",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            query.edit_message_text(f"Произошла ошибка при генерации списка тем: {e}. Попробуй еще раз.", reply_markup=main_menu())
+        return CHOOSE_TOPIC
     elif query.data == 'end_test' or query.data == 'cancel':
         if query.data == 'end_test':
             query.edit_message_text("Тест завершен досрочно. Возвращаемся в главное меню.")
