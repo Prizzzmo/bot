@@ -11,28 +11,33 @@ load_dotenv()
 
 # Получаем ключи API из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GROK_API_KEY = os.getenv("GROK_API_KEY")  # Замените на HUGGINGFACE_API_KEY, если используете Hugging Face
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Используем Google Gemini API
 
 # Состояния для ConversationHandler
 TOPIC, CHOOSE_TOPIC, TEST, ANSWER = range(4)
 
-# Функция для запросов к Grok (замените URL и параметры, если используете Hugging Face)
+# Функция для запросов к Google Gemini API
 def ask_grok(prompt):
-    url = "https://api.x.ai/v1/grok"  # Укажите правильный URL API Grok
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
     headers = {
-        "Authorization": f"Bearer {GROK_API_KEY}",
         "Content-Type": "application/json"
     }
     data = {
-        "prompt": prompt,
-        "max_tokens": 1000  # Увеличим для генерации длинных текстов и вопросов
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": 1000,
+            "temperature": 0.7
+        }
+    }
+    params = {
+        "key": GEMINI_API_KEY
     }
     try:
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, params=params)
         response.raise_for_status()  # Проверка на ошибки HTTP
-        return response.json()["response"]
+        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
-        return f"Ошибка при запросе к Grok: {e}"
+        return f"Ошибка при запросе к Google Gemini: {e}"
 
 # Альтернативная функция для Hugging Face (раскомментируйте, если используете Hugging Face)
 """
