@@ -209,9 +209,14 @@ def button_handler(update, context):
         query.edit_message_text(part2)
         query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
         return TOPIC
-    elif query.data == 'cancel':
-        query.edit_message_text("Действие отменено. Нажми /start, чтобы начать заново.")
-        return ConversationHandler.END
+    elif query.data == 'end_test' or query.data == 'cancel':
+        if query.data == 'end_test':
+            query.edit_message_text("Тест завершен досрочно. Возвращаемся в главное меню.")
+            query.message.reply_text("Выберите действие:", reply_markup=main_menu())
+            return TOPIC
+        else:
+            query.edit_message_text("Действие отменено. Нажми /start, чтобы начать заново.")
+            return ConversationHandler.END
 
 # Обработка выбора темы из списка или ввода своей темы
 def choose_topic(update, context):
@@ -330,7 +335,12 @@ def handle_answer(update, context):
     if context.user_data['current_question'] < len(questions):
         update.message.reply_text(f"Вопрос {context.user_data['current_question'] + 1} из {len(questions)}:")
         update.message.reply_text(questions[context.user_data['current_question']])
-        update.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).")
+        
+        # Создаем клавиатуру с кнопкой для завершения теста
+        keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        update.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).", reply_markup=reply_markup)
         return ANSWER
     else:
         score = context.user_data['score']
@@ -372,7 +382,8 @@ def main():
                 CallbackQueryHandler(button_handler)
             ],
             ANSWER: [
-                MessageHandler(Filters.text & ~Filters.command, handle_answer)
+                MessageHandler(Filters.text & ~Filters.command, handle_answer),
+                CallbackQueryHandler(button_handler)  # Добавляем обработчик для кнопки завершения теста
             ]
         },
         fallbacks=[CommandHandler('start', start)]
