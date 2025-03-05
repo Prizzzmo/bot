@@ -167,10 +167,8 @@ def button_handler(update, context):
                 display_topic = topic[:30] + '...' if len(topic) > 30 else topic
                 keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
 
-            # Добавляем кнопки навигации, другие темы и ввода своей темы
-            bottom_row = [InlineKeyboardButton("« Назад", callback_data='back_to_menu'),
-                          InlineKeyboardButton("Другие темы", callback_data='more_topics'),
-                          InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
+            # Добавляем только кнопку для ввода своей темы
+            bottom_row = [InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
             keyboard.append(bottom_row)
 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -245,10 +243,8 @@ def button_handler(update, context):
                 display_topic = topic[:30] + '...' if len(topic) > 30 else topic
                 keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
 
-            # Добавляем кнопки навигации, другие темы и ввода своей темы
-            bottom_row = [InlineKeyboardButton("« Назад", callback_data='back_to_menu'),
-                          InlineKeyboardButton("Основные темы", callback_data='topic'),
-                          InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
+            # Добавляем только кнопку для ввода своей темы
+            bottom_row = [InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
             keyboard.append(bottom_row)
 
             reply_markup = InlineKeyboardMarkup(keyboard)
