@@ -216,24 +216,28 @@ def choose_topic(update, context):
         query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить.")
         return CHOOSE_TOPIC
     elif query.data.startswith('topic_'):
-        topic_index = int(query.data.split('_')[1]) - 1
-        
-        # Проверяем наличие индекса в списке
-        if 0 <= topic_index < len(context.user_data['topics']):
-            topic = context.user_data['topics'][topic_index]
-            # Удаляем номер из темы, если он есть
-            if '. ' in topic:
-                topic = topic.split('. ', 1)[1]
-                
-            context.user_data['current_topic'] = topic
-            query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
-            prompt = f"Расскажи подробно о {topic} в истории России. Используй простой и понятный язык. Структурируй текст по датам или событиям."
         try:
-            response = ask_grok(prompt)
-            query.edit_message_text(response)
-            query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
+            topic_index = int(query.data.split('_')[1]) - 1
+            
+            # Проверяем наличие индекса в списке
+            if 0 <= topic_index < len(context.user_data['topics']):
+                topic = context.user_data['topics'][topic_index]
+                # Удаляем номер из темы, если он есть
+                if '. ' in topic:
+                    topic = topic.split('. ', 1)[1]
+                
+                context.user_data['current_topic'] = topic
+                query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
+                prompt = f"Расскажи подробно о {topic} в истории России. Используй простой и понятный язык. Структурируй текст по датам или событиям."
+                
+                response = ask_grok(prompt)
+                query.edit_message_text(response)
+                query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
+            else:
+                query.edit_message_text(f"Ошибка: Тема с индексом {topic_index+1} не найдена. Попробуйте выбрать другую тему.", reply_markup=main_menu())
         except Exception as e:
-            query.edit_message_text(f"Произошла ошибка: {e}. Попробуй еще раз.", reply_markup=main_menu())
+            print(f"Ошибка при обработке темы: {e}")
+            query.edit_message_text(f"Произошла ошибка при загрузке темы: {e}. Попробуй еще раз.", reply_markup=main_menu())
         return TOPIC
 
 # Обработка ввода своей темы
