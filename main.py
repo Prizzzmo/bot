@@ -18,25 +18,45 @@ TOPIC, CHOOSE_TOPIC, TEST, ANSWER = range(4)
 
 # Функция для запросов к Google Gemini API
 def ask_grok(prompt):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
     headers = {
         "Content-Type": "application/json"
     }
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 1000,
-            "temperature": 0.7
-        }
-    }
-    params = {
-        "key": GEMINI_API_KEY
+            "maxOutputTokens": 2000,
+            "temperature": 0.7,
+            "topP": 0.95,
+            "topK": 40
+        },
+        "safetySettings": [
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+        ]
     }
     try:
-        response = requests.post(url, headers=headers, json=data, params=params)
+        response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()  # Проверка на ошибки HTTP
         return response.json()["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
+        print(f"Ошибка API: {e}")
+        if hasattr(e, 'response') and e.response:
+            print(f"Ответ сервера: {e.response.text}")
         return f"Ошибка при запросе к Google Gemini: {e}"
 
 # Альтернативная функция для Hugging Face (раскомментируйте, если используете Hugging Face)
@@ -109,14 +129,14 @@ def button_handler(update, context):
                 reply_markup=main_menu()
             )
             return TOPIC
-        # Генерируем 30 вопросов с вариантами ответа
-        prompt = f"Составь 30 вопросов с вариантами ответа (a, b, c, d) по теме '{topic}' в истории России. Укажи правильный ответ в формате 'Правильный ответ: <буква>' после каждого вопроса. Раздели вопросы символом '---'."
+        # Генерируем 10 вопросов с вариантами ответа (уменьшаем количество до 10 для лучшей работы с API)
+        prompt = f"Составь 10 вопросов с вариантами ответа (a, b, c, d) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <буква>'. Каждый вопрос должен заканчиваться строкой '---'."
         try:
             questions = ask_grok(prompt)
             context.user_data['questions'] = questions.split('---')  # Разделяем вопросы
             context.user_data['current_question'] = 0
             context.user_data['score'] = 0
-            query.edit_message_text("Начинаем тест из 30 вопросов! Вот первый вопрос:")
+            query.edit_message_text("Начинаем тест из 10 вопросов! Вот первый вопрос:")
             query.message.reply_text(context.user_data['questions'][0])
             query.message.reply_text("Напиши букву правильного ответа (a, b, c или d).")
         except Exception as e:
@@ -181,7 +201,7 @@ def handle_answer(update, context):
     
     context.user_data['current_question'] += 1
     if context.user_data['current_question'] < len(questions):
-        update.message.reply_text(f"Вопрос {context.user_data['current_question'] + 1} из 30:")
+        update.message.reply_text(f"Вопрос {context.user_data['current_question'] + 1} из {len(questions)}:")
         update.message.reply_text(questions[context.user_data['current_question']])
         update.message.reply_text("Напиши букву правильного ответа (a, b, c или d).")
         return ANSWER
