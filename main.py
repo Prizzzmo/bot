@@ -52,12 +52,49 @@ def ask_grok(prompt):
     try:
         response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()  # Проверка на ошибки HTTP
-        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        
+        # Вывод для отладки
+        print("Ответ от API успешно получен")
+        
+        # Проверяем структуру ответа
+        response_json = response.json()
+        
+        # Вывод для отладки
+        print(f"Структура ответа: {response_json.keys()}")
+        
+        if "candidates" not in response_json or not response_json["candidates"]:
+            print(f"Ответ не содержит 'candidates': {response_json}")
+            return "API вернул ответ без содержимого. Возможно, запрос был заблокирован фильтрами безопасности."
+            
+        if "content" not in response_json["candidates"][0]:
+            print(f"Ответ не содержит 'content': {response_json['candidates'][0]}")
+            return "API вернул неверный формат ответа."
+            
+        if "parts" not in response_json["candidates"][0]["content"] or not response_json["candidates"][0]["content"]["parts"]:
+            print(f"Ответ не содержит 'parts': {response_json['candidates'][0]['content']}")
+            return "API вернул пустой ответ."
+            
+        return response_json["candidates"][0]["content"]["parts"][0]["text"]
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP Ошибка: {e}")
+        if hasattr(e, 'response') and e.response:
+            print(f"Статус код: {e.response.status_code}")
+            print(f"Ответ сервера: {e.response.text}")
+        return f"Ошибка HTTP при запросе к Google Gemini: {e}"
+    except requests.exceptions.ConnectionError as e:
+        print(f"Ошибка соединения: {e}")
+        return "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету."
+    except requests.exceptions.Timeout as e:
+        print(f"Ошибка таймаута: {e}")
+        return "Превышено время ожидания ответа от API Google Gemini."
+    except ValueError as e:
+        print(f"Ошибка при разборе JSON: {e}")
+        return "Ошибка при обработке ответа от API Google Gemini."
     except Exception as e:
-        print(f"Ошибка API: {e}")
+        print(f"Неожиданная ошибка API: {e}")
         if hasattr(e, 'response') and e.response:
             print(f"Ответ сервера: {e.response.text}")
-        return f"Ошибка при запросе к Google Gemini: {e}"
+        return f"Неизвестная ошибка при запросе к Google Gemini: {e}"
 
 # Альтернативная функция для Hugging Face (раскомментируйте, если используете Hugging Face)
 """
