@@ -108,7 +108,6 @@ def ask_grok(prompt):
 def main_menu():
     keyboard = [
         [InlineKeyboardButton("Выбрать тему", callback_data='topic')],
-        [InlineKeyboardButton("Пройти тест", callback_data='test')],
         [InlineKeyboardButton("Завершить", callback_data='cancel')]
     ]
     return InlineKeyboardMarkup(keyboard)
