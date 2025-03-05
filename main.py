@@ -243,31 +243,9 @@ def choose_topic(update, context):
                 
                 response = ask_grok(prompt)
                 
-                # Разбиваем текст на две части
-                if len(response) > 1000:
-                    # Находим подходящее место для разделения (конец предложения после 1000 символов)
-                    split_point = 1000
-                    for i in range(1000, min(1500, len(response))):
-                        if response[i] in ['.', '!', '?'] and (i + 1 >= len(response) or response[i + 1] == ' '):
-                            split_point = i + 1
-                            break
-                    
-                    part1 = response[:split_point]
-                    part2 = response[split_point:]
-                    
-                    # Сохраняем вторую часть в контексте
-                    context.user_data['topic_part2'] = part2
-                    
-                    # Кнопка "Продолжить чтение"
-                    continue_keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("📖 Продолжить чтение", callback_data='continue_reading')]
-                    ])
-                    
-                    query.edit_message_text(part1, reply_markup=continue_keyboard)
-                else:
-                    # Если текст короткий, отображаем целиком
-                    query.edit_message_text(response)
-                    query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
+                # Отображаем весь текст целиком
+                query.edit_message_text(response)
+                query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
             else:
                 query.edit_message_text(f"Ошибка: Тема с индексом {topic_index+1} не найдена. Попробуйте выбрать другую тему.", reply_markup=main_menu())
         except Exception as e:
@@ -283,31 +261,9 @@ def handle_custom_topic(update, context):
     try:
         response = ask_grok(prompt)
         
-        # Разбиваем текст на две части
-        if len(response) > 1000:
-            # Находим подходящее место для разделения (конец предложения после 1000 символов)
-            split_point = 1000
-            for i in range(1000, min(1500, len(response))):
-                if response[i] in ['.', '!', '?'] and (i + 1 >= len(response) or response[i + 1] == ' '):
-                    split_point = i + 1
-                    break
-            
-            part1 = response[:split_point]
-            part2 = response[split_point:]
-            
-            # Сохраняем вторую часть в контексте
-            context.user_data['topic_part2'] = part2
-            
-            # Кнопка "Продолжить чтение"
-            continue_keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("📖 Продолжить чтение", callback_data='continue_reading')]
-            ])
-            
-            update.message.reply_text(part1, reply_markup=continue_keyboard)
-        else:
-            # Если текст короткий, отображаем целиком
-            update.message.reply_text(response)
-            update.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
+        # Отображаем текст целиком
+        update.message.reply_text(response)
+        update.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
     except Exception as e:
         update.message.reply_text(f"Произошла ошибка: {e}. Попробуй еще раз.", reply_markup=main_menu())
     return TOPIC
