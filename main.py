@@ -129,20 +129,55 @@ def button_handler(update, context):
     query = update.callback_query
     query.answer()  # Подтверждаем нажатие кнопки
 
-    if query.data == 'topic':
+    if query.data == 'back_to_menu':
+        query.edit_message_text(
+            "Выберите действие в меню ниже:",
+            reply_markup=main_menu()
+        )
+        return TOPIC
+    elif query.data == 'topic':
         # Генерируем список тем с помощью ИИ
-        prompt = "Составь список из 10 популярных тем по истории России, которые могут быть интересны для изучения. Перечисли их в виде нумерованного списка."
+        prompt = "Составь список из 7 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
         try:
+            query.edit_message_text("Загружаю список тем истории России...")
             topics = ask_grok(prompt)
-            context.user_data['topics'] = topics.split('\n')  # Сохраняем темы в виде списка
+            
+            # Очищаем и форматируем полученные темы
+            filtered_topics = []
+            for line in topics.split('\n'):
+                line = line.strip()
+                if line and ('.' in line or ':' in line):
+                    # Извлекаем текст темы после номера или двоеточия
+                    parts = line.split('.', 1) if '.' in line else line.split(':', 1)
+                    if len(parts) > 1:
+                        filtered_topics.append(parts[1].strip())
+            
+            # Если после фильтрации не осталось тем, берем исходные строки
+            if not filtered_topics:
+                filtered_topics = [line.strip() for line in topics.split('\n') if line.strip()]
+            
+            # Ограничиваем до 7 тем для улучшения читаемости
+            filtered_topics = filtered_topics[:7]
+            
+            context.user_data['topics'] = filtered_topics
             keyboard = []
-            for i, topic in enumerate(context.user_data['topics'], 1):
-                keyboard.append([InlineKeyboardButton(f"{i}. {topic}", callback_data=f'topic_{i}')])
-            keyboard.append([InlineKeyboardButton("Ввести свою тему", callback_data='custom_topic')])
+            
+            # Создаем красивые кнопки с темами
+            for i, topic in enumerate(filtered_topics, 1):
+                # Ограничиваем длину темы в кнопке
+                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
+                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+            
+            # Добавляем кнопки навигации и ввода своей темы
+            bottom_row = [InlineKeyboardButton("« Назад", callback_data='back_to_menu'),
+                          InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
+            keyboard.append(bottom_row)
+            
             reply_markup = InlineKeyboardMarkup(keyboard)
             query.edit_message_text(
-                "Выбери тему из списка или введи свою:",
-                reply_markup=reply_markup
+                "📚 *Темы по истории России*\n\nВыберите тему для изучения или введите свою:",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
             )
         except Exception as e:
             query.edit_message_text(f"Произошла ошибка при генерации списка тем: {e}. Попробуй еще раз.", reply_markup=main_menu())
@@ -182,9 +217,17 @@ def choose_topic(update, context):
         return CHOOSE_TOPIC
     elif query.data.startswith('topic_'):
         topic_index = int(query.data.split('_')[1]) - 1
-        topic = context.user_data['topics'][topic_index].split('. ', 1)[1]  # Убираем номер из темы
-        context.user_data['current_topic'] = topic
-        prompt = f"Расскажи подробно о {topic} в истории России. Используй простой и понятный язык."
+        
+        # Проверяем наличие индекса в списке
+        if 0 <= topic_index < len(context.user_data['topics']):
+            topic = context.user_data['topics'][topic_index]
+            # Удаляем номер из темы, если он есть
+            if '. ' in topic:
+                topic = topic.split('. ', 1)[1]
+                
+            context.user_data['current_topic'] = topic
+            query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
+            prompt = f"Расскажи подробно о {topic} в истории России. Используй простой и понятный язык. Структурируй текст по датам или событиям."
         try:
             response = ask_grok(prompt)
             query.edit_message_text(response)
