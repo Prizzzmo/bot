@@ -19,7 +19,7 @@ TOPIC, CHOOSE_TOPIC, TEST, ANSWER = range(4)
 # Функция для запросов к Google Gemini API
 def ask_grok(prompt):
     # Упрощаем запрос для снижения вероятности ошибок
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {
         "Content-Type": "application/json"
     }
