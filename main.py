@@ -18,36 +18,25 @@ TOPIC, CHOOSE_TOPIC, TEST, ANSWER = range(4)
 
 # Функция для запросов к Google Gemini API
 def ask_grok(prompt):
+    # Упрощаем запрос для снижения вероятности ошибок
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
     headers = {
         "Content-Type": "application/json"
     }
     data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": 2000,
-            "temperature": 0.7,
-            "topP": 0.95,
-            "topK": 40
-        },
-        "safetySettings": [
+        "contents": [
             {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
             }
-        ]
+        ],
+        "generationConfig": {
+            "temperature": 0.7,
+            "maxOutputTokens": 1024
+        }
     }
     try:
         response = requests.post(url, headers=headers, json=data)
