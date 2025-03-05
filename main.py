@@ -191,7 +191,7 @@ def button_handler(update, context):
             )
             return TOPIC
         # Генерируем 10 вопросов с вариантами ответа (уменьшаем количество до 10 для лучшей работы с API)
-        prompt = f"Составь 10 вопросов с вариантами ответа (a, b, c, d) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <буква>'. Каждый вопрос должен заканчиваться строкой '---'."
+        prompt = f"Составь 10 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <цифра>'. Каждый вопрос должен заканчиваться строкой '---'."
         try:
             questions = ask_grok(prompt)
             context.user_data['questions'] = questions.split('---')  # Разделяем вопросы
@@ -199,7 +199,7 @@ def button_handler(update, context):
             context.user_data['score'] = 0
             query.edit_message_text("Начинаем тест из 10 вопросов! Вот первый вопрос:")
             query.message.reply_text(context.user_data['questions'][0])
-            query.message.reply_text("Напиши букву правильного ответа (a, b, c или d).")
+            query.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).")
         except Exception as e:
             query.edit_message_text(f"Произошла ошибка при генерации вопросов: {e}. Попробуй еще раз.", reply_markup=main_menu())
         return ANSWER
@@ -309,13 +309,13 @@ def handle_custom_topic(update, context):
 
 # Обработка ответов на тест
 def handle_answer(update, context):
-    user_answer = update.message.text.lower()
+    user_answer = update.message.text.strip()
     questions = context.user_data['questions']
     current_question = context.user_data['current_question']
     
     # Парсим правильный ответ из текста вопроса
     try:
-        correct_answer = questions[current_question].split("Правильный ответ: ")[1][0].lower()
+        correct_answer = questions[current_question].split("Правильный ответ: ")[1][0]
     except IndexError:
         update.message.reply_text("Ошибка в формате вопросов. Попробуй начать тест заново, нажав 'Пройти тест'.", reply_markup=main_menu())
         return TOPIC
@@ -330,7 +330,7 @@ def handle_answer(update, context):
     if context.user_data['current_question'] < len(questions):
         update.message.reply_text(f"Вопрос {context.user_data['current_question'] + 1} из {len(questions)}:")
         update.message.reply_text(questions[context.user_data['current_question']])
-        update.message.reply_text("Напиши букву правильного ответа (a, b, c или d).")
+        update.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).")
         return ANSWER
     else:
         score = context.user_data['score']
