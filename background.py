@@ -237,9 +237,16 @@ HTML_TEMPLATE = """
 
         .chat-input {
             display: flex;
+            flex-direction: column;
             padding: 15px;
             background-color: #f0f0f0;
             border-top: 1px solid #ddd;
+        }
+
+        .chat-button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
         }
 
         .chat-input input {
@@ -262,19 +269,17 @@ HTML_TEMPLATE = """
             background-color: #337ab7;
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 12px 30px;
             border-radius: 20px;
             cursor: pointer;
             font-weight: bold;
             transition: background-color 0.3s;
+            width: 50%;
+            max-width: 200px;
         }
         
         .chat-input button:hover {
             background-color: #2e6da4;
-        }
-
-        .chat-input button:hover {
-            background-color: #286090;
         }
 
         .typing-indicator {
@@ -322,7 +327,9 @@ HTML_TEMPLATE = """
                 <div class="chat-messages" id="chat-messages"></div>
                 <div class="chat-input">
                     <input type="text" id="chat-input" placeholder="Введите сообщение...">
-                    <button onclick="sendMessage()">Отправить</button>
+                    <div class="chat-button-container">
+                        <button onclick="sendMessage()">Отправить</button>
+                    </div>
                 </div>
                 <div class="typing-indicator" id="typing-indicator">Бот печатает...</div>
             </div>
