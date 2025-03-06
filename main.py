@@ -143,7 +143,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Используем Google Gemini API
 
 # Состояния для ConversationHandler
-TOPIC, CHOOSE_TOPIC, TEST, ANSWER = range(4)
+TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION = range(5)
 
 # Функция для запросов к Google Gemini API
 def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
@@ -252,6 +252,7 @@ def main_menu():
     keyboard = [
         [InlineKeyboardButton("Выбрать тему", callback_data='topic')],
         [InlineKeyboardButton("Пройти тест", callback_data='test')],
+        [InlineKeyboardButton("Беседа о истории России", callback_data='conversation')],
         [InlineKeyboardButton("Завершить", callback_data='cancel')]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -355,6 +356,15 @@ def button_handler(update, context):
             reply_markup=main_menu()
         )
         return TOPIC
+    elif query.data == 'conversation':
+        # Обработка кнопки беседы о истории России
+        query.edit_message_text(
+            "🗣️ *Беседа о истории России*\n\n"
+            "Здесь вы можете задать вопрос или начать беседу на любую тему, связанную с историей России.\n\n"
+            "Просто напишите вашу мысль или вопрос, и я отвечу вам на основе исторических данных.",
+            parse_mode='Markdown'
+        )
+        return CONVERSATION
     elif query.data == 'topic':
         # Генерируем список тем с помощью ИИ
         prompt = "Составь список из 30 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
@@ -748,6 +758,44 @@ def main():
         updater = Updater(TELEGRAM_TOKEN, use_context=True)
         dp = updater.dispatcher
 
+        # Функция для обработки сообщений в режиме беседы
+        def handle_conversation(update, context):
+            user_message = update.message.text
+            
+            # Формируем промпт для запроса к API
+            prompt = f"Пользователь задал вопрос или начал беседу на тему истории России: \"{user_message}\"\n\n" \
+                    "Ответь на этот вопрос или продолжи беседу, опираясь на исторические факты. " \
+                    "Будь информативным, но кратким. Если вопрос не относится к истории России, " \
+                    "вежливо направь беседу в историческое русло."
+            
+            # Отправляем индикатор набора текста
+            context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
+            
+            try:
+                # Получаем ответ от API
+                response = ask_grok(prompt, max_tokens=1024)
+                
+                # Отправляем ответ пользователю
+                update.message.reply_text(response)
+                
+                # Предлагаем продолжить беседу или вернуться в меню
+                keyboard = [
+                    [InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back_to_menu')]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                update.message.reply_text(
+                    "Вы можете продолжить беседу, задав новый вопрос, или вернуться в главное меню:",
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при обработке беседы: {e}")
+                update.message.reply_text(
+                    f"Произошла ошибка при обработке вашего сообщения: {e}. Попробуйте еще раз или вернитесь в меню.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back_to_menu')]])
+                )
+            
+            return CONVERSATION
+            
         # Создаем ConversationHandler для управления диалогом
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', start)],
@@ -765,6 +813,10 @@ def main():
                 ANSWER: [
                     MessageHandler(Filters.text & ~Filters.command, handle_answer),
                     CallbackQueryHandler(button_handler)  # Добавляем обработчик для кнопки завершения теста
+                ],
+                CONVERSATION: [
+                    MessageHandler(Filters.text & ~Filters.command, handle_conversation),
+                    CallbackQueryHandler(button_handler)  # Обработчик для кнопки возврата в меню
                 ]
             },
             fallbacks=[CommandHandler('start', start)]
