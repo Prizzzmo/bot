@@ -146,67 +146,89 @@ HTML_TEMPLATE = """
 
         /* Стили для чата */
         .chat-container {
-            max-width: 800px;
+            max-width: 90%;
+            min-width: 800px;
             margin: 20px auto;
             border: 1px solid #ddd;
             border-radius: 8px;
             overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
         }
 
         .chat-header {
             background-color: #337ab7;
             color: white;
-            padding: 15px;
+            padding: 18px;
             text-align: center;
             font-weight: bold;
+            font-size: 18px;
         }
 
         .chat-messages {
-            height: 400px;
+            height: 500px;
             overflow-y: auto;
-            padding: 15px;
+            padding: 20px;
             background-color: #f9f9f9;
         }
 
         .message {
             margin-bottom: 15px;
-            padding: 10px;
-            border-radius: 8px;
-            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 80%;
+            line-height: 1.4;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
         .user-message {
             background-color: #DCF8C6;
             margin-left: auto;
             text-align: right;
+            border-top-right-radius: 4px;
         }
 
         .bot-message {
             background-color: #E9EAEC;
             margin-right: auto;
+            border-top-left-radius: 4px;
         }
 
         .chat-input {
             display: flex;
-            padding: 10px;
+            padding: 15px;
             background-color: #f0f0f0;
+            border-top: 1px solid #ddd;
         }
 
         .chat-input input {
             flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-right: 10px;
+            padding: 12px 15px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            margin-right: 12px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .chat-input input:focus {
+            border-color: #337ab7;
+            box-shadow: 0 0 5px rgba(51, 122, 183, 0.3);
         }
 
         .chat-input button {
             background-color: #337ab7;
             color: white;
             border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
+            padding: 12px 20px;
+            border-radius: 20px;
             cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .chat-input button:hover {
+            background-color: #2e6da4;
         }
 
         .chat-input button:hover {
@@ -226,11 +248,11 @@ HTML_TEMPLATE = """
         <h1>Панель управления ботом истории России</h1>
 
         <div class="navigation">
-            <button onclick="showLogs()" class="nav-button active" id="logs-btn">Просмотр логов</button>
-            <button onclick="showMainPage()" class="nav-button" id="main-btn">Главная страница</button>
+            <button onclick="showLogs()" class="nav-button" id="logs-btn">Просмотр логов</button>
+            <button onclick="showMainPage()" class="nav-button active" id="main-btn">Главная страница</button>
         </div>
 
-        <div id="logs-section">
+        <div id="logs-section" style="display: none;">
             <h2>Логи бота</h2>
             <div class="controls">
                 <button onclick="refreshLogs()">Обновить логи</button>
@@ -247,7 +269,7 @@ HTML_TEMPLATE = """
             <div class="log-container" id="logs"></div>
         </div>
 
-        <div id="main-section" style="display: none;">
+        <div id="main-section">
             <h2>Главная страница</h2>
             <p>Добро пожаловать в панель управления ботом истории России!</p>
             <p>Этот веб-интерфейс позволяет просматривать логи работы бота и отслеживать его активность.</p>
