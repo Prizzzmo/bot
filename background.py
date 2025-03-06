@@ -1,4 +1,3 @@
-
 import os
 import re
 from flask import Flask, render_template, jsonify
@@ -69,7 +68,7 @@ HTML_TEMPLATE = """
         .info { color: #5bc0de; }
         .debug { color: #5cb85c; }
         .critical { color: #ff0000; background-color: #ffecec; font-weight: bold; padding: 5px; }
-        
+
         .controls {
             margin-bottom: 20px;
         }
@@ -91,7 +90,7 @@ HTML_TEMPLATE = """
         .filter-group label {
             margin-right: 10px;
         }
-        
+
         /* Новые стили для навигации */
         .navigation {
             display: flex;
@@ -100,7 +99,7 @@ HTML_TEMPLATE = """
             border-bottom: 1px solid #ddd;
             padding-bottom: 15px;
         }
-        
+
         .nav-button {
             background-color: #f8f9fa;
             color: #444;
@@ -112,44 +111,120 @@ HTML_TEMPLATE = """
             font-size: 16px;
             transition: all 0.3s ease;
         }
-        
+
         .nav-button:hover {
             background-color: #e9ecef;
         }
-        
+
         .nav-button.active {
             background-color: #337ab7;
             color: white;
             border-color: #2e6da4;
         }
-        
+
         #main-section {
             text-align: center;
             padding: 20px;
             line-height: 1.6;
         }
-        
+
         #main-section p {
             margin-bottom: 15px;
             font-size: 16px;
+        }
+
+        /* Стили для чата */
+        .chat-container {
+            max-width: 800px;
+            margin: 20px auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background-color: #337ab7;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 70%;
+        }
+
+        .user-message {
+            background-color: #DCF8C6;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .bot-message {
+            background-color: #E9EAEC;
+            margin-right: auto;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            background-color: #f0f0f0;
+        }
+
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        .chat-input button {
+            background-color: #337ab7;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .chat-input button:hover {
+            background-color: #286090;
+        }
+
+        .typing-indicator {
+            padding: 10px;
+            color: #777;
+            font-style: italic;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Панель управления ботом истории России</h1>
-        
+
         <div class="navigation">
             <button onclick="showLogs()" class="nav-button active" id="logs-btn">Просмотр логов</button>
             <button onclick="showMainPage()" class="nav-button" id="main-btn">Главная страница</button>
         </div>
-        
+
         <div id="logs-section">
             <h2>Логи бота</h2>
             <div class="controls">
                 <button onclick="refreshLogs()">Обновить логи</button>
                 <button onclick="clearFilters()">Сбросить фильтры</button>
-                
+
                 <div class="filter-group">
                     <label><input type="checkbox" id="show-error" checked> Ошибки</label>
                     <label><input type="checkbox" id="show-warning" checked> Предупреждения</label>
@@ -158,17 +233,26 @@ HTML_TEMPLATE = """
                     <label><input type="checkbox" id="show-critical" checked> Критические</label>
                 </div>
             </div>
+            <div class="log-container" id="logs"></div>
         </div>
-        
+
         <div id="main-section" style="display: none;">
             <h2>Главная страница</h2>
             <p>Добро пожаловать в панель управления ботом истории России!</p>
             <p>Этот веб-интерфейс позволяет просматривать логи работы бота и отслеживать его активность.</p>
             <p>Для просмотра логов нажмите кнопку "Просмотр логов" вверху страницы.</p>
-            <p>Чтобы связаться с ботом, найдите его в Telegram по имени вашего бота.</p>
+            <p>Чтобы связаться с ботом, используйте чат ниже:</p>
+            <div class="chat-container">
+                <div class="chat-header">Чат с ботом</div>
+                <div class="chat-messages" id="chat-messages"></div>
+                <div class="chat-input">
+                    <input type="text" id="chat-input" placeholder="Введите сообщение...">
+                    <button onclick="sendMessage()">Отправить</button>
+                </div>
+                <div class="typing-indicator" id="typing-indicator">Бот печатает...</div>
+            </div>
         </div>
-        
-        <div class="log-container" id="logs"></div>
+
     </div>
 
     <script>
@@ -179,7 +263,7 @@ HTML_TEMPLATE = """
                 .then(data => {
                     const logsContainer = document.getElementById('logs');
                     logsContainer.innerHTML = '';
-                    
+
                     data.logs.forEach(log => {
                         if (shouldDisplayLog(log)) {
                             const logElement = document.createElement('div');
@@ -188,13 +272,13 @@ HTML_TEMPLATE = """
                             logsContainer.appendChild(logElement);
                         }
                     });
-                    
+
                     // Автоскролл вниз
                     logsContainer.scrollTop = logsContainer.scrollHeight;
                 })
                 .catch(error => console.error('Ошибка при загрузке логов:', error));
         }
-        
+
         // Функция для определения класса CSS на основе уровня лога
         function getLogLevelClass(logText) {
             if (logText.includes(' ERROR ') || logText.includes(' - ERROR - ')) return 'error';
@@ -204,7 +288,7 @@ HTML_TEMPLATE = """
             if (logText.includes(' CRITICAL ') || logText.includes(' - CRITICAL - ')) return 'critical';
             return '';
         }
-        
+
         // Функция для определения, нужно ли отображать лог на основе фильтров
         function shouldDisplayLog(logText) {
             const showError = document.getElementById('show-error').checked;
@@ -212,18 +296,18 @@ HTML_TEMPLATE = """
             const showInfo = document.getElementById('show-info').checked;
             const showDebug = document.getElementById('show-debug').checked;
             const showCritical = document.getElementById('show-critical').checked;
-            
+
             const logClass = getLogLevelClass(logText);
-            
+
             if (logClass === 'error' && !showError) return false;
             if (logClass === 'warning' && !showWarning) return false;
             if (logClass === 'info' && !showInfo) return false;
             if (logClass === 'debug' && !showDebug) return false;
             if (logClass === 'critical' && !showCritical) return false;
-            
+
             return true;
         }
-        
+
         // Функция для сброса фильтров
         function clearFilters() {
             document.getElementById('show-error').checked = true;
@@ -233,7 +317,7 @@ HTML_TEMPLATE = """
             document.getElementById('show-critical').checked = true;
             refreshLogs();
         }
-        
+
         // Функции для навигации между разделами
         function showLogs() {
             document.getElementById('logs-section').style.display = 'block';
@@ -242,14 +326,14 @@ HTML_TEMPLATE = """
             document.getElementById('main-btn').classList.remove('active');
             refreshLogs(); // Обновляем логи при переходе на эту страницу
         }
-        
+
         function showMainPage() {
             document.getElementById('logs-section').style.display = 'none';
             document.getElementById('main-section').style.display = 'block';
             document.getElementById('main-btn').classList.add('active');
             document.getElementById('logs-btn').classList.remove('active');
         }
-        
+
         // Загружаем логи при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             refreshLogs();
@@ -260,6 +344,16 @@ HTML_TEMPLATE = """
                 }
             }, 5000);
         });
+
+
+        //Функции для чата (placeholder)
+        function sendMessage() {
+            const message = document.getElementById('chat-input').value;
+            // Здесь должна быть логика отправки сообщения на сервер
+            console.log("Отправлено сообщение:", message);
+            document.getElementById('chat-input').value = '';
+        }
+
     </script>
 </body>
 </html>
@@ -268,7 +362,7 @@ HTML_TEMPLATE = """
 # Функция для чтения логов с применением паттернов ошибок
 def read_logs():
     logs = []
-    
+
     # Проверяем наличие директории logs
     log_dir = "logs"
     if os.path.exists(log_dir):
@@ -276,11 +370,11 @@ def read_logs():
     else:
         # Если нет директории logs, ищем в корневой директории
         log_files = [f for f in os.listdir('.') if f.startswith('bot_log_') and f.endswith('.log')]
-    
+
     # Если логов нет совсем, возвращаем сообщение
     if not log_files:
         return ["Лог-файлы не найдены. Запустите бота для создания логов."]
-    
+
     # Паттерны распространенных ошибок с комментариями
     error_patterns = {
         r'ConnectionError': 'Ошибка подключения к внешнему API. Проверьте интернет-соединение.',
@@ -293,24 +387,24 @@ def read_logs():
         r'Отсутствует TELEGRAM_TOKEN': 'Не настроен токен Telegram бота в файле .env',
         r'Отсутствует GEMINI_API_KEY': 'Не настроен API ключ для Google Gemini в файле .env',
     }
-    
+
     for log_file in sorted(log_files, reverse=True):
         try:
             log_path = os.path.join(log_dir, log_file) if os.path.exists(log_dir) else log_file
             with open(log_path, 'r', encoding='utf-8') as file:
                 content = file.readlines()
-                
+
                 for line in content:
                     # Добавляем комментарии к известным ошибкам
                     for pattern, comment in error_patterns.items():
                         if re.search(pattern, line):
                             line = line.strip() + f" => {comment}\n"
                             break
-                    
+
                     logs.append(line.strip())
         except Exception as e:
             logs.append(f"Ошибка при чтении лог-файла {log_file}: {e}")
-    
+
     # Ограничиваем количество логов для отображения (последние 1000)
     return logs[-1000:]
 
