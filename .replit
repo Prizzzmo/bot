@@ -15,11 +15,19 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Run Bot"
+runButton = "Start Bot"
 
 [[workflows.workflow]]
 name = "Run Bot"
 author = 12662301
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+
+[[workflows.workflow]]
+name = "Start Bot"
+author = 40255892
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
