@@ -666,12 +666,26 @@ def main():
         flask_thread = background.start_flask_server()
         logger.info(f"Flask-сервер запущен на http://0.0.0.0:8080")
 
-        # Проверка наличия токенов
+        # Проверка наличия токенов с более подробными сообщениями
         if not TELEGRAM_TOKEN:
-            logger.error("Отсутствует TELEGRAM_TOKEN! Проверьте .env файл")
+            error_msg = "Отсутствует TELEGRAM_TOKEN! Проверьте .env файл. Токен должен быть установлен в переменной TELEGRAM_TOKEN."
+            logger.error(error_msg)
+            print(error_msg)
+            return
+        if TELEGRAM_TOKEN == "YOUR_TELEGRAM_TOKEN_HERE":
+            error_msg = "TELEGRAM_TOKEN не настроен! Замените YOUR_TELEGRAM_TOKEN_HERE на реальный токен в .env файле."
+            logger.error(error_msg)
+            print(error_msg)
             return
         if not GEMINI_API_KEY:
-            logger.error("Отсутствует GEMINI_API_KEY! Проверьте .env файл")
+            error_msg = "Отсутствует GEMINI_API_KEY! Проверьте .env файл. Ключ должен быть установлен в переменной GEMINI_API_KEY."
+            logger.error(error_msg)
+            print(error_msg)
+            return
+        if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
+            error_msg = "GEMINI_API_KEY не настроен! Замените YOUR_GEMINI_API_KEY_HERE на реальный ключ в .env файле."
+            logger.error(error_msg)
+            print(error_msg)
             return
 
         updater = Updater(TELEGRAM_TOKEN, use_context=True)
