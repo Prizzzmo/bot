@@ -145,65 +145,194 @@ load_dotenv()
 # Класс для кэширования ответов API
 class APICache:
     """
-    Простой класс для кэширования ответов API.
-    Поддерживает сохранение и загрузку кэша из файла.
+    Улучшенный класс для кэширования ответов API.
+    Поддерживает сохранение и загрузку кэша из файла,
+    имеет механизмы для защиты от повреждения файла кэша.
+    
+    © 2025 Silver Raven. Образовательный бот по истории России.
     """
-    def __init__(self, max_size=100, cache_file='api_cache.json'):
+    def __init__(self, max_size=200, cache_file='api_cache.json', backup_file='api_cache_backup.json'):
         self.cache = {}
         self.max_size = max_size
         self.cache_file = cache_file
+        self.backup_file = backup_file
+        self.last_save_time = datetime.now().timestamp()
+        self.modified_since_save = False
         self.load_cache()
         
     def get(self, key):
-        """Получить значение из кэша по ключу"""
-        return self.cache.get(key)
+        """Получить значение из кэша по ключу и обновить время доступа"""
+        cache_item = self.cache.get(key)
+        if cache_item:
+            # Обновляем время последнего доступа
+            cache_item['last_accessed'] = datetime.now().timestamp()
+            # Обновляем счетчик использования
+            cache_item['access_count'] = cache_item.get('access_count', 0) + 1
+            self.modified_since_save = True
+            return cache_item['value']
+        return None
 
-    def set(self, key, value):
-        """Добавить значение в кэш"""
+    def set(self, key, value, ttl=None):
+        """
+        Добавить значение в кэш
+        
+        Args:
+            key (str): Ключ для хранения
+            value (any): Значение для кэширования
+            ttl (int, optional): Время жизни записи в секундах
+        """
         # Если кэш переполнен, удаляем наименее востребованные элементы
         if len(self.cache) >= self.max_size:
-            # Сортируем по времени последнего доступа
-            items = sorted(self.cache.items(), key=lambda x: x[1].get('last_accessed', 0))
-            # Удаляем 10% старых элементов
-            for i in range(int(self.max_size * 0.1)):
-                if items:
-                    del self.cache[items[i][0]]
+            self._clean_cache()
         
-        # Добавляем новый элемент с временной меткой
+        # Добавляем новый элемент с временной меткой и счетчиком использования
+        expiry = None
+        if ttl:
+            expiry = datetime.now().timestamp() + ttl
+            
         self.cache[key] = {
             'value': value,
-            'last_accessed': datetime.now().timestamp()
+            'created': datetime.now().timestamp(),
+            'last_accessed': datetime.now().timestamp(),
+            'access_count': 1,
+            'expiry': expiry
         }
-        # Периодически сохраняем кэш
-        if len(self.cache) % 10 == 0:
+        
+        self.modified_since_save = True
+        
+        # Периодически сохраняем кэш, но не чаще чем раз в 30 секунд
+        current_time = datetime.now().timestamp()
+        if self.modified_since_save and (current_time - self.last_save_time > 30 or len(self.cache) % 20 == 0):
             self.save_cache()
+    
+    def _clean_cache(self):
+        """Очищает кэш от устаревших и наименее используемых записей"""
+        # Удаляем просроченные записи
+        current_time = datetime.now().timestamp()
+        expired_keys = [k for k, v in self.cache.items() 
+                      if v.get('expiry') and v['expiry'] < current_time]
+        
+        for key in expired_keys:
+            del self.cache[key]
+        
+        # Если после удаления просроченных записей кэш всё ещё переполнен
+        if len(self.cache) >= self.max_size:
+            # Сложный алгоритм оценки ценности записи:
+            # - Недавно созданные имеют преимущество (weighted_recency)
+            # - Часто используемые имеют преимущество (access_count)
+            # - Недавно использованные имеют преимущество (last_accessed)
+            
+            items_with_score = []
+            for key, data in self.cache.items():
+                age = current_time - data.get('created', 0)
+                recency = current_time - data.get('last_accessed', 0)
+                count = data.get('access_count', 1)
+                
+                # Записи младше суток получают бонус
+                weighted_recency = recency * (0.7 if age < 86400 else 1.0) 
+                
+                # Формула: частота использования / недавность использования 
+                # (чем выше счет, тем ценнее запись)
+                score = count / (weighted_recency + 1)
+                items_with_score.append((key, score))
+            
+            # Сортируем по возрастанию ценности (наименее ценные в начале)
+            items_with_score.sort(key=lambda x: x[1])
+            
+            # Удаляем 15% наименее ценных записей
+            for i in range(int(self.max_size * 0.15)):
+                if i < len(items_with_score):
+                    del self.cache[items_with_score[i][0]]
 
     def load_cache(self):
-        """Загружает кэш из файла, если он существует"""
+        """Загружает кэш из файла с резервным копированием"""
         try:
             if os.path.exists(self.cache_file):
-                with open(self.cache_file, 'r', encoding='utf-8') as f:
-                    loaded_cache = json.load(f)
-                    self.cache = {k: {'value': v['value'], 'last_accessed': v['last_accessed']} 
-                                 for k, v in loaded_cache.items()}
-                    logger.info(f"Кэш загружен из {self.cache_file}, {len(self.cache)} записей")
+                try:
+                    with open(self.cache_file, 'r', encoding='utf-8') as f:
+                        loaded_cache = json.load(f)
+                        self.cache = loaded_cache
+                        logger.info(f"Кэш загружен из {self.cache_file}, {len(self.cache)} записей")
+                        # Создаем резервную копию рабочего кэша
+                        with open(self.backup_file, 'w', encoding='utf-8') as backup:
+                            json.dump(self.cache, backup, ensure_ascii=False)
+                except json.JSONDecodeError:
+                    logger.warning(f"Ошибка формата JSON в файле кэша. Пробуем загрузить резервную копию.")
+                    if os.path.exists(self.backup_file):
+                        with open(self.backup_file, 'r', encoding='utf-8') as f:
+                            loaded_cache = json.load(f)
+                            self.cache = loaded_cache
+                            logger.info(f"Кэш загружен из резервной копии {self.backup_file}, {len(self.cache)} записей")
+                    else:
+                        logger.warning("Резервная копия кэша не найдена. Создаем новый кэш.")
+                        self.cache = {}
+            else:
+                logger.info(f"Файл кэша {self.cache_file} не найден. Создаем новый кэш.")
+                self.cache = {}
+                
+            # Фильтруем просроченные записи при загрузке
+            current_time = datetime.now().timestamp()
+            expired_keys = [k for k, v in self.cache.items() 
+                          if isinstance(v, dict) and v.get('expiry') and v['expiry'] < current_time]
+            
+            for key in expired_keys:
+                del self.cache[key]
+                
+            if expired_keys:
+                logger.info(f"Удалено {len(expired_keys)} просроченных записей из кэша")
+                
         except Exception as e:
             logger.error(f"Ошибка при загрузке кэша: {e}")
             self.cache = {}
 
     def save_cache(self):
-        """Сохраняет кэш в файл"""
+        """Сохраняет кэш в файл с резервным копированием"""
+        if not self.modified_since_save:
+            return
+            
         try:
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(self.cache, f, ensure_ascii=False, indent=2)
-            logger.info(f"Кэш сохранен в {self.cache_file}, {len(self.cache)} записей")
+            # Создаем временный файл
+            temp_file = f"{self.cache_file}.tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(self.cache, f, ensure_ascii=False)
+            
+            # Если временный файл успешно создан, заменяем основной файл
+            if os.path.exists(temp_file):
+                # В Windows нельзя просто переименовать файл, если целевой уже существует
+                if os.path.exists(self.cache_file):
+                    os.remove(self.cache_file)
+                os.rename(temp_file, self.cache_file)
+                
+                # Обновляем резервную копию каждые 5 сохранений
+                if os.path.exists(self.cache_file) and random.random() < 0.2:
+                    with open(self.backup_file, 'w', encoding='utf-8') as backup:
+                        with open(self.cache_file, 'r', encoding='utf-8') as source:
+                            backup.write(source.read())
+                
+                self.last_save_time = datetime.now().timestamp()
+                self.modified_since_save = False
+                logger.info(f"Кэш сохранен в {self.cache_file}, {len(self.cache)} записей")
         except Exception as e:
             logger.error(f"Ошибка при сохранении кэша: {e}")
 
     def clear(self):
         """Очистить кэш"""
         self.cache.clear()
+        self.modified_since_save = True
         self.save_cache()
+        
+    def remove_expired(self):
+        """Удаляет все истекшие записи из кэша"""
+        current_time = datetime.now().timestamp()
+        expired_keys = [k for k, v in self.cache.items() 
+                      if isinstance(v, dict) and v.get('expiry') and v['expiry'] < current_time]
+        
+        if expired_keys:
+            for key in expired_keys:
+                del self.cache[key]
+            logger.info(f"Удалено {len(expired_keys)} просроченных записей из кэша")
+            self.modified_since_save = True
+            self.save_cache()
 
 # Создаем глобальный экземпляр кэша
 api_cache = APICache()
@@ -213,31 +342,39 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Используем Google Gemini API
 
 # Функция для запросов к Google Gemini API
-def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
+def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True, retry_count=2, safety_filter=None, ttl=None):
     """
     Отправляет запрос к Google Gemini API и возвращает ответ.
+    Включает расширенную обработку ошибок и настройку фильтров безопасности.
 
     Args:
         prompt (str): Текст запроса
         max_tokens (int): Максимальное количество токенов в ответе
         temp (float): Температура генерации (0.0-1.0)
         use_cache (bool): Использовать ли кэширование
+        retry_count (int): Количество повторных попыток при ошибках
+        safety_filter (str, optional): Уровень фильтра безопасности ('BLOCK_NONE', 'BLOCK_SOME', 'BLOCK_MOST')
+        ttl (int, optional): Время жизни кэша для этого запроса (в секундах)
 
     Returns:
         str: Ответ от API или сообщение об ошибке
+        
+    © 2025 Silver Raven. Образовательный бот по истории России.
     """
     # Создаем уникальный ключ для кэша на основе параметров запроса
-    cache_key = f"{prompt}_{max_tokens}_{temp}"
+    cache_key = f"{prompt}_{max_tokens}_{temp}_{safety_filter}"
 
     # Проверяем кэш, если использование кэша включено
     if use_cache:
         cached_response = api_cache.get(cache_key)
         if cached_response:
             logger.info("Использую кэшированный ответ")
-            return cached_response['value']
+            return cached_response
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
+    
+    # Базовая конфигурация запроса
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -245,56 +382,131 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
             "maxOutputTokens": max_tokens
         }
     }
+    
+    # Добавление настроек фильтра безопасности, если указаны
+    if safety_filter:
+        data["safetySettings"] = [
+            {
+                "category": "HARM_CATEGORY_DANGEROUS",
+                "threshold": safety_filter
+            },
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": safety_filter
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": safety_filter
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": safety_filter
+            }
+        ]
 
-    try:
-        logger.info(f"Отправка запроса к Gemini API: {prompt[:50]}...")
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
+    # Функция для выполнения запроса с повторными попытками
+    def make_request(current_retry=0):
+        try:
+            logger.info(f"Отправка запроса к Gemini API: {prompt[:50]}...")
+            
+            # Добавляем таймаут для HTTP-запроса
+            response = requests.post(url, headers=headers, json=data, timeout=20)
+            response.raise_for_status()
 
-        response_json = response.json()
+            response_json = response.json()
 
-        # Проверка наличия всех необходимых ключей в ответе
-        if "candidates" not in response_json or not response_json["candidates"]:
-            logger.warning(f"Ответ не содержит 'candidates': {response_json}")
-            return "API вернул ответ без содержимого. Возможно, запрос был заблокирован фильтрами безопасности."
+            # Проверка наличия всех необходимых ключей в ответе
+            if "candidates" not in response_json or not response_json["candidates"]:
+                # Проверяем наличие информации о блокировке
+                if "promptFeedback" in response_json and response_json["promptFeedback"].get("blockReason"):
+                    block_reason = response_json["promptFeedback"]["blockReason"]
+                    logger.warning(f"Запрос заблокирован по причине: {block_reason}")
+                    return f"Запрос заблокирован фильтрами безопасности: {block_reason}. Пожалуйста, перефразируйте запрос."
+                    
+                logger.warning(f"Ответ не содержит 'candidates': {response_json}")
+                return "API вернул ответ без содержимого. Возможно, запрос был заблокирован фильтрами безопасности."
 
-        candidate = response_json["candidates"][0]
-        if "content" not in candidate:
-            logger.warning(f"Ответ не содержит 'content': {candidate}")
-            return "API вернул неверный формат ответа."
+            candidate = response_json["candidates"][0]
+            if "content" not in candidate:
+                logger.warning(f"Ответ не содержит 'content': {candidate}")
+                return "API вернул неверный формат ответа."
 
-        content = candidate["content"]
-        if "parts" not in content or not content["parts"]:
-            logger.warning(f"Ответ не содержит 'parts': {content}")
-            return "API вернул пустой ответ."
+            content = candidate["content"]
+            if "parts" not in content or not content["parts"]:
+                logger.warning(f"Ответ не содержит 'parts': {content}")
+                return "API вернул пустой ответ."
 
-        result = content["parts"][0]["text"]
-        logger.info(f"Получен ответ от API: {result[:50]}...")
+            result = content["parts"][0]["text"]
+            logger.info(f"Получен ответ от API: {result[:50]}...")
 
-        # Сохраняем результат в кэш
-        if use_cache:
-            api_cache.set(cache_key, result)
+            # Сохраняем результат в кэш
+            if use_cache:
+                api_cache.set(cache_key, result, ttl)
 
-        return result
+            return result
+            
+        except requests.exceptions.RequestException as e:
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            # Логирование с подробностями об ошибке
+            logger.error(f"{error_type}: {error_msg}")
 
-    except requests.exceptions.RequestException as e:
-        error_type = type(e).__name__
-        error_msg = str(e)
-        logger.error(f"{error_type}: {error_msg}")
+            # Проверяем, можно ли повторить запрос
+            if current_retry < retry_count:
+                retry_delay = (current_retry + 1) * 2  # Растущая задержка
+                logger.info(f"Повторная попытка ({current_retry+1}/{retry_count}) через {retry_delay} секунд...")
+                import time
+                time.sleep(retry_delay)
+                return make_request(current_retry + 1)
+                
+            # Более детальное логирование HTTP-ошибок
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, 'response'):
+                status_code = e.response.status_code
+                logger.error(f"Статус код: {status_code}")
+                
+                try:
+                    error_content = e.response.json()
+                    logger.error(f"Детали ошибки: {error_content}")
+                    
+                    # Проверка специфических ошибок API
+                    if 'error' in error_content:
+                        api_error = error_content['error']
+                        if 'status' in api_error and api_error['status'] == 'RESOURCE_EXHAUSTED':
+                            return "Превышены лимиты запросов к API. Пожалуйста, попробуйте позже."
+                        elif 'message' in api_error:
+                            return f"Ошибка API: {api_error['message']}"
+                except:
+                    logger.error(f"Ответ сервера (текст): {e.response.text}")
+                
+                # Возвращаем сообщение в зависимости от статус-кода
+                if status_code == 400:
+                    return "Неверный запрос к API. Проверьте параметры и формат запроса."
+                elif status_code == 401 or status_code == 403:
+                    return "Ошибка авторизации API. Проверьте ключ API и разрешения."
+                elif status_code == 404:
+                    return "Запрашиваемый ресурс API не найден. Проверьте URL и параметры."
+                elif status_code == 429:
+                    return "Превышены лимиты запросов к API. Пожалуйста, попробуйте позже."
+                elif 500 <= status_code < 600:
+                    return "Внутренняя ошибка сервера API. Пожалуйста, попробуйте позже."
+                else:
+                    return f"Ошибка HTTP ({status_code}) при запросе к Google Gemini: {error_msg}"
 
-        if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, 'response'):
-            logger.error(f"Статус код: {e.response.status_code}")
-            logger.error(f"Ответ сервера: {e.response.text}")
-            return f"Ошибка HTTP при запросе к Google Gemini ({e.response.status_code}): {error_msg}"
+            # Сообщения для других типов ошибок
+            error_messages = {
+                "ConnectionError": "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету.",
+                "Timeout": "Превышено время ожидания ответа от API Google Gemini.",
+                "JSONDecodeError": "Ошибка при обработке ответа от API Google Gemini.",
+                "HTTPError": f"Ошибка HTTP при запросе к Google Gemini: {error_msg}",
+                "SSLError": "Ошибка SSL при подключении к API. Проверьте настройки сети.",
+                "ProxyError": "Ошибка прокси-сервера при подключении к API."
+            }
 
-        error_messages = {
-            "ConnectionError": "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету.",
-            "Timeout": "Превышено время ожидания ответа от API Google Gemini.",
-            "JSONDecodeError": "Ошибка при обработке ответа от API Google Gemini.",
-            "HTTPError": f"Ошибка HTTP при запросе к Google Gemini: {error_msg}"
-        }
+            return error_messages.get(error_type, f"Ошибка при запросе к Google Gemini: {error_msg}")
 
-        return error_messages.get(error_type, f"Неизвестная ошибка при запросе к Google Gemini: {error_msg}")
+    # Выполняем запрос с возможностью повторных попыток
+    return make_request()
 
 # Функция для создания главного меню
 def main_menu():
@@ -303,12 +515,15 @@ def main_menu():
     
     Returns:
         InlineKeyboardMarkup: Клавиатура с кнопками меню
+        
+    © 2025 Silver Raven. Образовательный бот по истории России.
     """
     keyboard = [
         [InlineKeyboardButton("🔍 Выбрать тему", callback_data='topic')],
         [InlineKeyboardButton("✅ Пройти тест", callback_data='test')],
         [InlineKeyboardButton("💬 Беседа о истории России", callback_data='conversation')],
         [InlineKeyboardButton("📄 Скачать презентацию", callback_data='download_presentation')],
+        [InlineKeyboardButton("ℹ️ О боте", callback_data='about')],
         [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -747,6 +962,31 @@ def button_handler(update, context):
             query.message.reply_text("Выберите действие:", reply_markup=main_menu())
         return TOPIC
     
+    elif query.data == 'about':
+        # Обработка кнопки "О боте"
+        logger.info(f"Пользователь {user_id} запросил информацию о боте")
+        query.edit_message_text(
+            "ℹ️ *О боте 'История России'*\n\n"
+            "🤖 Образовательный бот по истории России.\n\n"
+            "🔍 С помощью этого бота вы можете:\n"
+            "   • Изучать различные темы по истории России\n"
+            "   • Проходить тесты для проверки знаний\n"
+            "   • Обсуждать интересующие вопросы на исторические темы\n\n"
+            "📚 Используйте меню для выбора нужной функции.\n\n"
+            "🛡️ Безопасность: Бот специализируется только на истории России, "
+            "хранит минимум данных пользователя и очищает историю сообщений.\n\n"
+            "⚙️ Технологическая платформа:\n"
+            "   • Telegram Bot API для взаимодействия с пользователями\n"
+            "   • Google Gemini API для генерации ответов и тестов\n"
+            "   • Flask для веб-интерфейса мониторинга\n\n"
+            "*© 2025 Silver Raven. Образовательный бот по истории России.*\n"
+            "Все права защищены.\n\n"
+            "Версия: 1.2.0",
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+        )
+        return TOPIC
+        
     elif query.data == 'end_test' or query.data == 'cancel':
         if query.data == 'end_test':
             logger.info(f"Пользователь {user_id} досрочно завершил тест")
@@ -1314,23 +1554,39 @@ def clear_chat_history(update, context):
         # Получаем все сохраненные ID сообщений для удаления
         message_ids_to_delete = context.user_data.get('previous_messages', [])
         
-        # Если нет сохраненных ID, пытаемся использовать диапазон сообщений
+        # Если нет сохраненных ID, пытаемся использовать сканирование сообщений
         if not message_ids_to_delete:
-            # Определяем диапазон сообщений для удаления
-            first_message_id = context.user_data.get('first_message_id', current_message_id - 200)
+            # Определяем диапазон сообщений для удаления, обычно 500 последних сообщений будет достаточно
+            # Используем более широкий диапазон для гарантированной очистки
+            max_range = 500
+            first_message_id = max(1, current_message_id - max_range)
             
             # Создаем список ID сообщений для удаления
             message_ids_to_delete = list(range(first_message_id, current_message_id))
+        else:
+            # Расширяем существующий список до текущего сообщения
+            last_id = max(message_ids_to_delete) if message_ids_to_delete else 0
+            if last_id < current_message_id - 1:
+                message_ids_to_delete.extend(range(last_id + 1, current_message_id))
         
         # Добавляем более старые сообщения для обеспечения полной очистки
-        extra_old_messages = list(range(current_message_id - 300, current_message_id - 200))
-        message_ids_to_delete.extend(extra_old_messages)
+        # Используем несколько диапазонов для повышения вероятности захвата всех сообщений
+        extra_ranges = [
+            range(current_message_id - 500, current_message_id - 400),
+            range(current_message_id - 400, current_message_id - 300),
+            range(current_message_id - 300, current_message_id - 200),
+            range(current_message_id - 200, current_message_id - 100)
+        ]
+        
+        for extra_range in extra_ranges:
+            message_ids_to_delete.extend(extra_range)
         
         # Удаляем дубликаты и сортируем ID сообщений в обратном порядке
         message_ids_to_delete = sorted(list(set(message_ids_to_delete)), reverse=True)
         
         # Группируем удаление для большей эффективности
-        batches = [message_ids_to_delete[i:i+30] for i in range(0, len(message_ids_to_delete), 30)]
+        # Используем меньшие пакеты (по 20 сообщений) для снижения вероятности ошибок
+        batches = [message_ids_to_delete[i:i+20] for i in range(0, len(message_ids_to_delete), 20)]
         
         # Удаляем сообщения пакетами
         total_deleted = 0
@@ -1351,21 +1607,25 @@ def clear_chat_history(update, context):
                     deleted_in_batch += 1
                     total_deleted += 1
                     
-                    # Короткая пауза после каждого 5-го удаления, чтобы избежать ограничений API
-                    if deleted_in_batch % 5 == 0:
-                        time.sleep(0.05)
+                    # Короткая пауза после каждого 3-го удаления, чтобы избежать ограничений API
+                    if deleted_in_batch % 3 == 0:
+                        time.sleep(0.1)  # Увеличенная пауза
                         
                 except Exception as e:
                     errors_in_batch += 1
                     total_errors += 1
                     
                     # Лог для отладки, но не перегружаем журнал
-                    if errors_in_batch <= 3:
-                        logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
+                    if errors_in_batch <= 5:  # Увеличиваем количество логируемых ошибок
+                        error_type = type(e).__name__
+                        if "MessageToDeleteNotFound" in error_type or "MessageCantBeDeleted" in error_type:
+                            logger.debug(f"Сообщение {msg_id} уже удалено или не может быть удалено")
+                        else:
+                            logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
             
             # Пауза между пакетами для снижения нагрузки на API
             if deleted_in_batch > 0:
-                time.sleep(0.5)
+                time.sleep(0.7)  # Увеличиваем паузу между пакетами
         
         # Сохраняем текущее ID сообщения как отправную точку для следующей очистки
         context.user_data['first_message_id'] = current_message_id
@@ -1374,8 +1634,28 @@ def clear_chat_history(update, context):
         context.user_data['previous_messages'] = []
         
         logger.info(f"История чата очищена для пользователя {chat_id}: удалено {total_deleted} сообщений, {total_errors} ошибок")
+        
+        # Если удалено мало сообщений, пробуем альтернативный метод очистки
+        if total_deleted < 5 and not context.user_data.get('clean_retry', False):
+            logger.warning(f"Недостаточно сообщений удалено ({total_deleted}), пробуем альтернативный метод")
+            context.user_data['clean_retry'] = True
+            # Отправляем сервисное сообщение, которое удалим вместе с последующими
+            service_msg = context.bot.send_message(chat_id=chat_id, text="🧹 Выполняется очистка чата...")
+            save_message_id(update, context, service_msg.message_id)
+            # Ожидаем немного и повторяем очистку
+            time.sleep(1)
+            clear_chat_history(update, context)
+            # Удаляем сервисное сообщение
+            try:
+                context.bot.delete_message(chat_id=chat_id, message_id=service_msg.message_id)
+            except:
+                pass
+            context.user_data['clean_retry'] = False
+            
     except Exception as e:
         logger.error(f"Ошибка при очистке истории чата: {e}")
+        # Восстанавливаем состояние для следующей попытки
+        context.user_data['clean_retry'] = False
 
 # Функция для сохранения ID сообщения
 def save_message_id(update, context, message_id):

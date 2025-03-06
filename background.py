@@ -347,7 +347,8 @@ HTML_TEMPLATE = """
 
     </div>
     <footer style="text-align: center; margin-top: 20px; font-size: 14px;">
-        © 2025 Silver Raven. Образовательный бот по истории России. Все права защищены.
+        © 2025 Silver Raven. Образовательный бот по истории России. Все права защищены.<br>
+        <span style="font-size: 12px; color: #666;">Версия 1.2.0 • Используется Google Gemini API</span>
     </footer>
     <script>
         // Функция для обновления логов
