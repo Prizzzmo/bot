@@ -5,8 +5,51 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Conve
 import requests
 from dotenv import load_dotenv
 
+
+import logging
+from datetime import datetime
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f"bot_log_{datetime.now().strftime('%Y%m%d')}.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # Загружаем переменные окружения из файла .env
 load_dotenv()
+
+
+# Добавляем простой механизм кэширования
+class SimpleCache:
+    def __init__(self, max_size=100):
+        self.cache = {}
+        self.max_size = max_size
+        
+    def get(self, key):
+        """Получить значение из кэша по ключу"""
+        return self.cache.get(key)
+        
+    def set(self, key, value):
+        """Добавить значение в кэш"""
+        # Если кэш переполнен, удаляем случайный элемент
+        if len(self.cache) >= self.max_size:
+            import random
+            random_key = random.choice(list(self.cache.keys()))
+            del self.cache[random_key]
+            
+        self.cache[key] = value
+        
+    def clear(self):
+        """Очистить кэш"""
+        self.cache.clear()
+
+# Создаем глобальный экземпляр кэша
+api_cache = SimpleCache()
 
 # Получаем ключи API из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -16,73 +59,86 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Используем Google Gemi
 TOPIC, CHOOSE_TOPIC, TEST, ANSWER = range(4)
 
 # Функция для запросов к Google Gemini API
-def ask_grok(prompt):
-    # Упрощаем запрос для снижения вероятности ошибок
+def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
+    """
+    Отправляет запрос к Google Gemini API и возвращает ответ.
+    
+    Args:
+        prompt (str): Текст запроса
+        max_tokens (int): Максимальное количество токенов в ответе
+        temp (float): Температура генерации (0.0-1.0)
+        use_cache (bool): Использовать ли кэширование
+        
+    Returns:
+        str: Ответ от API или сообщение об ошибке
+    """
+    # Создаем уникальный ключ для кэша на основе параметров запроса
+    cache_key = f"{prompt}_{max_tokens}_{temp}"
+    
+    # Проверяем кэш, если использование кэша включено
+    if use_cache:
+        cached_response = api_cache.get(cache_key)
+        if cached_response:
+            print("Использую кэшированный ответ")
+            return cached_response
+    
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-    headers = {
-        "Content-Type": "application/json"
-    }
+    headers = {"Content-Type": "application/json"}
     data = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 1024
+            "temperature": temp,
+            "maxOutputTokens": max_tokens
         }
     }
+    
     try:
         response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()  # Проверка на ошибки HTTP
-
-        # Вывод для отладки
-        print("Ответ от API успешно получен")
-
-        # Проверяем структуру ответа
+        response.raise_for_status()
+        
         response_json = response.json()
-
-        # Вывод для отладки
-        print(f"Структура ответа: {response_json.keys()}")
-
+        
+        # Проверка наличия всех необходимых ключей в ответе
         if "candidates" not in response_json or not response_json["candidates"]:
             print(f"Ответ не содержит 'candidates': {response_json}")
             return "API вернул ответ без содержимого. Возможно, запрос был заблокирован фильтрами безопасности."
-
-        if "content" not in response_json["candidates"][0]:
-            print(f"Ответ не содержит 'content': {response_json['candidates'][0]}")
+            
+        candidate = response_json["candidates"][0]
+        if "content" not in candidate:
+            print(f"Ответ не содержит 'content': {candidate}")
             return "API вернул неверный формат ответа."
-
-        if "parts" not in response_json["candidates"][0]["content"] or not response_json["candidates"][0]["content"]["parts"]:
-            print(f"Ответ не содержит 'parts': {response_json['candidates'][0]['content']}")
+            
+        content = candidate["content"]
+        if "parts" not in content or not content["parts"]:
+            print(f"Ответ не содержит 'parts': {content}")
             return "API вернул пустой ответ."
-
-        return response_json["candidates"][0]["content"]["parts"][0]["text"]
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP Ошибка: {e}")
-        if hasattr(e, 'response') and e.response:
+            
+        result = content["parts"][0]["text"]
+        
+        # Сохраняем результат в кэш
+        if use_cache:
+            api_cache.set(cache_key, result)
+            
+        return result
+        
+    except requests.exceptions.RequestException as e:
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f"{error_type}: {error_msg}")
+        
+        if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, 'response'):
             print(f"Статус код: {e.response.status_code}")
             print(f"Ответ сервера: {e.response.text}")
-        return f"Ошибка HTTP при запросе к Google Gemini: {e}"
-    except requests.exceptions.ConnectionError as e:
-        print(f"Ошибка соединения: {e}")
-        return "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету."
-    except requests.exceptions.Timeout as e:
-        print(f"Ошибка таймаута: {e}")
-        return "Превышено время ожидания ответа от API Google Gemini."
-    except ValueError as e:
-        print(f"Ошибка при разборе JSON: {e}")
-        return "Ошибка при обработке ответа от API Google Gemini."
-    except Exception as e:
-        print(f"Неожиданная ошибка API: {e}")
-        if hasattr(e, 'response') and e.response:
-            print(f"Ответ сервера: {e.response.text}")
-        return f"Неизвестная ошибка при запросе к Google Gemini: {e}"
+            return f"Ошибка HTTP при запросе к Google Gemini ({e.response.status_code}): {error_msg}"
+        
+        error_messages = {
+            "ConnectionError": "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету.",
+            "Timeout": "Превышено время ожидания ответа от API Google Gemini.",
+            "JSONDecodeError": "Ошибка при обработке ответа от API Google Gemini.",
+            "HTTPError": f"Ошибка HTTP при запросе к Google Gemini: {error_msg}"
+        }
+        
+        return error_messages.get(error_type, f"Неизвестная ошибка при запросе к Google Gemini: {error_msg}")
 
 # Альтернативная функция для Hugging Face (раскомментируйте, если используете Hugging Face)
 """
@@ -131,6 +187,75 @@ def start(update, context):
     )
     return TOPIC
 
+# Функция для парсинга тем из текста ответа API
+def parse_topics(topics_text):
+    """
+    Парсит текст с темами и возвращает отформатированный список тем.
+    
+    Args:
+        topics_text (str): Текст с темами от API
+        
+    Returns:
+        list: Список отформатированных тем
+    """
+    filtered_topics = []
+    for line in topics_text.split('\n'):
+        line = line.strip()
+        if not line or len(line) <= 1:
+            continue
+            
+        # Извлекаем текст темы после номера или двоеточия
+        if '.' in line or ':' in line:
+            parts = line.split('.', 1) if '.' in line else line.split(':', 1)
+            if len(parts) > 1:
+                topic_text = parts[1].strip()
+                if topic_text:
+                    filtered_topics.append(topic_text)
+        # Если нет стандартного разделителя, проверяем наличие номера в начале
+        elif line[0].isdigit():
+            # Ищем первый не цифровой и не разделительный символ
+            i = 1
+            while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
+                i += 1
+            if i < len(line):
+                topic_text = line[i:].strip()
+                if topic_text:
+                    filtered_topics.append(topic_text)
+        # Иначе берем строку как есть
+        else:
+            filtered_topics.append(line)
+    
+    # Ограничиваем до 30 тем
+    return filtered_topics[:30]
+
+# Функция для создания клавиатуры с темами
+def create_topics_keyboard(topics):
+    """
+    Создает клавиатуру с кнопками для выбора темы.
+    
+    Args:
+        topics (list): Список тем
+        
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с кнопками
+    """
+    keyboard = []
+    
+    for i, topic in enumerate(topics, 1):
+        # Проверяем, что тема не пустая
+        if topic and len(topic.strip()) > 0:
+            # Ограничиваем длину темы в кнопке
+            display_topic = topic[:30] + '...' if len(topic) > 30 else topic
+            keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+        else:
+            # Если тема пустая, добавляем заполнитель
+            keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
+    
+    # Добавляем кнопку для ввода своей темы
+    keyboard.append([InlineKeyboardButton("Своя тема", callback_data='custom_topic')])
+    
+    return InlineKeyboardMarkup(keyboard)
+
 # Обработка нажатий на кнопки меню
 def button_handler(update, context):
     query = update.callback_query
@@ -147,56 +272,15 @@ def button_handler(update, context):
         prompt = "Составь список из 30 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
         try:
             query.edit_message_text("Загружаю список тем истории России...")
-            topics = ask_grok(prompt)
-
-            # Очищаем и форматируем полученные темы
-            filtered_topics = []
-            for line in topics.split('\n'):
-                line = line.strip()
-                if line:
-                    # Извлекаем текст темы после номера или двоеточия, если они есть
-                    if ('.' in line or ':' in line):
-                        parts = line.split('.', 1) if '.' in line else line.split(':', 1)
-                        if len(parts) > 1:
-                            topic_text = parts[1].strip()
-                            if topic_text:  # Проверяем, что текст темы не пустой
-                                filtered_topics.append(topic_text)
-                    # Если нет стандартного разделителя, проверяем наличие номера в начале
-                    elif line[0].isdigit() and len(line) > 1:
-                        # Ищем первый не цифровой и не разделительный символ
-                        i = 1
-                        while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
-                            i += 1
-                        if i < len(line):
-                            topic_text = line[i:].strip()
-                            if topic_text:  # Проверяем, что текст темы не пустой
-                                filtered_topics.append(topic_text)
-                    # Если все остальные методы не сработали, берем строку как есть
-                    elif len(line) > 1:
-                        filtered_topics.append(line)
-
-            # Ограничиваем до 30 тем
-            filtered_topics = filtered_topics[:30]
-
+            topics_text = ask_grok(prompt)
+            
+            # Парсим и сохраняем темы
+            filtered_topics = parse_topics(topics_text)
             context.user_data['topics'] = filtered_topics
-            keyboard = []
-
-            # Создаем красивые кнопки с темами
-            for i, topic in enumerate(filtered_topics, 1):
-                # Проверяем, что тема не пустая
-                if topic and len(topic.strip()) > 0:
-                    # Ограничиваем длину темы в кнопке
-                    display_topic = topic[:30] + '...' if len(topic) > 30 else topic
-                    keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
-                else:
-                    # Если тема пустая, добавляем заполнитель
-                    keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
-
-            # Добавляем только кнопку для ввода своей темы
-            bottom_row = [InlineKeyboardButton("Своя тема", callback_data='custom_topic')]
-            keyboard.append(bottom_row)
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Создаем клавиатуру с темами
+            reply_markup = create_topics_keyboard(filtered_topics)
+            
             query.edit_message_text(
                 "📚 *Темы по истории России*\n\nВыберите тему для изучения или введите свою:",
                 reply_markup=reply_markup,
@@ -213,18 +297,50 @@ def button_handler(update, context):
                 reply_markup=main_menu()
             )
             return TOPIC
-        # Генерируем 10 вопросов с вариантами ответа (уменьшаем количество до 10 для лучшей работы с API)
+            
+        # Генерируем тест из вопросов
+        query.edit_message_text(f"🧠 Генерирую тест по теме: *{topic}*...", parse_mode='Markdown')
+        
+        # Используем параметры для возможности генерации большего текста
         prompt = f"Составь 10 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <цифра>'. Каждый вопрос должен заканчиваться строкой '---'."
         try:
-            questions = ask_grok(prompt)
-            context.user_data['questions'] = questions.split('---')  # Разделяем вопросы
+            # Увеличиваем лимит токенов для получения полных вопросов
+            questions = ask_grok(prompt, max_tokens=2048)
+            
+            # Очистка и валидация вопросов
+            question_list = [q.strip() for q in questions.split('---') if q.strip()]
+            
+            # Проверка наличия правильных ответов в каждом вопросе
+            valid_questions = []
+            for q in question_list:
+                if 'Правильный ответ:' in q:
+                    valid_questions.append(q)
+            
+            if not valid_questions:
+                raise ValueError("Не удалось сгенерировать корректные вопросы для теста")
+                
+            context.user_data['questions'] = valid_questions
             context.user_data['current_question'] = 0
             context.user_data['score'] = 0
-            query.edit_message_text("Начинаем тест из 10 вопросов! Вот первый вопрос:")
-            query.message.reply_text(context.user_data['questions'][0])
-            query.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).")
+            
+            # Создаем кнопку для завершения теста
+            keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            query.edit_message_text(
+                f"📝 *Тест по теме: {topic}*\n\nНачинаем тест из {len(valid_questions)} вопросов! Вот первый вопрос:",
+                parse_mode='Markdown'
+            )
+            query.message.reply_text(valid_questions[0])
+            query.message.reply_text(
+                "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
+                reply_markup=reply_markup
+            )
         except Exception as e:
-            query.edit_message_text(f"Произошла ошибка при генерации вопросов: {e}. Попробуй еще раз.", reply_markup=main_menu())
+            query.edit_message_text(
+                f"Произошла ошибка при генерации вопросов: {e}. Попробуй еще раз.", 
+                reply_markup=main_menu()
+            )
         return ANSWER
     elif query.data == 'continue_reading':
         # Отображаем вторую часть текста
@@ -307,6 +423,71 @@ def button_handler(update, context):
             query.edit_message_text("Действие отменено. Нажми /start, чтобы начать заново.")
             return ConversationHandler.END
 
+# Функция для получения информации о теме
+def get_topic_info(topic, update_message_func=None):
+    """
+    Получает информацию о теме из API и форматирует её для отправки.
+    
+    Args:
+        topic (str): Тема для изучения
+        update_message_func (callable, optional): Функция для обновления сообщения о загрузке
+        
+    Returns:
+        list: Список сообщений для отправки
+    """
+    chapter_titles = [
+        "📜 ВВЕДЕНИЕ И ИСТОКИ",
+        "⚔️ ОСНОВНЫЕ СОБЫТИЯ И РАЗВИТИЕ",
+        "🏛️ КЛЮЧЕВЫЕ ФИГУРЫ И РЕФОРМЫ",
+        "🌍 ВНЕШНЯЯ ПОЛИТИКА И ВЛИЯНИЕ",
+        "📊 ИТОГИ И ИСТОРИЧЕСКОЕ ЗНАЧЕНИЕ"
+    ]
+    
+    prompts = [
+        f"Расскажи о {topic} в истории России (глава 1). Дай введение и начальную историю, истоки темы. Используй структурированное изложение. Объем - один абзац. Не пиши 'продолжение следует'.",
+        f"Расскажи о {topic} в истории России (глава 2). Опиши основные события и развитие. Не делай вступление, продолжай повествование. Объем - один абзац. Не пиши 'продолжение следует'.",
+        f"Расскажи о {topic} в истории России (глава 3). Сосредоточься на ключевых фигурах, реформах и внутренней политике. Объем - один абзац. Не пиши 'продолжение следует'.",
+        f"Расскажи о {topic} в истории России (глава 4). Опиши внешнюю политику, международное влияние и связи. Объем - один абзац. Не пиши 'продолжение следует'.",
+        f"Расскажи о {topic} в истории России (глава 5). Опиши итоги, значение в истории и культуре, последствия. Заверши повествование. Объем - один абзац."
+    ]
+
+    # Получаем информацию по частям
+    all_responses = []
+    for i, prompt in enumerate(prompts, 1):
+        if update_message_func:
+            update_message_func(f"📝 Загружаю главу {i} из {len(prompts)} по теме: *{topic}*...")
+        
+        response = ask_grok(prompt)
+        # Добавляем заголовок главы перед текстом
+        chapter_response = f"*{chapter_titles[i-1]}*\n\n{response}"
+        all_responses.append(chapter_response)
+
+    # Объединяем ответы с разделителями
+    combined_responses = "\n\n" + "\n\n".join(all_responses)
+
+    # Разделяем длинный текст на части для отправки в Telegram (макс. 4000 символов)
+    messages = []
+    paragraphs = combined_responses.split('\n\n')
+    current_message = ""
+
+    for paragraph in paragraphs:
+        # Если добавление абзаца не превысит лимит
+        if len(current_message) + len(paragraph) + 2 < 4000:
+            if current_message:
+                current_message += '\n\n' + paragraph
+            else:
+                current_message = paragraph
+        else:
+            # Сохраняем текущее сообщение и начинаем новое
+            messages.append(current_message)
+            current_message = paragraph
+
+    # Добавляем последнее сообщение
+    if current_message:
+        messages.append(current_message)
+        
+    return messages
+
 # Обработка выбора темы из списка или ввода своей темы
 def choose_topic(update, context):
     query = update.callback_query
@@ -329,63 +510,20 @@ def choose_topic(update, context):
                 context.user_data['current_topic'] = topic
                 query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
 
-                # Разбиваем запрос на несколько частей для получения полной информации
-                chapter_titles = [
-                    "📜 ВВЕДЕНИЕ И ИСТОКИ",
-                    "⚔️ ОСНОВНЫЕ СОБЫТИЯ И РАЗВИТИЕ",
-                    "🏛️ КЛЮЧЕВЫЕ ФИГУРЫ И РЕФОРМЫ",
-                    "🌍 ВНЕШНЯЯ ПОЛИТИКА И ВЛИЯНИЕ",
-                    "📊 ИТОГИ И ИСТОРИЧЕСКОЕ ЗНАЧЕНИЕ"
-                ]
+                # Функция для обновления сообщения о загрузке
+                def update_message(text):
+                    query.edit_message_text(text, parse_mode='Markdown')
                 
-                prompts = [
-                    f"Расскажи о {topic} в истории России (глава 1). Дай введение и начальную историю, истоки темы. Используй структурированное изложение. Объем - один абзац. Не пиши 'продолжение следует'.",
-                    f"Расскажи о {topic} в истории России (глава 2). Опиши основные события и развитие. Не делай вступление, продолжай повествование. Объем - один абзац. Не пиши 'продолжение следует'.",
-                    f"Расскажи о {topic} в истории России (глава 3). Сосредоточься на ключевых фигурах, реформах и внутренней политике. Объем - один абзац. Не пиши 'продолжение следует'.",
-                    f"Расскажи о {topic} в истории России (глава 4). Опиши внешнюю политику, международное влияние и связи. Объем - один абзац. Не пиши 'продолжение следует'.",
-                    f"Расскажи о {topic} в истории России (глава 5). Опиши итоги, значение в истории и культуре, последствия. Заверши повествование. Объем - один абзац."
-                ]
-
-                # Получаем информацию по частям
-                all_responses = []
-                for i, prompt in enumerate(prompts, 1):
-                    query.edit_message_text(f"📝 Загружаю главу {i} из {len(prompts)} по теме: *{topic}*...", parse_mode='Markdown')
-                    response = ask_grok(prompt)
-                    # Добавляем заголовок главы перед текстом
-                    chapter_response = f"*{chapter_titles[i-1]}*\n\n{response}"
-                    all_responses.append(chapter_response)
-
-                # Объединяем ответы с разделителями
-                combined_responses = "\n\n" + "\n\n".join(all_responses)
-
-                # Разделяем длинный текст на части для отправки в Telegram (макс. 4000 символов)
-                messages = []
-                paragraphs = combined_responses.split('\n\n')
-                current_message = ""
-
-                for paragraph in paragraphs:
-                    # Если добавление абзаца не превысит лимит
-                    if len(current_message) + len(paragraph) + 2 < 4000:
-                        if current_message:
-                            current_message += '\n\n' + paragraph
-                        else:
-                            current_message = paragraph
-                    else:
-                        # Сохраняем текущее сообщение и начинаем новое
-                        messages.append(current_message)
-                        current_message = paragraph
-
-                # Добавляем последнее сообщение
-                if current_message:
-                    messages.append(current_message)
-
+                # Получаем информацию о теме
+                messages = get_topic_info(topic, update_message)
+                
                 # Отправляем первое сообщение с тем же ID (edit)
                 if messages:
-                    query.edit_message_text(messages[0])
+                    query.edit_message_text(messages[0], parse_mode='Markdown')
 
-                # Отправляем остальные сообщения как новые
-                for msg in messages[1:]:
-                    query.message.reply_text(msg)
+                    # Отправляем остальные сообщения как новые
+                    for msg in messages[1:]:
+                        query.message.reply_text(msg, parse_mode='Markdown')
 
                 query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
             else:
@@ -399,63 +537,21 @@ def choose_topic(update, context):
 def handle_custom_topic(update, context):
     topic = update.message.text
     context.user_data['current_topic'] = topic
-    # Разбиваем запрос на несколько частей для получения полной информации
-    chapter_titles = [
-        "📜 ВВЕДЕНИЕ И ИСТОКИ",
-        "⚔️ ОСНОВНЫЕ СОБЫТИЯ И РАЗВИТИЕ",
-        "🏛️ КЛЮЧЕВЫЕ ФИГУРЫ И РЕФОРМЫ",
-        "🌍 ВНЕШНЯЯ ПОЛИТИКА И ВЛИЯНИЕ",
-        "📊 ИТОГИ И ИСТОРИЧЕСКОЕ ЗНАЧЕНИЕ"
-    ]
     
-    prompts = [
-        f"Расскажи о {topic} в истории России (глава 1). Дай введение и начальную историю, истоки темы. Используй структурированное изложение. Объем - один абзац. Не пиши 'продолжение следует'.",
-        f"Расскажи о {topic} в истории России (глава 2). Опиши основные события и развитие. Не делай вступление, продолжай повествование. Объем - один абзац. Не пиши 'продолжение следует'.",
-        f"Расскажи о {topic} в истории России (глава 3). Сосредоточься на ключевых фигурах, реформах и внутренней политике. Объем - один абзац. Не пиши 'продолжение следует'.",
-        f"Расскажи о {topic} в истории России (глава 4). Опиши внешнюю политику, международное влияние и связи. Объем - один абзац. Не пиши 'продолжение следует'.",
-        f"Расскажи о {topic} в истории России (глава 5). Опиши итоги, значение в истории и культуре, последствия. Заверши повествование. Объем - один абзац."
-    ]
-
     try:
         update.message.reply_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
-
-        # Получаем информацию по частям
-        all_responses = []
-        for i, prompt in enumerate(prompts, 1):
-            update.message.reply_text(f"📝 Загружаю главу {i} из {len(prompts)}...")
-            response = ask_grok(prompt)
-            # Добавляем заголовок главы перед текстом
-            chapter_response = f"*{chapter_titles[i-1]}*\n\n{response}"
-            all_responses.append(chapter_response)
-
-        # Объединяем ответы с разделителями
-        combined_responses = "\n\n" + "\n\n".join(all_responses)
-
-        # Разделяем длинный текст на части для отправки в Telegram (макс. 4000 символов)
-        messages = []
-        paragraphs = combined_responses.split('\n\n')
-        current_message = ""
-
-        for paragraph in paragraphs:
-            # Если добавление абзаца не превысит лимит
-            if len(current_message) + len(paragraph) + 2 < 4000:
-                if current_message:
-                    current_message += '\n\n' + paragraph
-                else:
-                    current_message = paragraph
-            else:
-                # Сохраняем текущее сообщение и начинаем новое
-                messages.append(current_message)
-                current_message = paragraph
-
-        # Добавляем последнее сообщение
-        if current_message:
-            messages.append(current_message)
-
+        
+        # Функция для обновления сообщения о загрузке
+        def update_message(text):
+            update.message.reply_text(text, parse_mode='Markdown')
+        
+        # Получаем информацию о теме
+        messages = get_topic_info(topic, update_message)
+        
         # Отправляем все сообщения
         for msg in messages:
-            update.message.reply_text(msg)
-
+            update.message.reply_text(msg, parse_mode='Markdown')
+            
         update.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
     except Exception as e:
         update.message.reply_text(f"Произошла ошибка: {e}. Попробуй еще раз.", reply_markup=main_menu())
@@ -513,36 +609,61 @@ def handle_answer(update, context):
 
 # Основная функция для запуска бота
 def main():
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    try:
+        logger.info("Запуск бота...")
+        
+        # Проверка наличия токенов
+        if not TELEGRAM_TOKEN:
+            logger.error("Отсутствует TELEGRAM_TOKEN! Проверьте .env файл")
+            return
+        if not GEMINI_API_KEY:
+            logger.error("Отсутствует GEMINI_API_KEY! Проверьте .env файл")
+            return
+            
+        updater = Updater(TELEGRAM_TOKEN, use_context=True)
+        dp = updater.dispatcher
 
-    # Создаем ConversationHandler для управления диалогом
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            TOPIC: [
-                CallbackQueryHandler(button_handler)
-            ],
-            CHOOSE_TOPIC: [
-                CallbackQueryHandler(choose_topic),
-                MessageHandler(Filters.text & ~Filters.command, handle_custom_topic)
-            ],
-            TEST: [
-                CallbackQueryHandler(button_handler)
-            ],
-            ANSWER: [
-                MessageHandler(Filters.text & ~Filters.command, handle_answer),
-                CallbackQueryHandler(button_handler)  # Добавляем обработчик для кнопки завершения теста
-            ]
-        },
-        fallbacks=[CommandHandler('start', start)]
-    )
+        # Создаем ConversationHandler для управления диалогом
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start)],
+            states={
+                TOPIC: [
+                    CallbackQueryHandler(button_handler)
+                ],
+                CHOOSE_TOPIC: [
+                    CallbackQueryHandler(choose_topic),
+                    MessageHandler(Filters.text & ~Filters.command, handle_custom_topic)
+                ],
+                TEST: [
+                    CallbackQueryHandler(button_handler)
+                ],
+                ANSWER: [
+                    MessageHandler(Filters.text & ~Filters.command, handle_answer),
+                    CallbackQueryHandler(button_handler)  # Добавляем обработчик для кнопки завершения теста
+                ]
+            },
+            fallbacks=[CommandHandler('start', start)]
+        )
 
-    dp.add_handler(conv_handler)
+        # Добавляем обработчик ошибок
+        def error_handler(update, context):
+            """Обработчик ошибок: записывает их в журнал и информирует пользователя"""
+            logger.error(f"Ошибка: {context.error} в обновлении {update}")
+            
+            if update.effective_message:
+                error_message = f"Произошла ошибка: {context.error}"
+                update.effective_message.reply_text(error_message)
+                
+        dp.add_error_handler(error_handler)
+        dp.add_handler(conv_handler)
 
-    # Запускаем бота
-    updater.start_polling()
-    updater.idle()
+        # Запускаем бота
+        logger.info("Бот успешно запущен")
+        updater.start_polling()
+        updater.idle()
+        
+    except Exception as e:
+        logger.critical(f"Критическая ошибка при запуске бота: {e}")
 
 if __name__ == '__main__':
     main()
