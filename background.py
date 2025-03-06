@@ -11,7 +11,18 @@ app = Flask(__name__)
 
 # Настройка логирования для Flask
 log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-flask_handler = RotatingFileHandler('flask_log.log', maxBytes=10485760, backupCount=3)
+# Очищаем лог Flask при инициализации
+flask_log_path = 'flask_log.log'
+try:
+    # Если файл существует, открываем для записи (что очищает содержимое)
+    if os.path.exists(flask_log_path):
+        with open(flask_log_path, 'w') as f:
+            f.write("")
+    print(f"Лог Flask очищен при инициализации веб-сервера: {flask_log_path}")
+except Exception as e:
+    print(f"Ошибка при очистке лога Flask: {e}")
+
+flask_handler = RotatingFileHandler(flask_log_path, maxBytes=10485760, backupCount=3)
 flask_handler.setFormatter(log_formatter)
 app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.INFO)

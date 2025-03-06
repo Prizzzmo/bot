@@ -11,17 +11,57 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 import background  # Импортируем модуль Flask-сервера
 
+# Функция для очистки логов
+def clean_logs():
+    """
+    Очищает лог-файлы при запуске бота.
+    Удаляет содержимое текущего лог-файла и flask_log.log.
+    """
+    try:
+        # Проверяем наличие директории для логов
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+            print(f"Создана директория для логов: {log_dir}")
+            
+        # Очищаем лог Flask, если он существует
+        flask_log_path = "flask_log.log"
+        if os.path.exists(flask_log_path):
+            with open(flask_log_path, 'w') as f:
+                f.write("")
+            print(f"Лог Flask очищен: {flask_log_path}")
+            
+        # Дата для имени файла лога
+        log_date = datetime.now().strftime('%Y%m%d')
+        log_file_path = f"{log_dir}/bot_log_{log_date}.log"
+        
+        # Очищаем текущий лог бота, если он существует
+        if os.path.exists(log_file_path):
+            with open(log_file_path, 'w') as f:
+                f.write("")
+            print(f"Лог бота очищен: {log_file_path}")
+            
+        # Очищаем временные логи в корневой директории, если они есть
+        root_log_path = f"bot_log_{log_date}.log"
+        if os.path.exists(root_log_path):
+            with open(root_log_path, 'w') as f:
+                f.write("")
+            print(f"Временный лог очищен: {root_log_path}")
+            
+        print("Все логи успешно очищены")
+        return log_dir, log_file_path
+    except Exception as e:
+        print(f"Ошибка при очистке логов: {e}")
+        # Возвращаем стандартные пути в случае ошибки
+        return "logs", f"logs/bot_log_{datetime.now().strftime('%Y%m%d')}.log"
+
+# Очищаем логи и получаем пути
+log_dir, log_file_path = clean_logs()
+
 # Расширенная настройка логирования
-log_date = datetime.now().strftime('%Y%m%d')
 log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Проверяем наличие директории для логов
-log_dir = "logs"
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
-
 # Используем RotatingFileHandler для ограничения размера файлов логов
-log_file_path = f"{log_dir}/bot_log_{log_date}.log"
 file_handler = RotatingFileHandler(
     log_file_path, 
     maxBytes=10485760,  # 10 МБ
