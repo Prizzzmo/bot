@@ -297,6 +297,9 @@ HTML_TEMPLATE = """
         <div class="navigation">
             <button onclick="showLogs()" class="nav-button" id="logs-btn">Просмотр логов</button>
             <button onclick="showMainPage()" class="nav-button active" id="main-btn">Главная страница</button>
+            <a href="/download/presentation" class="nav-button" style="text-decoration: none;">
+                📄 Презентация
+            </a>
         </div>
 
         <div id="logs-section" style="display: none;">
@@ -321,6 +324,13 @@ HTML_TEMPLATE = """
             <p>Добро пожаловать в панель управления ботом истории России!</p>
             <p>Этот веб-интерфейс позволяет просматривать логи работы бота и отслеживать его активность.</p>
             <p>Для просмотра логов нажмите кнопку "Просмотр логов" вверху страницы.</p>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="/download/presentation" 
+                   style="background-color: #337ab7; color: white; padding: 10px 20px; 
+                          text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    📄 Скачать презентацию бота
+                </a>
+            </div>
             <p>Чтобы связаться с ботом, используйте чат ниже:</p>
             <div class="chat-container">
                 <div class="chat-header">Чат с ботом</div>
@@ -565,6 +575,52 @@ def index():
     except Exception as e:
         app.logger.error(f'Ошибка при обработке запроса главной страницы: {e}')
         return str(e), 500
+
+@app.route('/download/presentation')
+def download_presentation():
+    """
+    Маршрут для скачивания презентации бота через веб-интерфейс.
+    """
+    try:
+        app.logger.info('Запрос на скачивание презентации')
+        
+        # Проверяем наличие директории static
+        if not os.path.exists('static'):
+            os.makedirs('static')
+            app.logger.info('Создана директория static')
+        
+        # Путь к файлу презентации
+        presentation_path = 'static/presentation.txt'
+        
+        # Если файла нет, создаем его
+        if not os.path.exists(presentation_path):
+            app.logger.info('Файл презентации не найден, создаем новый')
+            try:
+                with open('presentation.md', 'r', encoding='utf-8') as md_file:
+                    md_content = md_file.read()
+                    
+                    # Упрощаем форматирование для txt версии
+                    txt_content = md_content.replace('## ', '').replace('### ', '').replace('- ', '   - ')
+                    
+                    with open(presentation_path, 'w', encoding='utf-8') as txt_file:
+                        txt_file.write(txt_content)
+                        
+                app.logger.info('Презентация успешно создана')
+            except Exception as e:
+                app.logger.error(f'Ошибка при создании презентации: {e}')
+                return f'Ошибка при создании презентации: {e}', 500
+        
+        # Отправляем файл для скачивания
+        from flask import send_file
+        return send_file(
+            presentation_path, 
+            as_attachment=True, 
+            download_name='Презентация_бота_истории_России.txt',
+            mimetype='text/plain'
+        )
+    except Exception as e:
+        app.logger.error(f'Ошибка при обработке запроса на скачивание презентации: {e}')
+        return f'Ошибка при скачивании презентации: {e}', 500
 
 @app.route('/logs')
 def logs():
