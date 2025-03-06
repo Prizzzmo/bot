@@ -1140,7 +1140,7 @@ def handle_conversation(update, context):
 # Функция для очистки истории чата
 def clear_chat_history(update, context):
     """
-    Очищает историю чата, удаляя предыдущие сообщения бота и пользователя.
+    Очищает историю чата, удаляя все предыдущие сообщения бота и пользователя.
     
     Args:
         update (telegram.Update): Объект обновления Telegram
@@ -1150,43 +1150,48 @@ def clear_chat_history(update, context):
         # Получаем ID чата
         chat_id = update.effective_chat.id
         
-        # Получаем список ID предыдущих сообщений из контекста пользователя
-        previous_messages = context.user_data.get('previous_messages', [])
-        
-        # Получаем текущее сообщение
+        # Получаем текущее сообщение ID
         current_message_id = None
         if update.message:
             current_message_id = update.message.message_id
         elif update.callback_query and update.callback_query.message:
             current_message_id = update.callback_query.message.message_id
         
-        # Определяем диапазон сообщений для удаления
-        if previous_messages and current_message_id:
-            # Находим последнее сообщение из предыдущей сессии
-            last_saved_message = max(previous_messages)
+        # Если нет текущего сообщения, не можем определить диапазон
+        if not current_message_id:
+            logger.warning(f"Не удалось определить текущее сообщение для чата {chat_id}")
+            return
             
-            # Удаляем все сообщения между последним сохраненным и текущим
-            for msg_id in range(last_saved_message + 1, current_message_id):
-                try:
-                    context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-                    logger.debug(f"Удалено промежуточное сообщение {msg_id} из чата {chat_id}")
-                except Exception as e:
-                    # Игнорируем ошибки удаления сообщений
-                    logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
+        # Пробуем найти первое сообщение в чате (начало диалога)
+        first_message_id = context.user_data.get('first_message_id', current_message_id - 100)
         
-        # Удаляем все сохраненные сообщения
-        for msg_id in previous_messages:
+        # Удаляем все сообщения в диапазоне от первого до текущего
+        # Используем более надежный подход с удалением и отслеживанием ошибок
+        count_deleted = 0
+        count_errors = 0
+        
+        # Очищаем все сообщения в диапазоне (используем обратный порядок для более эффективного удаления)
+        for msg_id in range(current_message_id - 1, first_message_id - 1, -1):
             try:
                 context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-                logger.debug(f"Удалено сохраненное сообщение {msg_id} из чата {chat_id}")
+                count_deleted += 1
+                # Добавляем небольшую задержку для избежания ограничений API
+                if count_deleted % 10 == 0:
+                    import time
+                    time.sleep(0.1)
             except Exception as e:
-                # Игнорируем ошибки удаления сообщений (могут быть слишком старые)
-                logger.debug(f"Не удалось удалить сохраненное сообщение {msg_id}: {e}")
+                count_errors += 1
+                # Лог для отладки, но не перегружаем журнал
+                if count_errors <= 5:
+                    logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
+        
+        # Сохраняем текущее ID сообщения как отправную точку для следующей очистки
+        context.user_data['first_message_id'] = current_message_id
         
         # Очищаем список предыдущих сообщений
         context.user_data['previous_messages'] = []
         
-        logger.info(f"История чата полностью очищена для пользователя {chat_id}")
+        logger.info(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений, {count_errors} ошибок")
     except Exception as e:
         logger.error(f"Ошибка при очистке истории чата: {e}")
 
