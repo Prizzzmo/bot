@@ -34,7 +34,7 @@ HTML_TEMPLATE = """
 <head>
     <title>Логи бота истории России</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -147,12 +147,54 @@ HTML_TEMPLATE = """
         /* Стили для чата */
         .chat-container {
             max-width: 90%;
-            min-width: 800px;
+            width: 100%;
+            min-width: auto;
             margin: 20px auto;
             border: 1px solid #ddd;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                max-width: 95%;
+                margin: 10px auto;
+            }
+
+            .chat-messages {
+                height: 400px;
+            }
+            
+            .chat-input input {
+                padding: 8px 12px;
+            }
+            
+            .chat-input button {
+                padding: 8px 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .chat-container {
+                max-width: 100%;
+                margin: 5px auto;
+            }
+            
+            .chat-header {
+                padding: 12px;
+                font-size: 16px;
+            }
+            
+            .chat-messages {
+                height: 350px;
+                padding: 10px;
+            }
+            
+            .message {
+                max-width: 90%;
+                padding: 8px 12px;
+            }
         }
 
         .chat-header {
