@@ -412,14 +412,15 @@ HTML_TEMPLATE = """
         // Обработка нажатия Enter в поле ввода
         document.addEventListener('DOMContentLoaded', function() {
             const inputField = document.getElementById('chat-input');
-            inputField.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
+            if (inputField) {
+                inputField.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        sendMessage();
+                    }
+                });
+            }
         });
-
     </script>
 </body>
 </html>
