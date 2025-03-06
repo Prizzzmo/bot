@@ -56,14 +56,14 @@ ERROR_DESCRIPTIONS = {
 def log_error(error, additional_info=None):
     error_type = type(error).__name__
     error_message = str(error)
-    
+
     # Добавляем комментарий к известным типам ошибок
     if error_type in ERROR_DESCRIPTIONS:
         comment = ERROR_DESCRIPTIONS[error_type]
         logger.error(f"{error_type}: {error_message} => {comment}")
     else:
         logger.error(f"{error_type}: {error_message}")
-    
+
     if additional_info:
         logger.error(f"Дополнительная информация: {additional_info}")
 
@@ -76,11 +76,11 @@ class SimpleCache:
     def __init__(self, max_size=100):
         self.cache = {}
         self.max_size = max_size
-        
+
     def get(self, key):
         """Получить значение из кэша по ключу"""
         return self.cache.get(key)
-        
+
     def set(self, key, value):
         """Добавить значение в кэш"""
         # Если кэш переполнен, удаляем случайный элемент
@@ -88,9 +88,9 @@ class SimpleCache:
             import random
             random_key = random.choice(list(self.cache.keys()))
             del self.cache[random_key]
-            
+
         self.cache[key] = value
-        
+
     def clear(self):
         """Очистить кэш"""
         self.cache.clear()
@@ -109,26 +109,26 @@ TOPIC, CHOOSE_TOPIC, TEST, ANSWER = range(4)
 def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
     """
     Отправляет запрос к Google Gemini API и возвращает ответ.
-    
+
     Args:
         prompt (str): Текст запроса
         max_tokens (int): Максимальное количество токенов в ответе
         temp (float): Температура генерации (0.0-1.0)
         use_cache (bool): Использовать ли кэширование
-        
+
     Returns:
         str: Ответ от API или сообщение об ошибке
     """
     # Создаем уникальный ключ для кэша на основе параметров запроса
     cache_key = f"{prompt}_{max_tokens}_{temp}"
-    
+
     # Проверяем кэш, если использование кэша включено
     if use_cache:
         cached_response = api_cache.get(cache_key)
         if cached_response:
             print("Использую кэшированный ответ")
             return cached_response
-    
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
@@ -138,53 +138,53 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
             "maxOutputTokens": max_tokens
         }
     }
-    
+
     try:
         response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()
-        
+
         response_json = response.json()
-        
+
         # Проверка наличия всех необходимых ключей в ответе
         if "candidates" not in response_json or not response_json["candidates"]:
             print(f"Ответ не содержит 'candidates': {response_json}")
             return "API вернул ответ без содержимого. Возможно, запрос был заблокирован фильтрами безопасности."
-            
+
         candidate = response_json["candidates"][0]
         if "content" not in candidate:
             print(f"Ответ не содержит 'content': {candidate}")
             return "API вернул неверный формат ответа."
-            
+
         content = candidate["content"]
         if "parts" not in content or not content["parts"]:
             print(f"Ответ не содержит 'parts': {content}")
             return "API вернул пустой ответ."
-            
+
         result = content["parts"][0]["text"]
-        
+
         # Сохраняем результат в кэш
         if use_cache:
             api_cache.set(cache_key, result)
-            
+
         return result
-        
+
     except requests.exceptions.RequestException as e:
         error_type = type(e).__name__
         error_msg = str(e)
         print(f"{error_type}: {error_msg}")
-        
+
         if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, 'response'):
             print(f"Статус код: {e.response.status_code}")
             print(f"Ответ сервера: {e.response.text}")
             return f"Ошибка HTTP при запросе к Google Gemini ({e.response.status_code}): {error_msg}"
-        
+
         error_messages = {
             "ConnectionError": "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету.",
             "Timeout": "Превышено время ожидания ответа от API Google Gemini.",
             "JSONDecodeError": "Ошибка при обработке ответа от API Google Gemini.",
             "HTTPError": f"Ошибка HTTP при запросе к Google Gemini: {error_msg}"
         }
-        
+
         return error_messages.get(error_type, f"Неизвестная ошибка при запросе к Google Gemini: {error_msg}")
 
 # Альтернативная функция для Hugging Face (раскомментируйте, если используете Hugging Face)
@@ -238,10 +238,10 @@ def start(update, context):
 def parse_topics(topics_text):
     """
     Парсит текст с темами и возвращает отформатированный список тем.
-    
+
     Args:
         topics_text (str): Текст с темами от API
-        
+
     Returns:
         list: Список отформатированных тем
     """
@@ -250,7 +250,7 @@ def parse_topics(topics_text):
         line = line.strip()
         if not line or len(line) <= 1:
             continue
-            
+
         # Извлекаем текст темы после номера или двоеточия
         if '.' in line or ':' in line:
             parts = line.split('.', 1) if '.' in line else line.split(':', 1)
@@ -271,7 +271,7 @@ def parse_topics(topics_text):
         # Иначе берем строку как есть
         else:
             filtered_topics.append(line)
-    
+
     # Ограничиваем до 30 тем
     return filtered_topics[:30]
 
@@ -279,15 +279,15 @@ def parse_topics(topics_text):
 def create_topics_keyboard(topics):
     """
     Создает клавиатуру с кнопками для выбора темы.
-    
+
     Args:
         topics (list): Список тем
-        
+
     Returns:
         InlineKeyboardMarkup: Клавиатура с кнопками
     """
     keyboard = []
-    
+
     for i, topic in enumerate(topics, 1):
         # Проверяем, что тема не пустая
         if topic and len(topic.strip()) > 0:
@@ -297,10 +297,10 @@ def create_topics_keyboard(topics):
         else:
             # Если тема пустая, добавляем заполнитель
             keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
-    
+
     # Добавляем кнопку для ввода своей темы
     keyboard.append([InlineKeyboardButton("Своя тема", callback_data='custom_topic')])
-    
+
     return InlineKeyboardMarkup(keyboard)
 
 # Обработка нажатий на кнопки меню
@@ -320,14 +320,14 @@ def button_handler(update, context):
         try:
             query.edit_message_text("Загружаю список тем истории России...")
             topics_text = ask_grok(prompt)
-            
+
             # Парсим и сохраняем темы
             filtered_topics = parse_topics(topics_text)
             context.user_data['topics'] = filtered_topics
-            
+
             # Создаем клавиатуру с темами
             reply_markup = create_topics_keyboard(filtered_topics)
-            
+
             query.edit_message_text(
                 "📚 *Темы по истории России*\n\nВыберите тему для изучения или введите свою:",
                 reply_markup=reply_markup,
@@ -344,36 +344,36 @@ def button_handler(update, context):
                 reply_markup=main_menu()
             )
             return TOPIC
-            
+
         # Генерируем тест из вопросов
         query.edit_message_text(f"🧠 Генерирую тест по теме: *{topic}*...", parse_mode='Markdown')
-        
+
         # Используем параметры для возможности генерации большего текста
         prompt = f"Составь 10 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <цифра>'. Каждый вопрос должен заканчиваться строкой '---'."
         try:
             # Увеличиваем лимит токенов для получения полных вопросов
             questions = ask_grok(prompt, max_tokens=2048)
-            
+
             # Очистка и валидация вопросов
             question_list = [q.strip() for q in questions.split('---') if q.strip()]
-            
+
             # Проверка наличия правильных ответов в каждом вопросе
             valid_questions = []
             for q in question_list:
                 if 'Правильный ответ:' in q:
                     valid_questions.append(q)
-            
+
             if not valid_questions:
                 raise ValueError("Не удалось сгенерировать корректные вопросы для теста")
-                
+
             context.user_data['questions'] = valid_questions
             context.user_data['current_question'] = 0
             context.user_data['score'] = 0
-            
+
             # Создаем кнопку для завершения теста
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             query.edit_message_text(
                 f"📝 *Тест по теме: {topic}*\n\nНачинаем тест из {len(valid_questions)} вопросов! Вот первый вопрос:",
                 parse_mode='Markdown'
@@ -474,11 +474,11 @@ def button_handler(update, context):
 def get_topic_info(topic, update_message_func=None):
     """
     Получает информацию о теме из API и форматирует её для отправки.
-    
+
     Args:
         topic (str): Тема для изучения
         update_message_func (callable, optional): Функция для обновления сообщения о загрузке
-        
+
     Returns:
         list: Список сообщений для отправки
     """
@@ -489,7 +489,7 @@ def get_topic_info(topic, update_message_func=None):
         "🌍 ВНЕШНЯЯ ПОЛИТИКА И ВЛИЯНИЕ",
         "📊 ИТОГИ И ИСТОРИЧЕСКОЕ ЗНАЧЕНИЕ"
     ]
-    
+
     prompts = [
         f"Расскажи о {topic} в истории России (глава 1). Дай введение и начальную историю, истоки темы. Используй структурированное изложение. Объем - один абзац. Не пиши 'продолжение следует'.",
         f"Расскажи о {topic} в истории России (глава 2). Опиши основные события и развитие. Не делай вступление, продолжай повествование. Объем - один абзац. Не пиши 'продолжение следует'.",
@@ -503,7 +503,7 @@ def get_topic_info(topic, update_message_func=None):
     for i, prompt in enumerate(prompts, 1):
         if update_message_func:
             update_message_func(f"📝 Загружаю главу {i} из {len(prompts)} по теме: *{topic}*...")
-        
+
         response = ask_grok(prompt)
         # Добавляем заголовок главы перед текстом
         chapter_response = f"*{chapter_titles[i-1]}*\n\n{response}"
@@ -532,7 +532,7 @@ def get_topic_info(topic, update_message_func=None):
     # Добавляем последнее сообщение
     if current_message:
         messages.append(current_message)
-        
+
     return messages
 
 # Обработка выбора темы из списка или ввода своей темы
@@ -560,10 +560,10 @@ def choose_topic(update, context):
                 # Функция для обновления сообщения о загрузке
                 def update_message(text):
                     query.edit_message_text(text, parse_mode='Markdown')
-                
+
                 # Получаем информацию о теме
                 messages = get_topic_info(topic, update_message)
-                
+
                 # Отправляем первое сообщение с тем же ID (edit)
                 if messages:
                     query.edit_message_text(messages[0], parse_mode='Markdown')
@@ -584,21 +584,21 @@ def choose_topic(update, context):
 def handle_custom_topic(update, context):
     topic = update.message.text
     context.user_data['current_topic'] = topic
-    
+
     try:
         update.message.reply_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
-        
+
         # Функция для обновления сообщения о загрузке
         def update_message(text):
             update.message.reply_text(text, parse_mode='Markdown')
-        
+
         # Получаем информацию о теме
         messages = get_topic_info(topic, update_message)
-        
+
         # Отправляем все сообщения
         for msg in messages:
             update.message.reply_text(msg, parse_mode='Markdown')
-            
+
         update.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
     except Exception as e:
         update.message.reply_text(f"Произошла ошибка: {e}. Попробуй еще раз.", reply_markup=main_menu())
@@ -658,12 +658,14 @@ def handle_answer(update, context):
 def main():
     try:
         logger.info("Запуск бота и веб-сервера логов...")
-        
+        import subprocess
+        subprocess.run(['pip', 'install', 'flask'], check=True) # Install Flask
+
         # Запускаем Flask-сервер для отображения логов в отдельном потоке
         logger.info("Запуск Flask-сервера для отображения логов...")
         flask_thread = background.start_flask_server()
         logger.info(f"Flask-сервер запущен на http://0.0.0.0:8080")
-        
+
         # Проверка наличия токенов
         if not TELEGRAM_TOKEN:
             logger.error("Отсутствует TELEGRAM_TOKEN! Проверьте .env файл")
@@ -671,7 +673,7 @@ def main():
         if not GEMINI_API_KEY:
             logger.error("Отсутствует GEMINI_API_KEY! Проверьте .env файл")
             return
-            
+
         updater = Updater(TELEGRAM_TOKEN, use_context=True)
         dp = updater.dispatcher
 
@@ -702,21 +704,21 @@ def main():
             """Обработчик ошибок: записывает их в журнал с комментариями и информирует пользователя"""
             error = context.error
             error_type = type(error).__name__
-            
+
             # Используем расширенное логирование ошибок
             additional_info = f"в обновлении {update}" if update else ""
             log_error(error, additional_info)
-            
+
             if update and update.effective_message:
                 # Формируем информативное сообщение для пользователя
                 error_message = f"Произошла ошибка: {error}"
-                
+
                 # Добавляем пользователю пояснение для известных типов ошибок
                 if error_type in ERROR_DESCRIPTIONS:
                     error_message += f"\n{ERROR_DESCRIPTIONS[error_type]}"
-                
-                update.effective_message.reply_text(error_message)
-                
+
+                update.effective_message.replytext(error_message)
+
         dp.add_error_handler(error_handler)
         dp.add_handler(conv_handler)
 
@@ -724,7 +726,7 @@ def main():
         logger.info("Бот успешно запущен")
         updater.start_polling()
         updater.idle()
-        
+
     except Exception as e:
         log_error(e, "Критическая ошибка при запуске бота")
         logger.critical("Бот не был запущен из-за критической ошибки")
