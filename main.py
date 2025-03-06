@@ -725,6 +725,11 @@ def button_handler(update, context):
                 reply_markup=main_menu()
             )
         return CHOOSE_TOPIC
+    elif query.data == 'custom_topic':
+        # Обработка кнопки своей темы
+        query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
+        logger.info(f"Пользователь {user_id} выбрал ввод своей темы")
+        return CHOOSE_TOPIC
     elif query.data == 'back_to_menu':
         query.edit_message_text(
             "Выберите действие в меню ниже:",
@@ -826,58 +831,76 @@ def choose_topic(update, context):
     Returns:
         int: Следующее состояние разговора
     """
-    query = update.callback_query
-    query.answer()
+    user_id = None
     
-    user_id = query.from_user.id
-    logger.info(f"Пользователь {user_id} выбирает тему: {query.data}")
+    # Проверяем, пришел ли запрос от кнопки или от текстового сообщения
+    if update.callback_query:
+        query = update.callback_query
+        query.answer()
+        user_id = query.from_user.id
+        logger.info(f"Пользователь {user_id} выбирает тему через кнопку: {query.data}")
+        
+        # Если пользователь выбрал "Больше тем"
+        if query.data == 'more_topics':
+            return button_handler(update, context)
+        
+        # Если пользователь выбрал "Своя тема"
+        elif query.data == 'custom_topic':
+            query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
+            return CHOOSE_TOPIC
+        
+        # Если пользователь хочет вернуться в меню
+        elif query.data == 'back_to_menu':
+            return button_handler(update, context)
+        
+        # Если пользователь выбрал тему из списка
+        elif query.data.startswith('topic_'):
+            try:
+                topic_index = int(query.data.split('_')[1]) - 1
 
-    # Если пользователь уже выбрал тему из списка
-    if query.data.startswith('topic_'):
-        try:
-            topic_index = int(query.data.split('_')[1]) - 1
+                # Проверяем наличие индекса в списке
+                if 0 <= topic_index < len(context.user_data['topics']):
+                    topic = context.user_data['topics'][topic_index]
+                    # Удаляем номер из темы, если он есть
+                    if '. ' in topic:
+                        topic = topic.split('. ', 1)[1]
 
-            # Проверяем наличие индекса в списке
-            if 0 <= topic_index < len(context.user_data['topics']):
-                topic = context.user_data['topics'][topic_index]
-                # Удаляем номер из темы, если он есть
-                if '. ' in topic:
-                    topic = topic.split('. ', 1)[1]
+                    context.user_data['current_topic'] = topic
+                    query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
+                    logger.info(f"Пользователь {user_id} выбрал тему: {topic}")
 
-                context.user_data['current_topic'] = topic
-                query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
-                logger.info(f"Пользователь {user_id} выбрал тему: {topic}")
+                    # Функция для обновления сообщения о загрузке
+                    def update_message(text):
+                        query.edit_message_text(text, parse_mode='Markdown')
 
-                # Функция для обновления сообщения о загрузке
-                def update_message(text):
-                    query.edit_message_text(text, parse_mode='Markdown')
+                    # Получаем информацию о теме
+                    messages = get_topic_info(topic, update_message)
 
-                # Получаем информацию о теме
-                messages = get_topic_info(topic, update_message)
+                    # Отправляем первое сообщение с тем же ID (edit)
+                    if messages:
+                        query.edit_message_text(messages[0], parse_mode='Markdown')
 
-                # Отправляем первое сообщение с тем же ID (edit)
-                if messages:
-                    query.edit_message_text(messages[0], parse_mode='Markdown')
+                        # Отправляем остальные сообщения как новые
+                        for msg in messages[1:]:
+                            query.message.reply_text(msg, parse_mode='Markdown')
 
-                    # Отправляем остальные сообщения как новые
-                    for msg in messages[1:]:
-                        query.message.reply_text(msg, parse_mode='Markdown')
-
-                query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
-                logger.info(f"Пользователю {user_id} успешно отправлена информация по теме: {topic}")
-            else:
-                logger.warning(f"Пользователь {user_id} выбрал несуществующую тему с индексом {topic_index+1}")
+                    query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
+                    logger.info(f"Пользователю {user_id} успешно отправлена информация по теме: {topic}")
+                else:
+                    logger.warning(f"Пользователь {user_id} выбрал несуществующую тему с индексом {topic_index+1}")
+                    query.edit_message_text(
+                        f"Ошибка: Тема с индексом {topic_index+1} не найдена. Попробуйте выбрать другую тему.", 
+                        reply_markup=main_menu()
+                    )
+            except Exception as e:
+                log_error(e, f"Ошибка при обработке темы для пользователя {user_id}")
                 query.edit_message_text(
-                    f"Ошибка: Тема с индексом {topic_index+1} не найдена. Попробуйте выбрать другую тему.", 
+                    f"Произошла ошибка при загрузке темы: {e}. Попробуй еще раз.", 
                     reply_markup=main_menu()
                 )
-        except Exception as e:
-            log_error(e, f"Ошибка при обработке темы для пользователя {user_id}")
-            query.edit_message_text(
-                f"Произошла ошибка при загрузке темы: {e}. Попробуй еще раз.", 
-                reply_markup=main_menu()
-            )
-        return TOPIC
+            return TOPIC
+    # Возвращаем CHOOSE_TOPIC, если не обработано другими условиями
+    return CHOOSE_TOPIC
 
 # Обработка ввода своей темы
 def handle_custom_topic(update, context):
@@ -1216,7 +1239,8 @@ def main():
                     CallbackQueryHandler(button_handler)
                 ],
                 CHOOSE_TOPIC: [
-                    CallbackQueryHandler(choose_topic),
+                    CallbackQueryHandler(button_handler, pattern='^(more_topics|custom_topic|back_to_menu)$'),
+                    CallbackQueryHandler(choose_topic, pattern='^topic_'),
                     MessageHandler(Filters.text & ~Filters.command, handle_custom_topic)
                 ],
                 TEST: [
