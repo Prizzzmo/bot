@@ -349,7 +349,8 @@ def start(update, context):
         "исторических личностях, международных отношениях и историческом значении.\n\n"
         "❗ *Данный бот создан в качестве учебного пособия.*\n\n"
         "📋 Вам отправлена подробная презентация бота, содержащая информацию о функциональности, "
-        "принципах работы с ИИ Gemini и мерах безопасности.",
+        "принципах работы с ИИ Gemini и мерах безопасности.\n\n"
+        "© 2025 Silver Raven. Образовательный бот по истории России.",
         parse_mode='Markdown'
     )
     # Сохраняем ID сообщения
@@ -405,44 +406,100 @@ def parse_topics(topics_text):
     """
     filtered_topics = []
     
-    # Используем регулярное выражение для более эффективного извлечения тем
-    # Паттерн ищет строки, которые начинаются с цифры или содержат разделители (точка, двоеточие)
-    pattern = r'(?:^\d+[.):]\s*|^[*•-]\s*|^[а-яА-Я\w]+[:.]\s*)(.+?)$'
+    # Усовершенствованное регулярное выражение для более точного извлечения тем
+    # Паттерн ищет строки, которые начинаются с цифры, маркера списка или содержат разделители
+    pattern = r'(?:^\d+[.):]\s*|^[*•\-–—]\s*|^[а-яА-ЯA-Za-z]+[:.]\s*)(.+?)$'
     
-    for line in topics_text.split('\n'):
-        line = line.strip()
-        if not line or len(line) <= 1:
+    # Предварительная очистка текста
+    lines = [line.strip() for line in topics_text.split('\n') if line.strip()]
+    
+    for line in lines:
+        if len(line) <= 1:
             continue
             
         # Пытаемся извлечь тему с помощью регулярного выражения
         match = re.search(pattern, line, re.MULTILINE)
         if match:
             topic_text = match.group(1).strip()
-            if topic_text:
+            if topic_text and len(topic_text) > 3:  # Проверка минимальной длины
+                # Удаляем кавычки в начале и конце, если они есть
+                topic_text = topic_text.strip('"\'«»')
                 filtered_topics.append(topic_text)
-        # Если регулярное выражение не сработало, используем старый метод
-        elif '.' in line or ':' in line:
-            parts = line.split('.', 1) if '.' in line else line.split(':', 1)
-            if len(parts) > 1:
-                topic_text = parts[1].strip()
-                if topic_text:
-                    filtered_topics.append(topic_text)
+        # Если регулярное выражение не сработало, используем улучшенные эвристические методы
+        elif any(sep in line for sep in ['. ', ': ', ' - ', ' – ']):
+            # Ищем первый подходящий разделитель
+            for sep in ['. ', ': ', ' - ', ' – ']:
+                if sep in line:
+                    parts = line.split(sep, 1)
+                    if len(parts) > 1 and parts[0].strip().isdigit():
+                        topic_text = parts[1].strip()
+                        if topic_text and len(topic_text) > 3:
+                            topic_text = topic_text.strip('"\'«»')
+                            filtered_topics.append(topic_text)
+                            break
         elif line[0].isdigit():
-            # Ищем первый не цифровой и не разделительный символ
-            i = 1
-            while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
+            # Улучшенный алгоритм поиска начала темы после цифр
+            i = 0
+            # Пропускаем цифры и разделители в начале
+            while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):,-–—'):
                 i += 1
             if i < len(line):
                 topic_text = line[i:].strip()
-                if topic_text:
+                if topic_text and len(topic_text) > 3:
+                    topic_text = topic_text.strip('"\'«»')
                     filtered_topics.append(topic_text)
-        else:
-            filtered_topics.append(line)
+        # Добавляем строки, которые выглядят как темы (не содержат запрещенных символов)
+        elif (not any(char in line for char in ['?', '!', '=', '@', '#', '%', '&', '*', '(', ')', '[', ']', '{', '}']) 
+              and len(line) > 5 and len(line) < 100):
+            topic_text = line.strip('"\'«»')
+            filtered_topics.append(topic_text)
 
-    # Удаляем дубликаты, сохраняя порядок
-    unique_topics = []
+    # Очистка тем от общих проблем
+    cleaned_topics = []
     for topic in filtered_topics:
-        if topic not in unique_topics:
+        # Удаление множественных пробелов
+        topic = re.sub(r'\s+', ' ', topic)
+        
+        # Проверка на окончание предложения и обрезка, если это необходимо
+        if '.' in topic[:-1]:  # Точка не в конце строки
+            topic = topic.split('.')[0] + '.'
+            
+        # Обрезка слишком длинных тем
+        if len(topic) > 70:
+            words = topic.split()
+            shortened = ' '.join(words[:8])  # Берем первые 8 слов
+            if not shortened.endswith('.'):
+                shortened += '...'
+            topic = shortened
+            
+        # Удаление вводных слов в начале темы
+        starters = ['тема:', 'topic:', 'вопрос:', 'период:', 'эпоха:']
+        for starter in starters:
+            if topic.lower().startswith(starter):
+                topic = topic[len(starter):].strip()
+        
+        # Убедимся, что первая буква заглавная
+        if topic and topic[0].isalpha():
+            topic = topic[0].upper() + topic[1:]
+            
+        cleaned_topics.append(topic)
+
+    # Удаляем дубликаты и похожие темы, сохраняя порядок
+    unique_topics = []
+    for topic in cleaned_topics:
+        # Проверка на похожие темы (если одна тема полностью содержится в другой)
+        is_duplicate = False
+        for existing in unique_topics:
+            # Игнорируем регистр при сравнении
+            if topic.lower() in existing.lower() or existing.lower() in topic.lower():
+                # Выбираем более короткую тему, если она не слишком короткая
+                if len(topic) < len(existing) and len(topic) > 10:
+                    unique_topics.remove(existing)
+                    unique_topics.append(topic)
+                is_duplicate = True
+                break
+                
+        if not is_duplicate and topic not in unique_topics:
             unique_topics.append(topic)
 
     # Ограничиваем до 30 тем
@@ -780,8 +837,11 @@ def get_topic_info(topic, update_message_func=None):
         if update_message_func:
             update_message_func(f"📝 Загружаю главу {i} из {len(prompts)} по теме: *{topic}*...")
         
-        # Получаем ответ от API
-        response = ask_grok(prompt)
+        # Получаем ответ от API с настройкой температуры для более точных фактов
+        response = ask_grok(prompt, temp=0.3)
+        
+        # Удаляем лишние пробелы и переносы строк
+        response = response.strip()
         
         # Добавляем заголовок главы перед текстом
         chapter_response = f"*{chapter_titles[i-1]}*\n\n{response}"
@@ -789,6 +849,9 @@ def get_topic_info(topic, update_message_func=None):
 
     # Объединяем ответы с разделителями
     combined_responses = "\n\n" + "\n\n".join(all_responses)
+    
+    # Добавляем копирайт в конце материала
+    combined_responses += "\n\n---\n\n*© 2025 Silver Raven. Образовательный бот по истории России.*"
 
     # Разделяем длинный текст на части для отправки в Telegram (макс. 4000 символов)
     messages = []
@@ -822,7 +885,23 @@ def get_topic_info(topic, update_message_func=None):
     if current_part:
         parts.append(current_part)
     
-    # Форматируем части для отправки, добавляя необходимое форматирование markdown
+    # Проверяем, что копирайт есть только в последней части
+    # Если копирайт оказался в середине - перемещаем его в конец
+    copyright_text = "*© 2025 Silver Raven. Образовательный бот по истории России.*"
+    for i in range(len(parts) - 1):
+        if copyright_text in parts[i]:
+            parts[i] = parts[i].replace(copyright_text, "").strip()
+            if not parts[-1].endswith(copyright_text):
+                parts[-1] = parts[-1] + "\n\n---\n\n" + copyright_text
+    
+    # Если копирайт отсутствует в последней части, добавляем его
+    if not parts[-1].endswith(copyright_text):
+        if "---" not in parts[-1][-10:]:
+            parts[-1] = parts[-1] + "\n\n---\n\n" + copyright_text
+        else:
+            parts[-1] = parts[-1] + "\n\n" + copyright_text
+    
+    # Форматируем части для отправки
     for part in parts:
         messages.append(part)
 
@@ -990,13 +1069,37 @@ def handle_answer(update, context):
     original_questions = context.user_data.get('original_questions', questions)
     display_questions = context.user_data.get('display_questions', questions)
     
+    # Валидация пользовательского ввода
+    valid_answers = ['1', '2', '3', '4']
+    if user_answer not in valid_answers:
+        sent_msg = update.message.reply_text(
+            "⚠️ Пожалуйста, введите только цифру (1, 2, 3 или 4)."
+        )
+        save_message_id(update, context, sent_msg.message_id)
+        
+        # Создаем клавиатуру с кнопкой для завершения теста
+        keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        sent_msg = update.message.reply_text(
+            "Введите ответ еще раз:",
+            reply_markup=reply_markup
+        )
+        save_message_id(update, context, sent_msg.message_id)
+        return ANSWER
+    
     # Парсим правильный ответ из оригинального текста вопроса
     try:
         correct_answer_match = re.search(r"Правильный ответ:\s*(\d+)", original_questions[current_question])
         if correct_answer_match:
             correct_answer = correct_answer_match.group(1)
         else:
-            raise ValueError("Формат правильного ответа не найден")
+            # Попытка найти ответ в альтернативных форматах
+            alt_match = re.search(r"Правильный ответ[:-]\s*([1-4])", original_questions[current_question], re.IGNORECASE)
+            if alt_match:
+                correct_answer = alt_match.group(1)
+            else:
+                raise ValueError("Формат правильного ответа не найден")
     except (IndexError, ValueError) as e:
         logger.error(f"Ошибка при обработке ответа пользователя {user_id}: {e}")
         update.message.reply_text(
@@ -1005,6 +1108,18 @@ def handle_answer(update, context):
         )
         return TOPIC
 
+    # Отслеживаем ответы пользователя для статистики
+    if 'user_answers' not in context.user_data:
+        context.user_data['user_answers'] = []
+    
+    # Добавляем текущий ответ в статистику
+    context.user_data['user_answers'].append({
+        'question_num': current_question + 1,
+        'user_answer': user_answer,
+        'correct_answer': correct_answer,
+        'is_correct': user_answer == correct_answer
+    })
+    
     # Проверяем ответ пользователя
     if user_answer == correct_answer:
         context.user_data['score'] = context.user_data.get('score', 0) + 1
@@ -1012,7 +1127,7 @@ def handle_answer(update, context):
         save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Пользователь {user_id} ответил верно на вопрос {current_question+1}")
     else:
-        # Не показываем правильный ответ
+        # Не показываем правильный ответ во время теста
         sent_msg = update.message.reply_text("❌ Неправильно!")
         save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Пользователь {user_id} ответил неверно на вопрос {current_question+1}")
@@ -1041,22 +1156,56 @@ def handle_answer(update, context):
         total_questions = len(questions)
         percentage = (score / total_questions) * 100
         
-        # Оценка усвоенного материала
+        # Оценка усвоенного материала с развернутым комментарием
         if percentage >= 90:
-            assessment = "🏆 Отлично! Ты прекрасно усвоил материал."
+            assessment = "🏆 Отлично! Ты прекрасно усвоил материал. Твои знания по данной теме очень глубокие."
+            next_steps = "Можешь попробовать изучить другие темы или углубить знания по смежным историческим периодам."
         elif percentage >= 70:
             assessment = "👍 Хорошо! Ты неплохо усвоил материал, но есть над чем поработать."
+            next_steps = "Рекомендую повторить некоторые аспекты темы и затем снова пройти тест для закрепления."
         elif percentage >= 50:
-            assessment = "👌 Удовлетворительно. Рекомендуется повторить материал."
+            assessment = "👌 Удовлетворительно. Ты понимаешь основы темы, но многие детали упущены."
+            next_steps = "Стоит внимательнее изучить материал, особенно обратить внимание на даты и ключевые события."
         else:
-            assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
+            assessment = "📚 Неудовлетворительно. Тема усвоена недостаточно хорошо."
+            next_steps = "Рекомендую заново изучить все главы по данной теме и затем повторить тестирование."
+        
+        # Формируем краткую статистику по ответам
+        user_answers = context.user_data.get('user_answers', [])
+        incorrect_count = sum(1 for answer in user_answers if not answer['is_correct'])
+        
+        # Добавляем информацию о правильных ответах на вопросы, в которых пользователь ошибся
+        incorrect_info = ""
+        if incorrect_count > 0:
+            incorrect_info = "\n\n*Информация о правильных ответах:*\n"
+            for answer in user_answers:
+                if not answer['is_correct']:
+                    q_num = answer['question_num']
+                    correct = answer['correct_answer']
+                    incorrect_info += f"• Вопрос {q_num}: правильный ответ - {correct}\n"
             
+        # Отправляем результаты теста
         update.message.reply_text(
-            f"🎯 Тест завершен! Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n{assessment}\n\n"
+            f"🎯 *Тест завершен!*\n\nТы ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n"
+            f"{assessment}\n\n{next_steps}{incorrect_info}\n\n"
             "Выбери следующее действие:",
-            reply_markup=main_menu()
+            reply_markup=main_menu(),
+            parse_mode='Markdown'
         )
         logger.info(f"Пользователь {user_id} завершил тест с результатом {score}/{total_questions} ({percentage:.1f}%)")
+        
+        # Очищаем информацию о текущем тесте
+        # Но сохраняем выбранную тему
+        current_topic = context.user_data.get('current_topic')
+        context.user_data.pop('questions', None)
+        context.user_data.pop('current_question', None)
+        context.user_data.pop('score', None)
+        context.user_data.pop('user_answers', None)
+        context.user_data.pop('original_questions', None)
+        context.user_data.pop('display_questions', None)
+        if current_topic:
+            context.user_data['current_topic'] = current_topic
+            
         return TOPIC
 
 # Функция для обработки сообщений в режиме беседы
@@ -1161,37 +1310,70 @@ def clear_chat_history(update, context):
         if not current_message_id:
             logger.warning(f"Не удалось определить текущее сообщение для чата {chat_id}")
             return
+        
+        # Получаем все сохраненные ID сообщений для удаления
+        message_ids_to_delete = context.user_data.get('previous_messages', [])
+        
+        # Если нет сохраненных ID, пытаемся использовать диапазон сообщений
+        if not message_ids_to_delete:
+            # Определяем диапазон сообщений для удаления
+            first_message_id = context.user_data.get('first_message_id', current_message_id - 200)
             
-        # Пробуем найти первое сообщение в чате (начало диалога)
-        first_message_id = context.user_data.get('first_message_id', current_message_id - 100)
+            # Создаем список ID сообщений для удаления
+            message_ids_to_delete = list(range(first_message_id, current_message_id))
         
-        # Удаляем все сообщения в диапазоне от первого до текущего
-        # Используем более надежный подход с удалением и отслеживанием ошибок
-        count_deleted = 0
-        count_errors = 0
+        # Добавляем более старые сообщения для обеспечения полной очистки
+        extra_old_messages = list(range(current_message_id - 300, current_message_id - 200))
+        message_ids_to_delete.extend(extra_old_messages)
         
-        # Очищаем все сообщения в диапазоне (используем обратный порядок для более эффективного удаления)
-        for msg_id in range(current_message_id - 1, first_message_id - 1, -1):
-            try:
-                context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-                count_deleted += 1
-                # Добавляем небольшую задержку для избежания ограничений API
-                if count_deleted % 10 == 0:
-                    import time
-                    time.sleep(0.1)
-            except Exception as e:
-                count_errors += 1
-                # Лог для отладки, но не перегружаем журнал
-                if count_errors <= 5:
-                    logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
+        # Удаляем дубликаты и сортируем ID сообщений в обратном порядке
+        message_ids_to_delete = sorted(list(set(message_ids_to_delete)), reverse=True)
+        
+        # Группируем удаление для большей эффективности
+        batches = [message_ids_to_delete[i:i+30] for i in range(0, len(message_ids_to_delete), 30)]
+        
+        # Удаляем сообщения пакетами
+        total_deleted = 0
+        total_errors = 0
+        
+        import time
+        
+        for batch in batches:
+            deleted_in_batch = 0
+            errors_in_batch = 0
+            
+            for msg_id in batch:
+                if msg_id >= current_message_id:
+                    continue  # Пропускаем текущее и будущие сообщения
+                
+                try:
+                    context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                    deleted_in_batch += 1
+                    total_deleted += 1
+                    
+                    # Короткая пауза после каждого 5-го удаления, чтобы избежать ограничений API
+                    if deleted_in_batch % 5 == 0:
+                        time.sleep(0.05)
+                        
+                except Exception as e:
+                    errors_in_batch += 1
+                    total_errors += 1
+                    
+                    # Лог для отладки, но не перегружаем журнал
+                    if errors_in_batch <= 3:
+                        logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
+            
+            # Пауза между пакетами для снижения нагрузки на API
+            if deleted_in_batch > 0:
+                time.sleep(0.5)
         
         # Сохраняем текущее ID сообщения как отправную точку для следующей очистки
         context.user_data['first_message_id'] = current_message_id
         
-        # Очищаем список предыдущих сообщений
+        # Сбрасываем список предыдущих сообщений
         context.user_data['previous_messages'] = []
         
-        logger.info(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений, {count_errors} ошибок")
+        logger.info(f"История чата очищена для пользователя {chat_id}: удалено {total_deleted} сообщений, {total_errors} ошибок")
     except Exception as e:
         logger.error(f"Ошибка при очистке истории чата: {e}")
 
