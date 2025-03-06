@@ -575,11 +575,23 @@ def button_handler(update, context):
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
+            # Очищаем правильные ответы из текста вопросов для отображения пользователю
+            display_questions = []
+            for q in valid_questions:
+                # Удаляем строку с правильным ответом из текста вопроса
+                cleaned_q = re.sub(r"Правильный ответ:\s*\d+", "", q).strip()
+                display_questions.append(cleaned_q)
+                
+            # Сохраняем оригинальные вопросы для проверки ответов
+            context.user_data['original_questions'] = valid_questions
+            # Сохраняем очищенные вопросы для отображения
+            context.user_data['display_questions'] = display_questions
+
             query.edit_message_text(
                 f"📝 *Тест по теме: {topic}*\n\nНачинаем тест из {len(valid_questions)} вопросов! Вот первый вопрос:",
                 parse_mode='Markdown'
             )
-            query.message.reply_text(valid_questions[0])
+            query.message.reply_text(display_questions[0])
             query.message.reply_text(
                 "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
                 reply_markup=reply_markup
@@ -600,7 +612,8 @@ def button_handler(update, context):
         prompt = f"Составь список из 30 новых и оригинальных тем по истории России, которые могут быть интересны для изучения. Сосредоточься на темах {random_seed}. Выбери темы, отличные от стандартных и ранее предложенных. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
         try:
             query.edit_message_text("🔄 Генерирую новый список уникальных тем по истории России...")
-            topics = ask_grok(prompt)
+            # Отключаем кэширование для получения действительно новых тем каждый раз
+            topics = ask_grok(prompt, use_cache=False)
 
             # Парсим и сохраняем темы
             filtered_topics = parse_topics(topics)
@@ -614,9 +627,9 @@ def button_handler(update, context):
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
-            logger.info(f"Пользователю {user_id} показаны дополнительные темы для изучения")
+            logger.info(f"Пользователю {user_id} показан новый список тем для изучения")
         except Exception as e:
-            log_error(e, f"Ошибка при генерации дополнительных тем для пользователя {user_id}")
+            log_error(e, f"Ошибка при генерации новых тем для пользователя {user_id}")
             query.edit_message_text(
                 f"Произошла ошибка при генерации списка тем: {e}. Попробуй еще раз.", 
                 reply_markup=main_menu()
@@ -894,9 +907,13 @@ def handle_answer(update, context):
         )
         return TOPIC
 
-    # Парсим правильный ответ из текста вопроса
+    # Получаем оригинальные вопросы с правильными ответами и вопросы для отображения
+    original_questions = context.user_data.get('original_questions', questions)
+    display_questions = context.user_data.get('display_questions', questions)
+    
+    # Парсим правильный ответ из оригинального текста вопроса
     try:
-        correct_answer_match = re.search(r"Правильный ответ:\s*(\d+)", questions[current_question])
+        correct_answer_match = re.search(r"Правильный ответ:\s*(\d+)", original_questions[current_question])
         if correct_answer_match:
             correct_answer = correct_answer_match.group(1)
         else:
@@ -915,16 +932,17 @@ def handle_answer(update, context):
         update.message.reply_text("✅ Правильно!")
         logger.info(f"Пользователь {user_id} ответил верно на вопрос {current_question+1}")
     else:
-        update.message.reply_text(f"❌ Неправильно. Правильный ответ: {correct_answer}")
+        # Не показываем правильный ответ
+        update.message.reply_text("❌ Неправильно!")
         logger.info(f"Пользователь {user_id} ответил неверно на вопрос {current_question+1}")
 
     # Переходим к следующему вопросу
     context.user_data['current_question'] = current_question + 1
     
-    if context.user_data['current_question'] < len(questions):
+    if context.user_data['current_question'] < len(display_questions):
         next_question = context.user_data['current_question'] + 1
-        update.message.reply_text(f"Вопрос {next_question} из {len(questions)}:")
-        update.message.reply_text(questions[context.user_data['current_question']])
+        update.message.reply_text(f"Вопрос {next_question} из {len(display_questions)}:")
+        update.message.reply_text(display_questions[context.user_data['current_question']])
 
         # Создаем клавиатуру с кнопкой для завершения теста
         keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
