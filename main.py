@@ -216,6 +216,14 @@ def main_menu():
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def topic_completed_menu():
+    keyboard = [
+        [InlineKeyboardButton("Ознакомиться с темой заново", callback_data='continue_reading')],
+        [InlineKeyboardButton("Пройти тест повторно", callback_data='test')],
+        [InlineKeyboardButton("В главное меню", callback_data='back_to_menu')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 # Команда /start (начало работы с ботом)
 def start(update, context):
     user = update.message.from_user
@@ -350,10 +358,10 @@ def button_handler(update, context):
         query.edit_message_text(f"🧠 Генерирую тест по теме: *{topic}*...", parse_mode='Markdown')
 
         # Используем параметры для возможности генерации большего текста
-        prompt = f"Составь 10 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <цифра>'. Каждый вопрос должен заканчиваться строкой '---'."
+        prompt = f"Составь 20 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <цифра>'. Каждый вопрос должен заканчиваться строкой '---'."
         try:
             # Увеличиваем лимит токенов для получения полных вопросов
-            questions = ask_grok(prompt, max_tokens=2048)
+            questions = ask_grok(prompt, max_tokens=4096) #Increased max_tokens
 
             # Очистка и валидация вопросов
             question_list = [q.strip() for q in questions.split('---') if q.strip()]
@@ -465,7 +473,7 @@ def button_handler(update, context):
     elif query.data == 'end_test' or query.data == 'cancel':
         if query.data == 'end_test':
             query.edit_message_text("Тест завершен досрочно. Возвращаемся в главное меню.")
-            query.message.reply_text("Выберите действие:", reply_markup=main_menu())
+            query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
             return TOPIC
         else:
             query.edit_message_text("Действие отменено. Нажми /start, чтобы начать заново.")
@@ -573,7 +581,7 @@ def choose_topic(update, context):
                     for msg in messages[1:]:
                         query.message.reply_text(msg, parse_mode='Markdown')
 
-                query.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
+                query.message.reply_text("Выбери следующее действие:", reply_markup=topic_completed_menu()) # Changed to topic_completed_menu
             else:
                 query.edit_message_text(f"Ошибка: Тема с индексом {topic_index+1} не найдена. Попробуйте выбрать другую тему.", reply_markup=main_menu())
         except Exception as e:
@@ -600,7 +608,7 @@ def handle_custom_topic(update, context):
         for msg in messages:
             update.message.reply_text(msg, parse_mode='Markdown')
 
-        update.message.reply_text("Выбери следующее действие:", reply_markup=main_menu())
+        update.message.reply_text("Выбери следующее действие:", reply_markup=topic_completed_menu()) #Changed to topic_completed_menu
     except Exception as e:
         update.message.reply_text(f"Произошла ошибка: {e}. Попробуй еще раз.", reply_markup=main_menu())
     return TOPIC
@@ -651,7 +659,7 @@ def handle_answer(update, context):
         update.message.reply_text(
             f"Тест завершен! Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.2f}%).\n{assessment}\n"
             "Выбери следующее действие:",
-            reply_markup=main_menu()
+            reply_markup=topic_completed_menu() # Changed to topic_completed_menu
         )
         return TOPIC
 
@@ -660,7 +668,7 @@ def main():
     try:
         logger.info("Запуск бота и веб-сервера логов...")
         print("Начинаю запуск бота и веб-сервера логов...")
-        
+
         # Проверка наличия необходимых модулей
         try:
             import flask
@@ -695,8 +703,7 @@ def main():
             print(error_msg)
             return
         if not GEMINI_API_KEY:
-            error_msg = "Отсутствует GEMINI_API_KEY! Проверьте .env файл. Ключ должен быть установлен в переменной GEMINI_API_KEY."
-            logger.error(error_msg)
+            error_msg = "Отсутствует GEMINI_API_KEY! Проверьте .env файл. Ключ должен быть установлен в переменной GEMINI_API_KEY."logger.error(error_msg)
             print(error_msg)
             return
         if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
