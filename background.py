@@ -1,6 +1,6 @@
 import os
 import re
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from datetime import datetime
 import threading
 import logging
@@ -346,13 +346,79 @@ HTML_TEMPLATE = """
         });
 
 
-        //Функции для чата (placeholder)
+        // Функции для чата
         function sendMessage() {
-            const message = document.getElementById('chat-input').value;
-            // Здесь должна быть логика отправки сообщения на сервер
-            console.log("Отправлено сообщение:", message);
-            document.getElementById('chat-input').value = '';
+            const messageInput = document.getElementById('chat-input');
+            const message = messageInput.value.trim();
+            
+            if (!message) return; // Не отправляем пустые сообщения
+            
+            // Показываем сообщение пользователя
+            addMessage(message, 'user-message');
+            
+            // Очищаем поле ввода
+            messageInput.value = '';
+            
+            // Показываем индикатор "бот печатает"
+            document.getElementById('typing-indicator').style.display = 'block';
+            
+            // Отправляем запрос на сервер
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Ошибка запроса');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Скрываем индикатор "бот печатает"
+                document.getElementById('typing-indicator').style.display = 'none';
+                
+                // Показываем ответ бота
+                addMessage(data.response, 'bot-message');
+                
+                // Прокручиваем чат вниз
+                const chatMessages = document.getElementById('chat-messages');
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                // Скрываем индикатор "бот печатает"
+                document.getElementById('typing-indicator').style.display = 'none';
+                
+                // Показываем сообщение об ошибке
+                addMessage('Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже.', 'bot-message');
+            });
         }
+        
+        // Функция для добавления сообщения в чат
+        function addMessage(text, className) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${className}`;
+            messageElement.textContent = text;
+            chatMessages.appendChild(messageElement);
+            
+            // Прокручиваем чат вниз
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Обработка нажатия Enter в поле ввода
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputField = document.getElementById('chat-input');
+            inputField.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
 
     </script>
 </body>
@@ -435,6 +501,31 @@ def get_logs():
         return jsonify({'logs': logs})
     except Exception as e:
         app.logger.error(f'Ошибка при получении логов через API: {e}')
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    try:
+        app.logger.info('Получен запрос чата')
+        data = request.json
+        user_message = data.get('message', '')
+        
+        if not user_message:
+            return jsonify({'error': 'Сообщение не может быть пустым'}), 400
+            
+        # Импортируем функцию для генерации ответа
+        from main import ask_grok
+        
+        # Формируем промпт для бота истории
+        prompt = f"Ответь на вопрос пользователя по истории России: {user_message}\n\nОтвет должен быть полезным, информативным и основан на исторических фактах. Если вопрос не связан с историей России, вежливо попроси задать вопрос по теме истории России."
+        
+        app.logger.info(f'Обработка сообщения пользователя: {user_message}')
+        bot_response = ask_grok(prompt, max_tokens=1024)
+        app.logger.info('Ответ сгенерирован')
+        
+        return jsonify({'response': bot_response})
+    except Exception as e:
+        app.logger.error(f'Ошибка при обработке запроса чата: {e}')
         return jsonify({'error': str(e)}), 500
 
 def run_flask():
