@@ -44,6 +44,11 @@ HTML_TEMPLATE = """
             color: #333;
             border-bottom: 1px solid #ddd;
             padding-bottom: 10px;
+            text-align: center;
+        }
+        h2 {
+            color: #444;
+            margin-top: 20px;
         }
         .log-container {
             height: 600px;
@@ -86,23 +91,81 @@ HTML_TEMPLATE = """
         .filter-group label {
             margin-right: 10px;
         }
+        
+        /* Новые стили для навигации */
+        .navigation {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 15px;
+        }
+        
+        .nav-button {
+            background-color: #f8f9fa;
+            color: #444;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            margin: 0 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-button:hover {
+            background-color: #e9ecef;
+        }
+        
+        .nav-button.active {
+            background-color: #337ab7;
+            color: white;
+            border-color: #2e6da4;
+        }
+        
+        #main-section {
+            text-align: center;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        #main-section p {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Логи бота истории России</h1>
+        <h1>Панель управления ботом истории России</h1>
         
-        <div class="controls">
-            <button onclick="refreshLogs()">Обновить логи</button>
-            <button onclick="clearFilters()">Сбросить фильтры</button>
-            
-            <div class="filter-group">
-                <label><input type="checkbox" id="show-error" checked> Ошибки</label>
-                <label><input type="checkbox" id="show-warning" checked> Предупреждения</label>
-                <label><input type="checkbox" id="show-info" checked> Информация</label>
-                <label><input type="checkbox" id="show-debug" checked> Отладка</label>
-                <label><input type="checkbox" id="show-critical" checked> Критические</label>
+        <div class="navigation">
+            <button onclick="showLogs()" class="nav-button active" id="logs-btn">Просмотр логов</button>
+            <button onclick="showMainPage()" class="nav-button" id="main-btn">Главная страница</button>
+        </div>
+        
+        <div id="logs-section">
+            <h2>Логи бота</h2>
+            <div class="controls">
+                <button onclick="refreshLogs()">Обновить логи</button>
+                <button onclick="clearFilters()">Сбросить фильтры</button>
+                
+                <div class="filter-group">
+                    <label><input type="checkbox" id="show-error" checked> Ошибки</label>
+                    <label><input type="checkbox" id="show-warning" checked> Предупреждения</label>
+                    <label><input type="checkbox" id="show-info" checked> Информация</label>
+                    <label><input type="checkbox" id="show-debug" checked> Отладка</label>
+                    <label><input type="checkbox" id="show-critical" checked> Критические</label>
+                </div>
             </div>
+        </div>
+        
+        <div id="main-section" style="display: none;">
+            <h2>Главная страница</h2>
+            <p>Добро пожаловать в панель управления ботом истории России!</p>
+            <p>Этот веб-интерфейс позволяет просматривать логи работы бота и отслеживать его активность.</p>
+            <p>Для просмотра логов нажмите кнопку "Просмотр логов" вверху страницы.</p>
+            <p>Чтобы связаться с ботом, найдите его в Telegram по имени вашего бота.</p>
         </div>
         
         <div class="log-container" id="logs"></div>
@@ -171,11 +234,31 @@ HTML_TEMPLATE = """
             refreshLogs();
         }
         
+        // Функции для навигации между разделами
+        function showLogs() {
+            document.getElementById('logs-section').style.display = 'block';
+            document.getElementById('main-section').style.display = 'none';
+            document.getElementById('logs-btn').classList.add('active');
+            document.getElementById('main-btn').classList.remove('active');
+            refreshLogs(); // Обновляем логи при переходе на эту страницу
+        }
+        
+        function showMainPage() {
+            document.getElementById('logs-section').style.display = 'none';
+            document.getElementById('main-section').style.display = 'block';
+            document.getElementById('main-btn').classList.add('active');
+            document.getElementById('logs-btn').classList.remove('active');
+        }
+        
         // Загружаем логи при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             refreshLogs();
-            // Обновляем логи каждые 5 секунд
-            setInterval(refreshLogs, 5000);
+            // Обновляем логи каждые 5 секунд, только если активна вкладка логов
+            setInterval(function() {
+                if (document.getElementById('logs-section').style.display !== 'none') {
+                    refreshLogs();
+                }
+            }, 5000);
         });
     </script>
 </body>
@@ -234,10 +317,20 @@ def read_logs():
 @app.route('/')
 def index():
     try:
-        app.logger.info('Запрос главной страницы логов')
+        app.logger.info('Запрос главной страницы')
         return HTML_TEMPLATE
     except Exception as e:
         app.logger.error(f'Ошибка при обработке запроса главной страницы: {e}')
+        return str(e), 500
+
+@app.route('/logs')
+def logs():
+    try:
+        app.logger.info('Запрос страницы логов')
+        # Используем тот же шаблон, JavaScript определит, что показывать
+        return HTML_TEMPLATE
+    except Exception as e:
+        app.logger.error(f'Ошибка при обработке запроса страницы логов: {e}')
         return str(e), 500
 
 @app.route('/api/logs')
