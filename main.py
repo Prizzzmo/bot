@@ -334,8 +334,11 @@ def start(update, context):
         os.makedirs('static')
         logger.info("Создана директория для статических файлов")
     
-    # Отправляем приветственное сообщение
-    update.message.reply_text(
+    # Очищаем историю чата
+    clear_chat_history(update, context)
+    
+    # Отправляем приветственное сообщение и сохраняем его ID
+    sent_message = update.message.reply_text(
         f"👋 Здравствуйте, {user.first_name}!\n\n"
         "🤖 Я образовательный бот по истории России. С моей помощью вы сможете:\n\n"
         "📚 *Изучать различные исторические темы* — от древних времен до современности\n"
@@ -349,6 +352,8 @@ def start(update, context):
         "принципах работы с ИИ Gemini и мерах безопасности.",
         parse_mode='Markdown'
     )
+    # Сохраняем ID сообщения
+    save_message_id(update, context, sent_message.message_id)
     
     # Отправляем файл презентации
     try:
@@ -380,10 +385,11 @@ def start(update, context):
         update.message.reply_text("К сожалению, не удалось отправить презентацию. Пожалуйста, попробуйте позже.")
     
     # Отправляем основное меню
-    update.message.reply_text(
+    sent_msg = update.message.reply_text(
         "Выберите действие в меню ниже, чтобы начать:",
         reply_markup=main_menu()
     )
+    save_message_id(update, context, sent_msg.message_id)
     return TOPIC
 
 # Функция для парсинга тем из текста ответа API
@@ -491,6 +497,9 @@ def button_handler(update, context):
     query = update.callback_query
     query.answer()  # Подтверждаем нажатие кнопки
     user_id = query.from_user.id
+    
+    # Очищаем историю чата перед новым действием
+    clear_chat_history(update, context)
     
     logger.info(f"Пользователь {user_id} нажал кнопку: {query.data}")
 
@@ -838,6 +847,10 @@ def choose_topic(update, context):
         query = update.callback_query
         query.answer()
         user_id = query.from_user.id
+        
+        # Очищаем историю чата перед новым действием
+        clear_chat_history(update, context)
+        
         logger.info(f"Пользователь {user_id} выбирает тему через кнопку: {query.data}")
         
         # Если пользователь выбрал "Больше тем"
@@ -918,6 +931,9 @@ def handle_custom_topic(update, context):
     user_id = update.message.from_user.id
     context.user_data['current_topic'] = topic
     
+    # Очищаем историю чата перед обработкой новой темы
+    clear_chat_history(update, context)
+    
     logger.info(f"Пользователь {user_id} ввел свою тему: {topic}")
 
     try:
@@ -956,6 +972,9 @@ def handle_answer(update, context):
     user_answer = update.message.text.strip()
     user_id = update.message.from_user.id
     
+    # Очищаем историю чата перед ответом на новый вопрос
+    clear_chat_history(update, context)
+    
     questions = context.user_data.get('questions', [])
     current_question = context.user_data.get('current_question', 0)
     
@@ -989,11 +1008,13 @@ def handle_answer(update, context):
     # Проверяем ответ пользователя
     if user_answer == correct_answer:
         context.user_data['score'] = context.user_data.get('score', 0) + 1
-        update.message.reply_text("✅ Правильно!")
+        sent_msg = update.message.reply_text("✅ Правильно!")
+        save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Пользователь {user_id} ответил верно на вопрос {current_question+1}")
     else:
         # Не показываем правильный ответ
-        update.message.reply_text("❌ Неправильно!")
+        sent_msg = update.message.reply_text("❌ Неправильно!")
+        save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Пользователь {user_id} ответил неверно на вопрос {current_question+1}")
 
     # Переходим к следующему вопросу
@@ -1001,14 +1022,18 @@ def handle_answer(update, context):
     
     if context.user_data['current_question'] < len(display_questions):
         next_question = context.user_data['current_question'] + 1
-        update.message.reply_text(f"Вопрос {next_question} из {len(display_questions)}:")
-        update.message.reply_text(display_questions[context.user_data['current_question']])
+        sent_msg1 = update.message.reply_text(f"Вопрос {next_question} из {len(display_questions)}:")
+        save_message_id(update, context, sent_msg1.message_id)
+        
+        sent_msg2 = update.message.reply_text(display_questions[context.user_data['current_question']])
+        save_message_id(update, context, sent_msg2.message_id)
 
         # Создаем клавиатуру с кнопкой для завершения теста
         keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        update.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).", reply_markup=reply_markup)
+        sent_msg3 = update.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).", reply_markup=reply_markup)
+        save_message_id(update, context, sent_msg3.message_id)
         return ANSWER
     else:
         # Тест завершен, показываем результаты
@@ -1049,6 +1074,9 @@ def handle_conversation(update, context):
     user_message = update.message.text
     user_id = update.message.from_user.id
     
+    # Очищаем историю чата перед ответом на новое сообщение
+    clear_chat_history(update, context)
+    
     logger.info(f"Пользователь {user_id} отправил сообщение в режиме беседы: {user_message[:50]}...")
     
     # Проверяем, относится ли сообщение к истории России
@@ -1077,8 +1105,9 @@ def handle_conversation(update, context):
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
         response = ask_grok(prompt, max_tokens=1024)
         
-        # Отправляем ответ пользователю
-        update.message.reply_text(response)
+        # Отправляем ответ пользователю и сохраняем ID сообщения
+        sent_msg = update.message.reply_text(response)
+        save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Отправлен ответ пользователю {user_id}")
         
         # Предлагаем продолжить беседу или вернуться в меню
@@ -1107,6 +1136,58 @@ def handle_conversation(update, context):
         )
     
     return CONVERSATION
+
+# Функция для очистки истории чата
+def clear_chat_history(update, context):
+    """
+    Очищает историю чата, удаляя предыдущие сообщения бота.
+    
+    Args:
+        update (telegram.Update): Объект обновления Telegram
+        context (telegram.ext.CallbackContext): Контекст разговора
+    """
+    try:
+        # Получаем ID чата и ID последнего сообщения
+        chat_id = update.effective_chat.id
+        message_id = update.effective_message.message_id
+        
+        # Получаем список ID предыдущих сообщений из контекста пользователя
+        previous_messages = context.user_data.get('previous_messages', [])
+        
+        # Удаляем предыдущие сообщения
+        for msg_id in previous_messages:
+            try:
+                context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                logger.info(f"Удалено сообщение {msg_id} из чата {chat_id}")
+            except Exception as e:
+                # Игнорируем ошибки удаления сообщений (могут быть слишком старые)
+                logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
+        
+        # Очищаем список предыдущих сообщений
+        context.user_data['previous_messages'] = []
+        
+        logger.info(f"История чата очищена для пользователя {chat_id}")
+    except Exception as e:
+        logger.error(f"Ошибка при очистке истории чата: {e}")
+
+# Функция для сохранения ID сообщения
+def save_message_id(update, context, message_id):
+    """
+    Сохраняет ID сообщения в список предыдущих сообщений.
+    
+    Args:
+        update (telegram.Update): Объект обновления Telegram
+        context (telegram.ext.CallbackContext): Контекст разговора
+        message_id (int): ID сообщения для сохранения
+    """
+    if 'previous_messages' not in context.user_data:
+        context.user_data['previous_messages'] = []
+    
+    context.user_data['previous_messages'].append(message_id)
+    
+    # Ограничиваем список последними 50 сообщениями
+    if len(context.user_data['previous_messages']) > 50:
+        context.user_data['previous_messages'] = context.user_data['previous_messages'][-50:]
 
 # Обработчик ошибок
 def error_handler(update, context):
@@ -1220,12 +1301,14 @@ def main():
                 
                 # Отправляем презентацию пользователю
                 with open(presentation_path, 'rb') as document:
-                    update.message.reply_document(
+                    sent_doc = update.message.reply_document(
                         document=document, 
                         filename="Презентация_бота_истории_России.txt",
                         caption="📝 *Презентация бота*\nЗдесь вы можете ознакомиться с подробным описанием функций и возможностей бота.",
                         parse_mode='Markdown'
                     )
+                    # Сохраняем ID сообщения с документом
+                    save_message_id(update, context, sent_doc.message_id)
                 logger.info(f"Презентация отправлена пользователю {user.id}")
             except Exception as e:
                 log_error(e, f"Ошибка при отправке презентации пользователю {user.id}")
