@@ -658,8 +658,24 @@ def handle_answer(update, context):
 def main():
     try:
         logger.info("Запуск бота и веб-сервера логов...")
-        import subprocess
-        subprocess.run(['pip', 'install', 'flask'], check=True) # Install Flask
+        print("Начинаю запуск бота и веб-сервера логов...")
+        
+        # Проверка наличия необходимых модулей
+        try:
+            import flask
+            print(f"Flask установлен, версия: {flask.__version__}")
+            logger.info(f"Flask установлен, версия: {flask.__version__}")
+        except ImportError:
+            print("Flask не установлен, пытаюсь установить...")
+            logger.warning("Flask не установлен, пытаюсь установить...")
+            import subprocess
+            try:
+                subprocess.run(['pip', 'install', 'flask'], check=True)
+                print("Flask успешно установлен")
+                logger.info("Flask успешно установлен")
+            except Exception as e:
+                print(f"Ошибка при установке Flask: {e}")
+                logger.error(f"Ошибка при установке Flask: {e}")
 
         # Запускаем Flask-сервер для отображения логов в отдельном потоке
         logger.info("Запуск Flask-сервера для отображения логов...")
