@@ -7,18 +7,57 @@ from dotenv import load_dotenv
 
 
 import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
+import background  # Импортируем модуль Flask-сервера
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(f"bot_log_{datetime.now().strftime('%Y%m%d')}.log"),
-        logging.StreamHandler()
-    ]
+# Расширенная настройка логирования
+log_date = datetime.now().strftime('%Y%m%d')
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Используем RotatingFileHandler для ограничения размера файлов логов
+file_handler = RotatingFileHandler(
+    f"bot_log_{log_date}.log", 
+    maxBytes=10485760,  # 10 МБ
+    backupCount=5
 )
-logger = logging.getLogger(__name__)
+file_handler.setFormatter(log_formatter)
+
+# Консольный вывод
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+
+# Настройка корневого логгера
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
+
+# Словарь с описаниями ошибок для расширенного логирования
+ERROR_DESCRIPTIONS = {
+    'ConnectionError': 'Ошибка подключения к внешнему API. Проверьте интернет-соединение.',
+    'Timeout': 'Превышено время ожидания ответа от внешнего API.',
+    'JSONDecodeError': 'Ошибка при разборе JSON ответа от API.',
+    'HTTPError': 'Ошибка HTTP при запросе к внешнему API.',
+    'TelegramError': 'Ошибка при взаимодействии с Telegram API.',
+    'KeyboardInterrupt': 'Бот был остановлен вручную.',
+    'ApiError': 'Ошибка при взаимодействии с внешним API.',
+}
+
+# Расширенная функция логирования ошибок с комментариями
+def log_error(error, additional_info=None):
+    error_type = type(error).__name__
+    error_message = str(error)
+    
+    # Добавляем комментарий к известным типам ошибок
+    if error_type in ERROR_DESCRIPTIONS:
+        comment = ERROR_DESCRIPTIONS[error_type]
+        logger.error(f"{error_type}: {error_message} => {comment}")
+    else:
+        logger.error(f"{error_type}: {error_message}")
+    
+    if additional_info:
+        logger.error(f"Дополнительная информация: {additional_info}")
 
 # Загружаем переменные окружения из файла .env
 load_dotenv()
@@ -610,7 +649,12 @@ def handle_answer(update, context):
 # Основная функция для запуска бота
 def main():
     try:
-        logger.info("Запуск бота...")
+        logger.info("Запуск бота и веб-сервера логов...")
+        
+        # Запускаем Flask-сервер для отображения логов в отдельном потоке
+        logger.info("Запуск Flask-сервера для отображения логов...")
+        flask_thread = background.start_flask_server()
+        logger.info(f"Flask-сервер запущен на http://0.0.0.0:8080")
         
         # Проверка наличия токенов
         if not TELEGRAM_TOKEN:
@@ -647,11 +691,22 @@ def main():
 
         # Добавляем обработчик ошибок
         def error_handler(update, context):
-            """Обработчик ошибок: записывает их в журнал и информирует пользователя"""
-            logger.error(f"Ошибка: {context.error} в обновлении {update}")
+            """Обработчик ошибок: записывает их в журнал с комментариями и информирует пользователя"""
+            error = context.error
+            error_type = type(error).__name__
             
-            if update.effective_message:
-                error_message = f"Произошла ошибка: {context.error}"
+            # Используем расширенное логирование ошибок
+            additional_info = f"в обновлении {update}" if update else ""
+            log_error(error, additional_info)
+            
+            if update and update.effective_message:
+                # Формируем информативное сообщение для пользователя
+                error_message = f"Произошла ошибка: {error}"
+                
+                # Добавляем пользователю пояснение для известных типов ошибок
+                if error_type in ERROR_DESCRIPTIONS:
+                    error_message += f"\n{ERROR_DESCRIPTIONS[error_type]}"
+                
                 update.effective_message.reply_text(error_message)
                 
         dp.add_error_handler(error_handler)
@@ -663,7 +718,8 @@ def main():
         updater.idle()
         
     except Exception as e:
-        logger.critical(f"Критическая ошибка при запуске бота: {e}")
+        log_error(e, "Критическая ошибка при запуске бота")
+        logger.critical("Бот не был запущен из-за критической ошибки")
 
 if __name__ == '__main__':
     main()
