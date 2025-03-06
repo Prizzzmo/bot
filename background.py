@@ -184,8 +184,19 @@ HTML_TEMPLATE = """
 
 # Функция для чтения логов с применением паттернов ошибок
 def read_logs():
-    log_files = [f for f in os.listdir('.') if f.startswith('bot_log_') and f.endswith('.log')]
     logs = []
+    
+    # Проверяем наличие директории logs
+    log_dir = "logs"
+    if os.path.exists(log_dir):
+        log_files = [f for f in os.listdir(log_dir) if f.startswith('bot_log_') and f.endswith('.log')]
+    else:
+        # Если нет директории logs, ищем в корневой директории
+        log_files = [f for f in os.listdir('.') if f.startswith('bot_log_') and f.endswith('.log')]
+    
+    # Если логов нет совсем, возвращаем сообщение
+    if not log_files:
+        return ["Лог-файлы не найдены. Запустите бота для создания логов."]
     
     # Паттерны распространенных ошибок с комментариями
     error_patterns = {
@@ -196,11 +207,14 @@ def read_logs():
         r'API вернул ответ без содержимого': 'Ответ API не содержит ожидаемых данных, возможна блокировка запроса.',
         r'ApiError': 'Ошибка при взаимодействии с внешним API.',
         r'TelegramError': 'Ошибка при взаимодействии с Telegram API.',
+        r'Отсутствует TELEGRAM_TOKEN': 'Не настроен токен Telegram бота в файле .env',
+        r'Отсутствует GEMINI_API_KEY': 'Не настроен API ключ для Google Gemini в файле .env',
     }
     
     for log_file in sorted(log_files, reverse=True):
         try:
-            with open(log_file, 'r', encoding='utf-8') as file:
+            log_path = os.path.join(log_dir, log_file) if os.path.exists(log_dir) else log_file
+            with open(log_path, 'r', encoding='utf-8') as file:
                 content = file.readlines()
                 
                 for line in content:
@@ -237,14 +251,24 @@ def get_logs():
         return jsonify({'error': str(e)}), 500
 
 def run_flask():
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    try:
+        app.logger.info("Запуск Flask сервера на порту 8080")
+        app.run(host='0.0.0.0', port=8080, debug=False)
+    except Exception as e:
+        app.logger.error(f"Ошибка при запуске Flask сервера: {e}")
+        print(f"Ошибка при запуске Flask сервера: {e}")
 
 # Функция для запуска Flask в отдельном потоке
 def start_flask_server():
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True  # Поток будет завершен при завершении основной программы
-    flask_thread.start()
-    return flask_thread
+    try:
+        flask_thread = threading.Thread(target=run_flask)
+        flask_thread.daemon = True  # Поток будет завершен при завершении основной программы
+        flask_thread.start()
+        return flask_thread
+    except Exception as e:
+        app.logger.error(f"Не удалось запустить поток для Flask сервера: {e}")
+        print(f"Не удалось запустить поток для Flask сервера: {e}")
+        return None
 
 if __name__ == '__main__':
     # Запуск Flask напрямую (для тестирования)

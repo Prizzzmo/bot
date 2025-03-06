@@ -15,9 +15,15 @@ import background  # Импортируем модуль Flask-сервера
 log_date = datetime.now().strftime('%Y%m%d')
 log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+# Проверяем наличие директории для логов
+log_dir = "logs"
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
 # Используем RotatingFileHandler для ограничения размера файлов логов
+log_file_path = f"{log_dir}/bot_log_{log_date}.log"
 file_handler = RotatingFileHandler(
-    f"bot_log_{log_date}.log", 
+    log_file_path, 
     maxBytes=10485760,  # 10 МБ
     backupCount=5
 )
@@ -32,6 +38,8 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
+
+print(f"Логирование настроено. Файлы логов будут сохраняться в: {log_file_path}")
 
 # Словарь с описаниями ошибок для расширенного логирования
 ERROR_DESCRIPTIONS = {
