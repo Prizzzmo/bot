@@ -9,6 +9,76 @@ class UIManager:
         self.logger = logger
     
     def main_menu(self):
+        """Создает клавиатуру с главным меню"""
+        keyboard = [
+            [InlineKeyboardButton("📚 Выбрать тему", callback_data='topic')],
+            [InlineKeyboardButton("🧠 Пройти тест", callback_data='test')],
+            [InlineKeyboardButton("🗣️ Беседа об истории", callback_data='conversation')],
+            [InlineKeyboardButton("🧹 Очистить чат", callback_data='clear_client')],
+            [InlineKeyboardButton("ℹ️ О проекте", callback_data='project_info')]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+        
+    def parse_topics(self, topics_text):
+        """Парсит темы из текста, возвращенного API"""
+        topics = []
+        
+        # Ищем списки с нумерацией
+        matches = re.findall(r'^\s*\d+\.\s+(.+)$', topics_text, re.MULTILINE)
+        
+        # Если нашли нумерованный список
+        if matches:
+            topics = [match.strip() for match in matches if match.strip()]
+        else:
+            # Пробуем искать темы с тире или звездочками
+            alt_matches = re.findall(r'^\s*[-*]\s+(.+)$', topics_text, re.MULTILINE)
+            if alt_matches:
+                topics = [match.strip() for match in alt_matches if match.strip()]
+            else:
+                # Если не нашли ни нумерованного списка, ни списка с тире, разбиваем по строкам
+                lines = topics_text.split('\n')
+                topics = [line.strip() for line in lines if line.strip() and len(line.strip()) < 100]
+        
+        return topics
+    
+    def create_topics_keyboard(self, topics):
+        """Создает клавиатуру с темами"""
+        keyboard = []
+        
+        # Добавляем до 10 тем (по 2 в ряд)
+        topics_to_show = topics[:min(20, len(topics))]
+        
+        for i in range(0, len(topics_to_show), 2):
+            row = []
+            # Добавляем первую кнопку в ряду
+            topic_text = f"{i+1}. {topics_to_show[i]}"
+            if len(topic_text) > 40:  # Ограничиваем длину текста кнопки
+                topic_text = topic_text[:37] + "..."
+            row.append(InlineKeyboardButton(topic_text, callback_data=f'topic_{i+1}'))
+            
+            # Добавляем вторую кнопку, если она есть
+            if i + 1 < len(topics_to_show):
+                topic_text = f"{i+2}. {topics_to_show[i+1]}"
+                if len(topic_text) > 40:
+                    topic_text = topic_text[:37] + "..."
+                row.append(InlineKeyboardButton(topic_text, callback_data=f'topic_{i+2}'))
+            
+            keyboard.append(row)
+            
+        # Добавляем кнопки меню внизу
+        keyboard.append([InlineKeyboardButton("🔄 Больше тем", callback_data='more_topics')])
+        keyboard.append([InlineKeyboardButton("✏️ Своя тема", callback_data='custom_topic')])
+        keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
+        
+        return InlineKeyboardMarkup(keyboard)
+
+class UIManager:
+    """Класс для управления пользовательским интерфейсом"""
+    
+    def __init__(self, logger):
+        self.logger = logger
+    
+    def main_menu(self):
         """
         Создает главное меню в виде кнопок.
 

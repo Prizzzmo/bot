@@ -318,6 +318,39 @@ class CommandHandlers:
                 self.logger.info(f"Пользователь {user_id} отменил действие")
                 query.edit_message_text("Действие отменено. Нажми /start, чтобы начать заново.")
                 return ConversationHandler.END
+        elif query.data == 'clear_client':
+            self.logger.info(f"Пользователь {user_id} запросил очистку чата на стороне клиента через кнопку")
+            query.answer("Отправляю команду очистки...")
+
+            # Очищаем чат на стороне клиента
+            success = self.message_manager.clear_chat_client_side(update, context)
+
+            if success:
+                try:
+                    query.edit_message_text(
+                        "✅ Команда очистки чата отправлена успешно!",
+                        reply_markup=self.ui_manager.main_menu()
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Не удалось обновить сообщение после очистки: {e}")
+                    query.message.reply_text(
+                        "✅ Команда очистки чата отправлена успешно!",
+                        reply_markup=self.ui_manager.main_menu()
+                    )
+            else:
+                try:
+                    query.edit_message_text(
+                        "❌ Не удалось выполнить очистку чата на стороне клиента.",
+                        reply_markup=self.ui_manager.main_menu()
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Не удалось обновить сообщение об ошибке: {e}")
+                    query.message.reply_text(
+                        "❌ Не удалось выполнить очистку чата на стороне клиента.",
+                        reply_markup=self.ui_manager.main_menu()
+                    )
+
+            return self.TOPIC
         elif query.data == 'custom_topic':
             query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
             return self.CHOOSE_TOPIC
@@ -660,7 +693,7 @@ class CommandHandlers:
         # Отправляем новое сообщение после очистки
         update.message.reply_text(
             "Чат очищен! Выберите действие:",
-            reply_markup=self.uimanager.main_menu()
+            reply_markup=self.ui_manager.main_menu()
         )
 
         return self.TOPIC

@@ -333,3 +333,44 @@ class MessageManager:
         # Вторая попытка очистки для максимальной надежности
         time.sleep(0.5)
         self.clear_chat_history(update, context, preserve_message_id=active_message_id)
+        
+    def clear_chat_client_side(self, update, context):
+        """
+        Очищает чат на стороне клиента с помощью API Telegram.
+        Отправляет команду /clearcache, которая очищает локальный кэш истории в клиенте Telegram.
+        
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+            
+        Returns:
+            bool: True если команда была отправлена успешно, False в противном случае
+        """
+        if not update or not context or not update.effective_chat:
+            self.logger.warning("Недостаточно данных для очистки чата на стороне клиента")
+            return False
+            
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id if update.effective_user else "Неизвестный"
+        
+        try:
+            # Отправляем специальную команду для очистки кэша истории сообщений
+            message = context.bot.send_message(chat_id=chat_id, text="/clearcache")
+            
+            # Логирование успешной отправки команды
+            self.logger.info(f"Отправлена команда очистки кэша для пользователя {user_id}")
+            
+            # После отправки команды очистки можно удалить сообщение с командой
+            time.sleep(0.5)
+            try:
+                context.bot.delete_message(chat_id=chat_id, message_id=message.message_id)
+            except Exception as e:
+                self.logger.debug(f"Не удалось удалить сообщение с командой очистки: {e}")
+                
+            # Можно отправить подтверждение очистки
+            context.bot.send_message(chat_id=chat_id, text="🧹 История чата очищена на стороне клиента")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка при очистке чата на стороне клиента: {e}")
+            return False
