@@ -1,0 +1,287 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивная карта исторических событий России</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            z-index: 1000;
+        }
+        .filter-panel {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background-color: white;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            max-width: 300px;
+        }
+        .event-info {
+            max-width: 300px;
+        }
+        .event-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .event-date {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .event-description {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .category-filter {
+            margin-bottom: 10px;
+        }
+        select {
+            width: 100%;
+            padding: 5px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+        }
+        .timeline {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background-color: rgba(0, 0, 0, 0.7);
+            overflow-x: auto;
+            white-space: nowrap;
+            z-index: 1000;
+            padding: 10px 0;
+        }
+        .timeline-item {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 0 5px;
+            background-color: #4a7fbe;
+            color: white;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .timeline-item:hover {
+            background-color: #3a6eaa;
+        }
+        @media (max-width: 768px) {
+            .filter-panel {
+                top: unset;
+                bottom: 70px;
+                right: 10px;
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Интерактивная карта исторических событий России</h1>
+    </div>
+    
+    <div id="map"></div>
+    
+    <div class="filter-panel">
+        <div class="category-filter">
+            <label for="category-select">Фильтр по категории:</label>
+            <select id="category-select">
+                <option value="">Все категории</option>
+                {% for category in categories %}
+                <option value="{{ category }}">{{ category }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    
+    <div class="timeline" id="timeline">
+        <!-- Будет заполнено с помощью JavaScript -->
+    </div>
+    
+    <script>
+        // Инициализация карты с центром на России
+        const map = L.map('map').setView([55.75, 37.62], 4);
+        
+        // Добавление картографической подложки
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Загрузка данных о событиях
+        const events = {{ events|tojson }};
+        const markers = {};
+        const categories = {{ categories|tojson }};
+        
+        // Функция для форматирования даты
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            
+            // Проверка на формат с указанием только года
+            if (/^\d{1,4}$/.test(dateStr)) {
+                return dateStr + ' г.';
+            }
+            
+            // Проверка на формат с указанием года и месяца
+            if (/^\d{1,4}-\d{1,2}$/.test(dateStr)) {
+                const [year, month] = dateStr.split('-');
+                const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+                return `${monthNames[parseInt(month) - 1]} ${year} г.`;
+            }
+            
+            // Полный формат с днем, месяцем и годом
+            try {
+                const [year, month, day] = dateStr.split('-');
+                const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+                return `${day} ${monthNames[parseInt(month) - 1]} ${year} г.`;
+            } catch (e) {
+                return dateStr;
+            }
+        }
+        
+        // Создание маркеров для каждого события
+        events.forEach(event => {
+            if (event.location && event.location.lat && event.location.lng) {
+                const marker = L.marker([event.location.lat, event.location.lng])
+                    .addTo(map)
+                    .bindPopup(`
+                        <div class="event-info">
+                            <div class="event-title">${event.title}</div>
+                            <div class="event-date">${formatDate(event.date)}</div>
+                            <div class="event-description">${event.description}</div>
+                        </div>
+                    `);
+                
+                markers[event.id] = marker;
+            }
+        });
+        
+        // Функция для фильтрации событий по категории
+        function filterEventsByCategory(category) {
+            // Очищаем карту
+            Object.values(markers).forEach(marker => {
+                marker.removeFrom(map);
+            });
+            
+            // Добавляем только события выбранной категории или все, если категория не выбрана
+            events.forEach(event => {
+                if (!category || event.category === category) {
+                    if (markers[event.id]) {
+                        markers[event.id].addTo(map);
+                    }
+                }
+            });
+            
+            // Обновляем таймлайн
+            updateTimeline(category);
+        }
+        
+        // Обработчик изменения выбранной категории
+        document.getElementById('category-select').addEventListener('change', function() {
+            const selectedCategory = this.value;
+            filterEventsByCategory(selectedCategory);
+            
+            // Обновляем URL с параметром категории
+            const url = new URL(window.location);
+            if (selectedCategory) {
+                url.searchParams.set('category', selectedCategory);
+            } else {
+                url.searchParams.delete('category');
+            }
+            window.history.pushState({}, '', url);
+        });
+        
+        // Функция для создания таймлайна
+        function updateTimeline(category) {
+            const timelineElement = document.getElementById('timeline');
+            timelineElement.innerHTML = '';
+            
+            // Фильтруем события по категории
+            const filteredEvents = category 
+                ? events.filter(event => event.category === category)
+                : events;
+            
+            // Сортируем события по дате
+            filteredEvents.sort((a, b) => {
+                const dateA = a.date ? new Date(a.date.replace(/-/g, '/')) : new Date(0);
+                const dateB = b.date ? new Date(b.date.replace(/-/g, '/')) : new Date(0);
+                return dateA - dateB;
+            });
+            
+            // Добавляем события на таймлайн
+            filteredEvents.forEach(event => {
+                const timelineItem = document.createElement('div');
+                timelineItem.className = 'timeline-item';
+                timelineItem.textContent = `${event.title} (${event.date})`;
+                timelineItem.addEventListener('click', () => {
+                    if (markers[event.id]) {
+                        map.setView([event.location.lat, event.location.lng], 8);
+                        markers[event.id].openPopup();
+                    }
+                });
+                timelineElement.appendChild(timelineItem);
+            });
+        }
+        
+        // Инициализация таймлайна со всеми событиями
+        updateTimeline('');
+        
+        // Проверка URL параметров при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Проверка параметра category
+            const category = urlParams.get('category');
+            if (category) {
+                document.getElementById('category-select').value = category;
+                filterEventsByCategory(category);
+            }
+            
+            // Проверка параметра events (список ID событий через запятую)
+            const eventIds = urlParams.get('events');
+            if (eventIds) {
+                const ids = eventIds.split(',').map(id => parseInt(id));
+                
+                // Центрируем карту на первом событии из списка
+                if (ids.length > 0) {
+                    const firstEvent = events.find(e => e.id === ids[0]);
+                    if (firstEvent && firstEvent.location) {
+                        map.setView([firstEvent.location.lat, firstEvent.location.lng], 6);
+                    }
+                }
+                
+                // Показываем только выбранные события
+                Object.values(markers).forEach(marker => marker.removeFrom(map));
+                ids.forEach(id => {
+                    if (markers[id]) {
+                        markers[id].addTo(map);
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -46,6 +46,9 @@ class Bot:
                     CONVERSATION: [
                         MessageHandler(Filters.text & ~Filters.command, self.handlers.handle_conversation),
                         CallbackQueryHandler(self.handlers.button_handler)  # Обработчик для кнопки возврата в меню
+                    ],
+                    MAP: [
+                        CallbackQueryHandler(self.handlers.button_handler)  # Обработчик для взаимодействия с картой
                     ]
                 },
                 fallbacks=[CommandHandler('start', self.handlers.start)],

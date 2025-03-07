@@ -14,14 +14,16 @@ class CommandHandlers:
         self.content_service = content_service
         self.logger = logger
         self.config = config
+        self.history_map = None  # Будет установлено позже
 
         # Импортируем константы состояний из config
-        from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
+        from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION, MAP
         self.TOPIC = TOPIC
         self.CHOOSE_TOPIC = CHOOSE_TOPIC
         self.TEST = TEST
         self.ANSWER = ANSWER
         self.CONVERSATION = CONVERSATION
+        self.MAP = MAP
 
     def start(self, update, context):
         """
@@ -244,6 +246,89 @@ class CommandHandlers:
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
             return self.TOPIC
+        elif query.data == 'history_map':
+            # Обработка кнопки интерактивной карты
+            user_id = query.from_user.id
+            self.logger.info(f"Пользователь {user_id} запросил историческую карту")
+            
+            # Создаем клавиатуру для выбора категории событий на карте
+            categories = self.history_map.get_categories()
+            keyboard = []
+            
+            # Добавляем кнопки для каждой категории
+            for category in categories:
+                keyboard.append([InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}')])
+            
+            # Добавляем кнопку для случайных событий и возврата в меню
+            keyboard.append([InlineKeyboardButton("🎲 Случайные события", callback_data='map_random')])
+            keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
+            
+            query.edit_message_text(
+                "🗺️ *Интерактивная карта исторических событий*\n\n"
+                "Выберите категорию исторических событий для отображения на карте или "
+                "посмотрите случайные события из разных периодов истории России.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            return self.MAP
+            
+        elif query.data.startswith('map_category_'):
+            # Обработка выбора категории на карте
+            category = query.data[13:]  # map_category_{category}
+            user_id = query.from_user.id
+            self.logger.info(f"Пользователь {user_id} выбрал категорию карты: {category}")
+            
+            # Генерируем URL для просмотра карты с выбранной категорией
+            map_url = self.history_map.generate_map_url(category=category)
+            
+            # Создаем кнопки для просмотра карты и возврата к выбору категории
+            keyboard = [
+                [InlineKeyboardButton("🌐 Открыть карту в браузере", url=map_url)],
+                [InlineKeyboardButton("⬅️ К выбору категории", callback_data='history_map')],
+                [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+            ]
+            
+            query.edit_message_text(
+                f"📍 *Категория: {category}*\n\n"
+                f"Вы выбрали категорию исторических событий: *{category}*\n\n"
+                f"Нажмите на кнопку ниже, чтобы открыть интерактивную карту с событиями этой категории.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            return self.MAP
+            
+        elif query.data == 'map_random':
+            # Обработка выбора случайных событий
+            user_id = query.from_user.id
+            self.logger.info(f"Пользователь {user_id} запросил случайные события на карте")
+            
+            # Получаем случайные события
+            random_events = self.history_map.get_random_events(5)
+            
+            # Генерируем URL для просмотра карты со случайными событиями
+            map_url = self.history_map.generate_map_url(events=random_events)
+            
+            # Формируем список событий для отображения
+            events_list = "\n".join([f"• *{event['title']}* ({event.get('date', 'Дата неизвестна')})" for event in random_events])
+            
+            # Создаем кнопки для просмотра карты и возврата к выбору категории
+            keyboard = [
+                [InlineKeyboardButton("🌐 Открыть карту в браузере", url=map_url)],
+                [InlineKeyboardButton("🎲 Другие случайные события", callback_data='map_random')],
+                [InlineKeyboardButton("⬅️ К выбору категории", callback_data='history_map')],
+                [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+            ]
+            
+            query.edit_message_text(
+                "🎲 *Случайные исторические события*\n\n"
+                "Для вас выбраны следующие события из истории России:\n"
+                f"{events_list}\n\n"
+                "Нажмите на кнопку ниже, чтобы увидеть эти события на интерактивной карте.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            return self.MAP
+            
         elif query.data == 'conversation':
             # Обработка кнопки беседы о истории России
             query.edit_message_text(

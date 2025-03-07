@@ -18,6 +18,7 @@ class UIManager:
         keyboard = [
             [InlineKeyboardButton("🔍 Выбрать тему", callback_data='topic')],
             [InlineKeyboardButton("✅ Пройти тест", callback_data='test')],
+            [InlineKeyboardButton("🗺️ Историческая карта", callback_data='history_map')],
             [InlineKeyboardButton("💬 Беседа о истории России", callback_data='conversation')],
             [InlineKeyboardButton("ℹ️ Информация о проекте", callback_data='project_info')],
             [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
