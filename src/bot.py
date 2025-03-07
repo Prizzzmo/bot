@@ -1,3 +1,4 @@
+import threading
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 
 from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
@@ -75,3 +76,15 @@ class Bot:
             # Попытка принудительного завершения updater если он был создан
             if hasattr(self, 'updater'):
                 self.updater.stop()
+
+
+class BotManager:
+    """Класс для управления запуском бота и его жизненным циклом"""
+    
+    def __init__(self):
+        self.logger = None
+        
+    def run(self):
+        """Запускает основную функцию для инициализации и запуска бота"""
+        from main import main
+        main()
