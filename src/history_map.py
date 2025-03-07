@@ -176,7 +176,7 @@ class HistoryMap:
         Returns:
             str: URL для просмотра карты
         """
-        base_url = "https://" + os.environ.get("REPL_SLUG", "history-map") + "." + os.environ.get("REPL_OWNER", "repl") + ".repl.co/map"
+        base_url = "https://" + os.environ.get("REPL_SLUG", "history-map") + "." + os.environ.get("REPL_OWNER", "repl") + ".repl.co:8080/map"
 
         if category:
             return f"{base_url}?category={category}"

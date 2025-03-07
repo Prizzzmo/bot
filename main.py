@@ -66,7 +66,7 @@ def main():
     api_client = APIClient(config.gemini_api_key, api_cache, logger)
     message_manager = MessageManager(logger)
     content_service = ContentService(api_client, logger)
-    
+
     # Инициализируем сервис аналитики
     from src.analytics import Analytics
     analytics = Analytics(logger)

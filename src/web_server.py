@@ -68,6 +68,8 @@ class MapServer:
     def _run_server(self):
         """Внутренний метод для запуска сервера"""
         try:
-            self.app.run(host='0.0.0.0', port=8081, debug=False, use_reloader=False)
+            port = 8080  # Используем порт 8080, который по умолчанию открыт в Replit
+            self.app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+            self.logger.info(f"Веб-сервер запущен на порту {port}")
         except Exception as e:
             self.logger.error(f"Ошибка при запуске веб-сервера: {e}")
