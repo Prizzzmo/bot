@@ -60,10 +60,8 @@ class Bot:
         """Запуск бота"""
         try:
             self.logger.info("Бот успешно запущен")
-            print("Бот успешно запущен")
             self.updater.start_polling(timeout=30, read_latency=2.0, drop_pending_updates=True)
             self.updater.idle()
         except Exception as e:
             self.logger.log_error(e, "Критическая ошибка при запуске бота")
             self.logger.critical(f"Бот не был запущен из-за критической ошибки: {e}")
-            print(f"КРИТИЧЕСКАЯ ОШИБКА: {e}")

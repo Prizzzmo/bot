@@ -25,7 +25,6 @@ class Logger:
             log_dir = "logs"
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
-                print(f"Создана директория для логов: {log_dir}")
 
             # Дата для имени файла лога
             log_date = datetime.now().strftime('%Y%m%d')
@@ -35,16 +34,13 @@ class Logger:
             if os.path.exists(log_file_path):
                 with open(log_file_path, 'w') as f:
                     f.write("")
-                print(f"Лог бота очищен: {log_file_path}")
 
             # Очищаем временные логи в корневой директории, если они есть
             root_log_path = f"bot_log_{log_date}.log"
             if os.path.exists(root_log_path):
                 with open(root_log_path, 'w') as f:
                     f.write("")
-                print(f"Временный лог очищен: {root_log_path}")
 
-            print("Все логи успешно очищены")
             return log_dir, log_file_path
         except Exception as e:
             print(f"Ошибка при очистке логов: {e}")
@@ -62,23 +58,25 @@ class Logger:
         log_dir, log_file_path = self.clean_logs()
 
         # Расширенная настройка логирования
-        log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
         # Используем RotatingFileHandler для ограничения размера файлов логов
         file_handler = RotatingFileHandler(
             log_file_path, 
             maxBytes=10485760,  # 10 МБ
-            backupCount=5
+            backupCount=3
         )
         file_handler.setFormatter(log_formatter)
+        file_handler.setLevel(logging.ERROR)  # Записываем в файл только ошибки
 
         # Консольный вывод
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(log_formatter)
+        console_handler.setLevel(logging.ERROR)  # Выводим в консоль только ошибки и критические сообщения
 
         # Настройка корневого логгера
         logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.INFO)  # Базовый уровень логирования
 
         # Удаляем существующие обработчики, чтобы избежать дублирования
         for handler in logger.handlers[:]:
@@ -87,7 +85,7 @@ class Logger:
         logger.addHandler(file_handler)
         logger.addHandler(console_handler)
 
-        print(f"Логирование настроено. Файлы логов будут сохраняться в: {log_file_path}")
+        print(f"Логирование настроено. Сохраняются только записи о запуске и ошибках.")
         self.logger = logger
         return logger
     
@@ -113,21 +111,26 @@ class Logger:
             self.logger.error(f"Дополнительная информация: {additional_info}")
     
     def info(self, message):
-        """Логирование информационного сообщения"""
-        self.logger.info(message)
+        """Логирование информационного сообщения о запуске"""
+        # Логируем только сообщения о запуске
+        if "запуск" in message.lower() or "старт" in message.lower() or "инициализ" in message.lower():
+            self.logger.info(message)
+            print(message)
     
     def warning(self, message):
-        """Логирование предупреждения"""
-        self.logger.warning(message)
+        """Логирование только важных предупреждений"""
+        pass
     
     def error(self, message):
         """Логирование ошибки"""
         self.logger.error(message)
+        print(f"ОШИБКА: {message}")
     
     def debug(self, message):
-        """Логирование отладочного сообщения"""
-        self.logger.debug(message)
+        """Логирование отладочных сообщений отключено"""
+        pass
     
     def critical(self, message):
         """Логирование критической ошибки"""
         self.logger.critical(message)
+        print(f"КРИТИЧЕСКАЯ ОШИБКА: {message}")

@@ -16,7 +16,6 @@ def main():
         # Инициализируем логгер
         logger = Logger()
         logger.info("Запуск бота истории России...")
-        print("Начинаю запуск бота истории России...")
 
         # Инициализируем конфигурацию
         config = Config()
@@ -54,13 +53,11 @@ def main():
             bot.run()
         else:
             logger.error("Не удалось настроить бота")
-            print("Не удалось настроить бота")
 
     except Exception as e:
         if logger:
             logger.log_error(e, "Критическая ошибка при запуске бота")
             logger.critical(f"Бот не был запущен из-за критической ошибки: {e}")
-        print(f"КРИТИЧЕСКАЯ ОШИБКА: {e}")
 
 if __name__ == '__main__':
     main()
