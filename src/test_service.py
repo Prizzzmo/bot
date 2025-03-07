@@ -27,9 +27,9 @@ class TestService:
         Returns:
             dict: Данные теста с вопросами
         """
-        # Запрашиваем простой набор вопросов у API
-        prompt = f"Создай 5 простых вопросов для тестирования по теме '{topic}'. Каждый вопрос должен иметь 4 варианта ответа (1-4) и обязательно указанный правильный ответ в формате 'Правильный ответ: X'. Пронумеруй вопросы. НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.)."
-        response = self.api_client.ask_grok(prompt, use_cache=False)
+        # Запрашиваем набор из 20 вопросов у API
+        prompt = f"Создай 20 вопросов для тестирования по теме '{topic}'. Каждый вопрос должен иметь 4 варианта ответа, четко пронумерованных от 1 до 4. После каждого вопроса с вариантами укажи правильный ответ в формате 'Правильный ответ: X', где X - число от 1 до 4. Пронумеруй все вопросы. Обязательно форматируй варианты ответов в виде '1) Вариант', '2) Вариант' и т.д. НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.)."
+        response = self.api_client.ask_grok(prompt, max_tokens=4000, use_cache=False)
         
         # Разделяем текст на вопросы, используя либо пустые строки, либо номера
         raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', response)
@@ -114,26 +114,60 @@ class TestService:
         # Ищем варианты ответов
         options = []
         
-        # Сначала ищем стандартные форматы вариантов ответов (цифра с точкой или скобкой)
+        # Проверяем каждую строку на наличие вариантов ответов
+        option_patterns = [
+            r'^\d[\)\.]\s+', # 1) или 1. формат
+            r'^[A-D][\)\.]\s+', # A) или A. формат
+            r'^\(\d\)\s+', # (1) формат
+            r'^\([A-D]\)\s+', # (A) формат
+            r'^\d+\s*[-–—]\s+', # 1 - формат
+            r'^[A-D]\s*[-–—]\s+', # A - формат
+        ]
+        
         for line in cleaned_lines:
             # Пропускаем строку с вопросом
             if line == main_question:
                 continue
                 
-            # Проверяем разные форматы: 1) текст, 1. текст, A) текст, A. текст
-            if re.match(r'^\d[\)\.]\s+', line) or re.match(r'^[A-D][\)\.]\s+', line):
-                # Преобразуем буквенные варианты в цифровые (A → 1, B → 2, etc.)
-                if re.match(r'^[A-D][\)\.]\s+', line):
-                    letter = line[0]
-                    number = ord(letter) - ord('A') + 1
-                    text = line[2:].strip() if len(line) > 2 else f"Вариант {number}"
-                    options.append(f"{number}) {text}")
-                else:
-                    options.append(line)
+            # Проверяем все возможные форматы вариантов ответов
+            is_option = False
+            for pattern in option_patterns:
+                if re.match(pattern, line):
+                    is_option = True
+                    
+                    # Преобразуем все форматы в стандартный "1) Текст"
+                    if re.match(r'^[A-D]', line):  # Если начинается с буквы
+                        letter = line[0]
+                        number = ord(letter) - ord('A') + 1
+                        # Удаляем префикс и форматируем
+                        text = re.sub(r'^[A-D][\)\.\(\s-–—]+\s*', '', line).strip()
+                        options.append(f"{number}) {text}")
+                    else:  # Если начинается с цифры
+                        # Извлекаем номер
+                        match = re.match(r'^[(\s]*(\d+)[)\.\s-–—]+\s*', line)
+                        if match:
+                            number = match.group(1)
+                            # Удаляем префикс и форматируем
+                            text = re.sub(r'^[(\s]*\d+[)\.\s-–—]+\s*', '', line).strip()
+                            options.append(f"{number}) {text}")
+                        else:
+                            # Если не удалось извлечь номер, оставляем как есть
+                            options.append(line)
+                    break
+            
+            # Если строка не распознана как вариант, но содержит числа от 1 до 4, 
+            # то это может быть вариант ответа без явного форматирования
+            if not is_option and re.search(r'\b[1-4]\b', line):
+                for i in range(1, 5):
+                    if f" {i} " in f" {line} " or line.startswith(f"{i} "):
+                        text = re.sub(r'^\d+\s*', '', line).strip()
+                        options.append(f"{i}) {text}")
+                        is_option = True
+                        break
         
-        # Если стандартные варианты не найдены, пытаемся распознать другие форматы
+        # Если варианты всё еще не найдены, используем эвристический метод
         if not options:
-            # Рассматриваем каждую строку после вопроса как потенциальный вариант ответа
+            # Находим строки после вопроса
             option_index = 0
             for i, line in enumerate(cleaned_lines):
                 if line == main_question:
@@ -143,12 +177,16 @@ class TestService:
             # Берем до 4-х строк после вопроса как варианты ответов
             for i in range(option_index, min(option_index + 4, len(cleaned_lines))):
                 if i < len(cleaned_lines):
+                    # Форматируем каждую строку как вариант ответа
                     options.append(f"{i - option_index + 1}) {cleaned_lines[i]}")
         
         # Если всё еще нет вариантов или их меньше 4, добавляем заполнители
         if len(options) < 4:
             for i in range(len(options), 4):
                 options.append(f"{i+1}) Вариант ответа {i+1}")
+        
+        # Ограничиваем количество вариантов до 4
+        options = options[:4]
                 
         return {
             "main_question": main_question,

@@ -688,10 +688,13 @@ class CommandHandlers:
                 return self.TOPIC
 
             # Генерируем тест из вопросов
-            query.edit_message_text(f"🧠 Генерирую тест по теме: *{topic}*...", parse_mode='Markdown')
+            query.edit_message_text(f"🧠 Генерирую тест по теме: *{topic}*...\n\nПодготовка 20 вопросов может занять некоторое время. Пожалуйста, подождите.", parse_mode='Markdown')
             self.logger.info(f"Генерация теста по теме '{topic}' для пользователя {user_id}")
 
             try:
+                # Отправляем индикатор печати, пока генерируются вопросы
+                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
+                
                 # Получаем тест через сервис тестирования
                 test_data = self.test_service.generate_test(topic)
 
@@ -719,7 +722,7 @@ class CommandHandlers:
 
                 # Отправляем сообщение с началом теста без форматирования Markdown
                 query.edit_message_text(
-                    f"📝 Тест по теме: {topic}\n\nНачинаем тест из {len(valid_questions)} вопросов! Вот первый вопрос:"
+                    f"📝 Тест по теме: {topic}\n\nНачинаем тест из {len(valid_questions)} вопросов! Это позволит всесторонне проверить ваши знания по данной теме. Вот первый вопрос:"
                 )
 
                 # Проверяем существование первого вопроса
@@ -1160,9 +1163,14 @@ class CommandHandlers:
 
             # Отправляем несколько сообщений для лучшего форматирования
 
+            # Вычисляем процент выполнения теста
+            completion_percent = int((current_question / total_questions) * 100)
+            progress_bar = "▓" * (completion_percent // 5) + "░" * (20 - (completion_percent // 5))
+            
             # 1. Сообщение с информацией о прогрессе теста
             progress_text = (f"🧠 Вопрос {current_question+1} из {total_questions}\n"
-                            f"(правильно отвечено: {context.user_data.get('score', 0)} из {current_question})")
+                            f"{progress_bar} {completion_percent}%\n"
+                            f"Правильно отвечено: {context.user_data.get('score', 0)} из {current_question}")
             sent_msg1 = update.message.reply_text(progress_text)
             self.message_manager.save_message_id(update, context, sent_msg1.message_id)
 
@@ -1171,9 +1179,24 @@ class CommandHandlers:
             self.message_manager.save_message_id(update, context, sent_msg2.message_id)
 
             # 3. Отдельное сообщение с вариантами ответов
-            options_text = "\n".join(options)
-            sent_msg3 = update.message.reply_text(options_text)
-            self.message_manager.save_message_id(update, context, sent_msg3.message_id)
+            # Проверяем, что у нас есть варианты ответов
+            if options and len(options) == 4:
+                options_text = "\n".join(options)
+                sent_msg3 = update.message.reply_text(options_text)
+                self.message_manager.save_message_id(update, context, sent_msg3.message_id)
+            else:
+                # Если вариантов нет или их неправильное количество, создаем стандартные
+                standard_options = [
+                    "1) Первый вариант ответа",
+                    "2) Второй вариант ответа",
+                    "3) Третий вариант ответа",
+                    "4) Четвертый вариант ответа"
+                ]
+                options_text = "\n".join(standard_options)
+                sent_msg3 = update.message.reply_text(
+                    "Варианты ответов:\n" + options_text + "\n\n⚠️ Примечание: варианты ответов могли быть сгенерированы автоматически из-за проблемы с форматированием."
+                )
+                self.message_manager.save_message_id(update, context, sent_msg3.message_id)
 
             # 4. Сообщение с инструкцией и кнопкой для завершения
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
@@ -1242,6 +1265,24 @@ class CommandHandlers:
             else:
                 assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
                 grade = "Неудовлетворительно"
+                
+            # Определение уровня знаний по 20-балльной шкале для более точной оценки
+            if total_questions == 20:
+                if score >= 18:  # 90-100%
+                    level = "Экспертный уровень"
+                elif score >= 16:  # 80-89%
+                    level = "Продвинутый уровень"
+                elif score >= 14:  # 70-79%
+                    level = "Хороший уровень"
+                elif score >= 12:  # 60-69%
+                    level = "Средний уровень"
+                elif score >= 10:  # 50-59%
+                    level = "Базовый уровень"
+                else:  # < 50%
+                    level = "Начальный уровень"
+                
+                # Добавляем уровень знаний к оценке
+                assessment = f"{assessment}\n\nУровень знаний: *{level}*"
 
             # Получаем рекомендации похожих тем
             similar_topics = self.recommend_similar_topics(topic, context)
