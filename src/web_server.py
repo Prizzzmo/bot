@@ -62,13 +62,12 @@ class MapServer:
     def run(self):
         """Запуск веб-сервера в отдельном потоке"""
         threading.Thread(target=self._run_server, daemon=True).start()
-        self.logger.info("Веб-сервер с интерактивной картой запущен на порту 8080")
 
     def _run_server(self):
         """Внутренний метод для запуска сервера"""
         try:
             port = 8080  # Используем порт 8080, который по умолчанию открыт в Replit
-            self.app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
-            self.logger.info(f"Веб-сервер запущен на порту {port}")
+            self.logger.info(f"Запуск веб-сервера интерактивной карты на порту {port}")
+            self.app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False, threaded=True)
         except Exception as e:
-            self.logger.error(f"Ошибка при запуске веб-сервера: {e}")
+            self.logger.error(f"Ошибка при запуске веб-сервера карты: {e}")

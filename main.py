@@ -58,10 +58,12 @@ def main():
     # from src.history_map import HistoryMap
     # history_map = HistoryMap(logger)
 
-    # Создаем и запускаем веб-сервер
+    # Создаем и запускаем веб-сервер для карты
     from src.web_server import MapServer
     map_server = MapServer(history_map, logger)
     map_server.run()
+    
+    logger.info("Веб-сервер с интерактивной картой запущен на порту 8080")
 
     # Создаем обработчик команд
     handlers = CommandHandlers(ui_manager, api_client, message_manager, content_service, logger, config)
