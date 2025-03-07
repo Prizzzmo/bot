@@ -51,8 +51,12 @@ class BotFactory:
         # Создаем менеджер сообщений
         message_manager = MessageManager(logger)
 
-        # Создаем UI-менеджер
-        ui_manager = UIManager(logger)
+        # Создаем сервисы для тестов и тем
+        test_service = TestService(api_client, logger)
+        topic_service = TopicService(api_client, logger)
+        
+        # Создаем UI-менеджер с передачей topic_service
+        ui_manager = UIManager(logger, topic_service)
 
         # Создаем сервис контента
         content_service = ContentService(api_client, logger)
@@ -84,9 +88,7 @@ class BotFactory:
             history_map_service=history_map_service
         )
 
-        #Создаем сервисы для тестов и тем
-        test_service = TestService(api_client, logger)
-        topic_service = TopicService(api_client, logger)
+        # Сервисы для тестов и тем уже созданы выше
 
         # Создаем бота
         bot = Bot(
