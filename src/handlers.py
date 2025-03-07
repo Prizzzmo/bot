@@ -697,6 +697,33 @@ class CommandHandlers:
         )
 
         return self.TOPIC
+        
+    def clear_client_command(self, update, context):
+        """
+        Обрабатывает команду /clear_client для очистки чата на стороне клиента.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        user_id = update.message.from_user.id
+        self.logger.info(f"Пользователь {user_id} запросил очистку чата на стороне клиента")
+
+        # Очищаем чат на стороне клиента
+        success = self.message_manager.clear_chat_client_side(update, context)
+
+        if success:
+            update.message.reply_text(
+                "✅ Команда очистки чата отправлена успешно! Выберите действие:",
+                reply_markup=self.ui_manager.main_menu()
+            )
+        else:
+            update.message.reply_text(
+                "❌ Не удалось выполнить очистку чата на стороне клиента. Выберите действие:",
+                reply_markup=self.ui_manager.main_menu()
+            )
+
+        return self.TOPIC
 
     def admin_command(self, update, context):
         """
