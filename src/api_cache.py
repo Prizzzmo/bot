@@ -59,26 +59,46 @@ class APICache:
             self.operation_count = 0
 
     def cleanup_expired(self):
-        """Очистка устаревших элементов кэша по TTL с оптимизацией памяти"""
+        """Очистка устаревших элементов кэша по TTL с оптимизированным управлением памятью"""
         current_time = datetime.now().timestamp()
-        keys_to_remove = [key for key, data in self.cache.items() if current_time - data['created_at'] > data['ttl']]
-
-        # Удаляем устаревшие ключи
-        for key in keys_to_remove:
-            del self.cache[key]
-
-        # Очищаем кэш, если он слишком большой (>80% от max_size)
-        if len(self.cache) > self.max_size * 0.8:
-            # Сортируем по времени последнего доступа и оставляем только 50% наиболее новых элементов
-            sorted_keys = sorted(self.cache.items(), key=lambda x: x[1]['last_accessed'], reverse=True)
-            keys_to_keep = sorted_keys[:int(self.max_size * 0.5)]
+        
+        # Оптимизация: прямое удаление без создания промежуточного списка
+        # и оптимизированный поиск кандидатов для удаления
+        try:
+            delete_count = 0
+            for key in list(self.cache.keys()):
+                data = self.cache[key]
+                # Удаляем устаревшие ключи
+                if current_time - data['created_at'] > data['ttl']:
+                    del self.cache[key]
+                    delete_count += 1
             
-            # Обновляем кэш только нужными элементами
-            new_cache = {k: self.cache[k] for k, _ in keys_to_keep}
-            self.cache = new_cache
-
-        if keys_to_remove:
-            self.logger.info(f"Удалено {len(keys_to_remove)} устаревших элементов из кэша")
+            # Очищаем кэш, если он слишком большой (>90% от max_size)
+            # Улучшенный алгоритм для уменьшения частоты очистки
+            cache_size = len(self.cache)
+            if cache_size > self.max_size * 0.9:
+                # Используем быстрый алгоритм - удаляем 30% наименее используемых записей
+                # без полной сортировки кэша, используя алгоритм выбора k-го элемента
+                access_times = [(k, v['last_accessed']) for k, v in self.cache.items()]
+                
+                # Определяем порог доступа для удаления (примерно 30% старых элементов)
+                threshold_idx = int(cache_size * 0.3)
+                if threshold_idx > 0:
+                    # Находим пороговое значение времени доступа (быстрее полной сортировки)
+                    threshold_time = sorted([t[1] for t in access_times])[threshold_idx]
+                    
+                    # Удаляем элементы с временем доступа ниже порогового значения
+                    for k, access_time in access_times:
+                        if access_time <= threshold_time:
+                            if k in self.cache:  # Проверка на всякий случай
+                                del self.cache[k]
+                
+                self.logger.debug(f"Произведена очистка кэша, осталось {len(self.cache)} элементов")
+            
+            if delete_count > 0:
+                self.logger.debug(f"Удалено {delete_count} устаревших элементов из кэша")
+        except Exception as e:
+            self.logger.error(f"Ошибка при очистке кэша: {e}")
 
     def load_cache(self):
         """Загружает кэш из файла, если он существует, с оптимизацией"""

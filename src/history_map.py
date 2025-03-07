@@ -1,4 +1,273 @@
 
+import os
+import json
+import random
+import time
+import threading
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from datetime import datetime
+import numpy as np
+import concurrent.futures
+
+class HistoryMap:
+    """Класс для работы с картой исторических событий с оптимизацией производительности"""
+    
+    def __init__(self, logger):
+        self.logger = logger
+        self.events_file = "historical_events.json"
+        self.events_data = self._load_events_data()
+        self.map_cache = {}  # Кэш для сгенерированных карт
+        self.cache_lock = threading.RLock()  # Блокировка для потокобезопасного доступа к кэшу
+        self.max_cache_size = 10  # Максимальное количество элементов в кэше
+        self.map_generation_lock = threading.Semaphore(2)  # Ограничиваем одновременную генерацию карт
+        
+    def _load_events_data(self):
+        """Загружает данные о исторических событиях"""
+        try:
+            if os.path.exists(self.events_file):
+                with open(self.events_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {"events": [], "categories": []}
+        except Exception as e:
+            self.logger.error(f"Ошибка при загрузке исторических событий: {e}")
+            return {"events": [], "categories": []}
+    
+    def get_categories(self):
+        """Возвращает список категорий исторических событий"""
+        categories = self.events_data.get("categories", [])
+        # Возвращаем копию для предотвращения изменений извне
+        return categories.copy()
+    
+    def get_random_events(self, count=5):
+        """Возвращает случайные исторические события"""
+        events = self.events_data.get("events", [])
+        return random.sample(events, min(count, len(events)))
+    
+    def generate_map_image(self, category=None, events=None):
+        """
+        Генерирует изображение карты с историческими событиями
+        с оптимизацией кэширования и параллельной обработки.
+        
+        Args:
+            category (str, optional): Категория событий для отображения
+            events (list, optional): Список событий для отображения
+            
+        Returns:
+            str: Путь к сгенерированному изображению
+        """
+        # Оптимизация: используем кэш для часто запрашиваемых карт
+        cache_key = f"map_{category}_{hash(str(events))}"
+        
+        with self.cache_lock:
+            # Проверяем кэш
+            if cache_key in self.map_cache:
+                cached_path, timestamp = self.map_cache[cache_key]
+                # Проверяем существование файла и его возраст (не старше 30 минут)
+                if os.path.exists(cached_path) and (time.time() - timestamp) < 1800:
+                    self.logger.debug(f"Использую кэшированную карту: {cached_path}")
+                    return cached_path
+        
+        # Ограничиваем количество одновременных генераций карт
+        with self.map_generation_lock:
+            try:
+                # Создаем директорию для карт, если не существует
+                maps_dir = "generated_maps"
+                if not os.path.exists(maps_dir):
+                    os.makedirs(maps_dir)
+                
+                # Оптимизированная генерация имени файла
+                timestamp = int(time.time())
+                map_path = f"{maps_dir}/map_{timestamp}.png"
+                
+                # Оптимизированный выбор событий для отображения с использованием NumPy
+                if events:
+                    selected_events = events
+                elif category:
+                    # Фильтруем события только по категории для ускорения
+                    selected_events = [e for e in self.events_data.get("events", []) 
+                                      if category in e.get("categories", [])]
+                else:
+                    # Выбираем подмножество случайных событий для оптимизации
+                    all_events = self.events_data.get("events", [])
+                    if len(all_events) > 20:
+                        selected_events = random.sample(all_events, 20)
+                    else:
+                        selected_events = all_events
+                
+                # Проверяем количество событий
+                if not selected_events:
+                    self.logger.warning(f"Нет событий для категории: {category}")
+                    return None
+                
+                # Создаем фигуру с оптимизированными настройками для ускорения рендеринга
+                plt.figure(figsize=(10, 8), dpi=100)
+                
+                # Подготавливаем данные для визуализации с использованием NumPy для векторизации
+                coords = np.array([(e.get("longitude", 0), e.get("latitude", 0)) 
+                                 for e in selected_events])
+                
+                # Оптимизированная генерация цветов
+                markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*']
+                colors = list(mcolors.TABLEAU_COLORS)
+                
+                # Рисуем карту с оптимизацией
+                plt.scatter(coords[:, 0], coords[:, 1], c=colors[:1], 
+                           marker='o', s=80, alpha=0.7)
+                
+                # Добавляем метки с номерами оптимизированным способом
+                for i, (event, (lon, lat)) in enumerate(zip(selected_events, coords)):
+                    plt.annotate(str(i+1), (lon, lat), fontsize=9, 
+                                ha='center', va='center')
+                
+                # Добавляем описание событий
+                event_descriptions = []
+                for i, event in enumerate(selected_events[:20]):  # Ограничиваем для читаемости
+                    event_descriptions.append(f"{i+1}. {event.get('name', 'Нет названия')} "
+                                            f"({event.get('year', 'Год неизвестен')})")
+                
+                # Добавляем текст описания с разделением на колонки
+                plt.figtext(0.05, 0.02, '\n'.join(event_descriptions[:10]), 
+                           fontsize=8, wrap=True, va='bottom')
+                if len(event_descriptions) > 10:
+                    plt.figtext(0.55, 0.02, '\n'.join(event_descriptions[10:20]), 
+                              fontsize=8, wrap=True, va='bottom')
+                
+                # Добавляем заголовок карты
+                title = f"Исторические события России: {category}" if category else "Исторические события России"
+                plt.title(title)
+                
+                # Сохраняем карту с оптимизированными настройками
+                plt.tight_layout(rect=[0, 0.1, 1, 0.97])  # Оптимизация размеров
+                plt.savefig(map_path, bbox_inches='tight', pad_inches=0.2)
+                plt.close()
+                
+                # Сохраняем в кэш
+                with self.cache_lock:
+                    # Удаляем старые элементы, если кэш переполнен
+                    if len(self.map_cache) >= self.max_cache_size:
+                        oldest_key = min(self.map_cache, key=lambda k: self.map_cache[k][1])
+                        del self.map_cache[oldest_key]
+                    
+                    self.map_cache[cache_key] = (map_path, time.time())
+                
+                return map_path
+            except Exception as e:
+                self.logger.error(f"Ошибка при генерации карты: {e}")
+                return None
+    
+    def generate_map_by_topic(self, topic):
+        """
+        Генерирует карту по заданной теме с оптимизированной параллельной обработкой.
+        
+        Args:
+            topic (str): Тема для поиска событий
+            
+        Returns:
+            str: Путь к сгенерированному изображению
+        """
+        # Оптимизируем поиск событий по теме с использованием параллельных вычислений
+        all_events = self.events_data.get("events", [])
+        
+        def match_event(event):
+            """Проверяет соответствие события теме (для параллельной обработки)"""
+            event_name = event.get("name", "").lower()
+            event_desc = event.get("description", "").lower()
+            topic_lower = topic.lower()
+            
+            # Оптимизированная проверка соответствия
+            if topic_lower in event_name or topic_lower in event_desc:
+                return True
+                
+            # Обрабатываем ключевые слова из темы
+            topic_words = set(topic_lower.split())
+            name_words = set(event_name.split())
+            desc_words = set(event_desc.split())
+            
+            # Проверяем пересечение множеств слов (быстрее чем поиск подстрок)
+            if topic_words.intersection(name_words) or topic_words.intersection(desc_words):
+                return True
+                
+            return False
+            
+        # Используем параллельную обработку для поиска соответствующих событий
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            matches = list(executor.map(match_event, all_events))
+            
+        # Формируем список событий по результатам параллельной обработки
+        matching_events = [event for event, match in zip(all_events, matches) if match]
+        
+        # Если находим слишком много событий, ограничиваем для читаемости
+        if len(matching_events) > 15:
+            matching_events = random.sample(matching_events, 15)
+            
+        # Если событий недостаточно, пробуем использовать более общий подход
+        if len(matching_events) < 3:
+            self.logger.debug(f"Недостаточно событий ({len(matching_events)}) для темы: {topic}")
+            # Находим хотя бы какие-то события, которые могут быть связаны
+            years_match = []
+            for event in all_events:
+                for word in topic.lower().split():
+                    if word.isdigit() and word in str(event.get("year", "")):
+                        years_match.append(event)
+                        break
+            
+            # Добавляем события по годам, если нашли
+            if years_match:
+                matching_events.extend(years_match)
+                # Убираем дубликаты
+                matching_events = list({e.get("id", i): e for i, e in enumerate(matching_events)}.values())
+                
+            # Если всё еще недостаточно, добавляем случайные события
+            if len(matching_events) < 5:
+                random_events = random.sample(all_events, min(5, len(all_events)))
+                matching_events.extend(random_events)
+                # Убираем дубликаты
+                matching_events = list({e.get("id", i): e for i, e in enumerate(matching_events)}.values())
+        
+        # Генерируем карту с найденными событиями
+        return self.generate_map_image(events=matching_events)
+    
+    def clean_old_maps(self, max_age_hours=24):
+        """Очищает старые сгенерированные карты для экономии места"""
+        try:
+            maps_dir = "generated_maps"
+            if not os.path.exists(maps_dir):
+                return
+                
+            current_time = time.time()
+            max_age_seconds = max_age_hours * 3600
+            
+            # Используем оптимизированный подход с одним циклом
+            deleted_count = 0
+            for filename in os.listdir(maps_dir):
+                if filename.startswith("map_") and filename.endswith(".png"):
+                    file_path = os.path.join(maps_dir, filename)
+                    # Проверяем возраст файла
+                    file_age = current_time - os.path.getmtime(file_path)
+                    
+                    # Проверяем, не используется ли файл в кэше
+                    is_cached = False
+                    with self.cache_lock:
+                        for path, _ in self.map_cache.values():
+                            if path == file_path:
+                                is_cached = True
+                                break
+                    
+                    # Удаляем старые файлы, которые не в кэше
+                    if file_age > max_age_seconds and not is_cached:
+                        try:
+                            os.remove(file_path)
+                            deleted_count += 1
+                        except Exception as e:
+                            self.logger.debug(f"Не удалось удалить файл {file_path}: {e}")
+            
+            if deleted_count > 0:
+                self.logger.debug(f"Очищено {deleted_count} старых карт")
+        except Exception as e:
+            self.logger.error(f"Ошибка при очистке старых карт: {e}")
+
+
 import random
 import json
 import os

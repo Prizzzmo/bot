@@ -110,7 +110,53 @@ class Logger:
         if additional_info:
             self.logger.error(f"Дополнительная информация: {additional_info}")
 
+    # Добавляем буферизированное логирование для повышения производительности
+    def __init__(self, name):
+        self.logger = logging.getLogger(name)
+        self.log_buffer = []
+        self.buffer_size = 100
+        self.buffer_lock = threading.Lock()
+        self.flush_timer = None
+        self.setup_flush_timer()
+        
+    def setup_flush_timer(self):
+        """Настраивает таймер для периодического сброса буфера логов"""
+        self.flush_timer = threading.Timer(30.0, self.flush_buffer)
+        self.flush_timer.daemon = True
+        self.flush_timer.start()
+        
+    def flush_buffer(self):
+        """Сбрасывает буфер логов на диск"""
+        with self.buffer_lock:
+            if self.log_buffer:
+                for level, msg in self.log_buffer:
+                    if level == 'debug':
+                        self.logger.debug(msg)
+                    elif level == 'info':
+                        self.logger.info(msg)
+                    elif level == 'warning':
+                        self.logger.warning(msg)
+                    elif level == 'error':
+                        self.logger.error(msg)
+                self.log_buffer = []
+        
+        # Перезапускаем таймер
+        self.setup_flush_timer()
+        
+    def add_to_buffer(self, level, message):
+        """Добавляет сообщение в буфер логов"""
+        with self.buffer_lock:
+            self.log_buffer.append((level, message))
+            if len(self.log_buffer) >= self.buffer_size:
+                self.flush_buffer()
+                
+    def debug(self, message):
+        """Логирует отладочное сообщение с буферизацией для неважных сообщений"""
+        self.add_to_buffer('debug', message)
+
     def info(self, message):
+        """Логирует информационное сообщение с буферизацией"""
+        self.add_to_buffer('info', message)
         """Логирование информационного сообщения о запуске"""
         # Логируем только сообщения о запуске и критичные операции
         important_keywords = ["запуск", "старт", "инициализ", "остановк", "завершен", "конфликт"]
