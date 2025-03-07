@@ -1,7 +1,8 @@
 import telegram
 import re
 import random
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatAction
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ChatAction
 from telegram.ext import ConversationHandler
 
 class CommandHandlers:
