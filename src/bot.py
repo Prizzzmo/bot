@@ -56,6 +56,9 @@ class Bot:
             dp.add_error_handler(self.handlers.error_handler)
             dp.add_handler(conv_handler)
             
+            # Добавляем обработчик для команды очистки чата
+            dp.add_handler(CommandHandler('clear', self.handlers.clear_command))
+            
             # Добавляем обработчик для команды администратора
             dp.add_handler(CommandHandler('admin', self.handlers.admin_command))
             

@@ -644,6 +644,28 @@ class CommandHandlers:
 
         return self.CONVERSATION
     
+    def clear_command(self, update, context):
+        """
+        Обрабатывает команду /clear для очистки истории чата.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        user_id = update.message.from_user.id
+        self.logger.info(f"Пользователь {user_id} запросил очистку чата")
+        
+        # Вызываем очистку чата
+        self.message_manager.clear_all(update, context)
+        
+        # Отправляем новое сообщение после очистки
+        update.message.reply_text(
+            "Чат очищен! Выберите действие:",
+            reply_markup=self.ui_manager.main_menu()
+        )
+        
+        return self.TOPIC
+        
     def admin_command(self, update, context):
         """
         Обрабатывает команду /admin для доступа к административной панели.

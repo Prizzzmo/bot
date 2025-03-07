@@ -59,6 +59,143 @@ class MessageManager:
 
         # Используем блокировку для предотвращения конкурентных операций удаления
         with self._deletion_lock:
+            chat_id = update.effective_chat.id
+            # Инициализация списка сообщений, если его нет
+            if 'previous_messages' not in context.user_data:
+                context.user_data['previous_messages'] = []
+                return
+                
+            # Копируем список, чтобы не изменять его во время перебора
+            message_ids = context.user_data['previous_messages'].copy()
+            
+            # Если список пуст, ничего не делаем
+            if not message_ids:
+                return
+                
+            # Исключаем сообщение, которое нужно сохранить
+            if preserve_message_id and preserve_message_id in message_ids:
+                message_ids.remove(preserve_message_id)
+            
+            # Счетчики для статистики
+            total = len(message_ids)
+            deleted = 0
+            failed = 0
+            error_types = {}
+            
+            # Функция для удаления одного сообщения с обработкой ошибок
+            def delete_single_message(msg_id):
+                nonlocal deleted, failed
+                
+                try:
+                    context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                    deleted += 1
+                    return True
+                except telegram.error.BadRequest as e:
+                    # Классифицируем ошибки для лучшего логирования
+                    error_message = str(e).lower()
+                    error_category = "unknown"
+                    
+                    if "message to delete not found" in error_message:
+                        error_category = "not_found"
+                    elif "message can't be deleted" in error_message:
+                        error_category = "cannot_delete"
+                    elif "message is too old" in error_message:
+                        error_category = "too_old"
+                    
+                    self.logger.debug(f"Не удалось удалить сообщение {msg_id}: {error_category}")
+                    
+                    # Подсчитываем типы ошибок
+                    if error_category not in error_types:
+                        error_types[error_category] = 0
+                    error_types[error_category] += 1
+                    
+                    failed += 1
+                    return False
+                except Exception as e:
+                    self.logger.error(f"Неожиданная ошибка при удалении сообщения {msg_id}: {e}")
+                    failed += 1
+                    return False
+            
+            # Разбиваем удаление на небольшие пакеты для снижения нагрузки на API
+            batch_size = 3  # Очень маленький размер пакета для надежности
+            for i in range(0, len(message_ids), batch_size):
+                batch = message_ids[i:i+batch_size]
+                
+                # Удаляем каждое сообщение последовательно для максимальной надежности
+                for msg_id in batch:
+                    delete_single_message(msg_id)
+                    # Добавляем небольшую паузу между каждым удалением
+                    time.sleep(0.2)
+                
+                # Пауза между пакетами для предотвращения ограничения API
+                time.sleep(0.5)
+            
+            # Обновляем список сохраненных сообщений
+            # Сохраняем только активное сообщение (если оно есть)
+            if preserve_message_id:
+                context.user_data['previous_messages'] = [preserve_message_id]
+            else:
+                context.user_data['previous_messages'] = []
+            
+            # Логируем результаты очистки
+            self.logger.info(f"Очистка чата: удалено {deleted}/{total} сообщений, ошибок: {failed}")
+            if error_types:
+                self.logger.info(f"Типы ошибок при удалении: {error_types}")
+                
+    def clean_all_messages_except_active(self, update, context):
+        """
+        Очищает все сообщения в чате, кроме активного.
+        Используется перед отправкой новых сообщений.
+        
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        # Определяем активное сообщение
+        active_message_id = None
+        
+        if update.callback_query and update.callback_query.message:
+            active_message_id = update.callback_query.message.message_id
+        
+        # Вызываем основную функцию очистки с сохранением активного сообщения
+        self.clear_chat_history(update, context, preserve_message_id=active_message_id)
+    
+    def clear_all(self, update, context):
+        """
+        Принудительная полная очистка всех сообщений без исключений.
+        Используется по команде /clear_all
+        
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        # Проверяем, что обновление содержит необходимые данные
+        if not update or not update.effective_chat or not context:
+            self.logger.warning("Недостаточно данных для полной очистки чата")
+            return
+            
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id if update.effective_user else "Неизвестный"
+        
+        self.logger.info(f"Запрос полной очистки чата от пользователя {user_id}")
+        
+        try:
+            # Очищаем список предыдущих сообщений перед удалением
+            if 'previous_messages' in context.user_data:
+                num_messages = len(context.user_data['previous_messages'])
+                context.user_data['previous_messages'] = []
+                
+                # Уведомляем о результате (если это не команда из обработчика)
+                if update.message:
+                    update.message.reply_text(f"✅ Очистка завершена. Удалено {num_messages} сообщений из истории.")
+            else:
+                # Если список не был инициализирован
+                if update.message:
+                    update.message.reply_text("✅ История сообщений уже пуста.")
+        except Exception as e:
+            self.logger.error(f"Ошибка при полной очистке чата: {e}")
+            if update.message:
+                update.message.reply_text(f"❌ Ошибка при очистке чата: {e}")tion_lock:
             try:
                 chat_id = update.effective_chat.id
                 
