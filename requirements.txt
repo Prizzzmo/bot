@@ -16,3 +16,5 @@ pillow
 jinja2
 basemap
 matplotlib
+pandas
+pandas

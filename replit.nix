@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.glibcLocales
     pkgs.geos
     pkgs.geckodriver
     pkgs.qhull
