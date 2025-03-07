@@ -127,8 +127,7 @@ class CommandHandlers:
             for k in old_keys:
                 del self.callback_cache[k]
 
-        # Очищаем историю чата только один раз для экономии ресурсов
-        self.message_manager.clean_all_messages_except_active(update, context)
+        # Функция очистки чата удалена
 
         self.logger.info(f"Пользователь {user_id} нажал кнопку: {query_data}")
 
@@ -1084,9 +1083,7 @@ class CommandHandlers:
             query.answer()
             user_id = query.from_user.id
 
-            # Очищаем историю чата перед новым действием (двойной вызов)
-            self.message_manager.clear_chat_history(update, context)
-            self.message_manager.clear_chat_history(update, context)
+            # Функция очистки чата удалена
 
             self.logger.info(f"Пользователь {user_id} выбирает тему через кнопку: {query.data}")
 
@@ -1315,9 +1312,7 @@ class CommandHandlers:
         user_id = update.message.from_user.id
         context.user_data['current_topic'] = topic
 
-        # Очищаем историю чата перед обработкой новой темы (двойной вызов)
-        self.message_manager.clear_chat_history(update, context)
-        self.message_manager.clear_chat_history(update, context)
+        # Функция очистки чата удалена
 
         self.logger.info(f"Пользователь {user_id} ввел свою тему: {topic}")
 
@@ -1410,8 +1405,7 @@ class CommandHandlers:
         user_answer = update.message.text.strip()
         user_id = update.message.from_user.id
 
-        # Очищаем историю чата перед ответом на новый вопрос
-        self.message_manager.clear_chat_history(update, context)
+        # Функция очистки чата удалена
 
         # Получаем сохраненные данные теста
         questions = context.user_data.get('questions', [])
