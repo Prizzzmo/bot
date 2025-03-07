@@ -209,10 +209,66 @@ class CommandHandlers:
                 # Отправляем отдельное сообщение со ссылками на скачивание
                 download_message = "📥 *Скачать презентацию:*\n\n"
                 
-                # Отправляем файлы напрямую как документы
+                # Проверяем наличие Replit Object Storage и инициализируем
                 try:
-                    # Проверяем существование файла перед открытием
+                    from replit.object_storage import Client
+                    obj_storage_available = True
+                    self.logger.info("Инициализация Object Storage для хранения презентаций")
+                    storage_client = Client()
+                except ImportError:
+                    obj_storage_available = False
+                    self.logger.warning("Replit Object Storage не доступен. Будет использоваться локальное хранение.")
+                except Exception as storage_init_error:
+                    obj_storage_available = False
+                    self.logger.error(f"Ошибка при инициализации Object Storage: {storage_init_error}")
+                
+                # Проверяем, есть ли файл в Object Storage (если доступно)
+                docx_in_storage = False
+                if obj_storage_available:
+                    try:
+                        # Проверяем наличие файла в Object Storage
+                        docx_in_storage = storage_client.exists('История_России_подробная_презентация.docx')
+                        self.logger.info(f"Файл презентации в Object Storage: {docx_in_storage}")
+                    except Exception as storage_check_error:
+                        self.logger.error(f"Ошибка при проверке файла в Object Storage: {storage_check_error}")
+                
+                # Отправляем файл, используя оптимальную стратегию
+                try:
+                    # Сначала пытаемся отправить из Object Storage, если возможно
+                    if obj_storage_available and docx_in_storage:
+                        self.logger.info("Отправка презентации из Object Storage")
+                        try:
+                            # Загружаем из Object Storage во временный буфер
+                            from io import BytesIO
+                            file_buffer = BytesIO()
+                            storage_client.download_to_file('История_России_подробная_презентация.docx', file_buffer)
+                            file_buffer.seek(0)
+                            
+                            # Проверяем размер файла
+                            if file_buffer.getbuffer().nbytes > 0:
+                                # Отправляем из буфера
+                                file_buffer.name = 'История_России_подробная_презентация.docx'
+                                sent_doc = context.bot.send_document(
+                                    chat_id=update.effective_chat.id,
+                                    document=file_buffer,
+                                    filename='История_России_подробная_презентация.docx',
+                                    caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word.",
+                                    timeout=60
+                                )
+                                self.message_manager.save_message_id(update, context, sent_doc.message_id)
+                                self.logger.info("Презентация успешно отправлена из Object Storage")
+                                
+                            else:
+                                raise ValueError("Файл из Object Storage пуст")
+                                
+                        except Exception as storage_send_error:
+                            self.logger.error(f"Ошибка при отправке из Object Storage: {storage_send_error}")
+                            # Переходим к обычному методу отправки
+                            raise ValueError("Не удалось отправить из Object Storage")
+                    
+                    # Если не удалось отправить из Object Storage, пробуем из локального файла
                     if os.path.exists(docx_path) and os.path.getsize(docx_path) > 0:
+                        self.logger.info("Отправка презентации из локального файла")
                         with open(docx_path, 'rb') as docx_file:
                             # Читаем содержимое файла
                             file_content = docx_file.read()
@@ -233,38 +289,42 @@ class CommandHandlers:
                                     timeout=60  # Увеличенный таймаут
                                 )
                                 self.message_manager.save_message_id(update, context, sent_doc.message_id)
+                                self.logger.info("Презентация успешно отправлена из локального файла")
+                                
+                                # Сохраняем в Object Storage для будущего использования, если он доступен
+                                if obj_storage_available and not docx_in_storage:
+                                    try:
+                                        with open(docx_path, 'rb') as f:
+                                            storage_client.upload_from_file('История_России_подробная_презентация.docx', f)
+                                        self.logger.info("Презентация сохранена в Object Storage после успешной отправки")
+                                    except Exception as backup_error:
+                                        self.logger.error(f"Не удалось сохранить файл в Object Storage: {backup_error}")
                             else:
-                                raise ValueError("Файл презентации пуст")
+                                raise ValueError("Локальный файл презентации пуст")
                     else:
-                        raise ValueError(f"Файл не существует или пуст: {docx_path}")
+                        raise ValueError(f"Локальный файл не существует или пуст: {docx_path}")
                         
                 except Exception as docx_err:
                     self.logger.error(f"Ошибка при отправке DOCX файла: {docx_err}")
                     
-                    # Создаем новую презентацию с использованием Object Storage если доступно
+                    # Создаем новую презентацию и пробуем отправить еще раз
                     try:
-                        # Пробуем сохранить в Object Storage если оно доступно
-                        try:
-                            from replit.object_storage import Client
-                            obj_storage_available = True
-                        except ImportError:
-                            obj_storage_available = False
-                            
+                        self.logger.info("Пересоздание презентации после ошибки")
                         # Пересоздаем презентацию
                         from create_presentation_doc import create_presentation_docx
                         new_docx_path = create_presentation_docx('detailed_presentation.md', 'История_России_новая_презентация.docx')
                         
-                        # Если Object Storage доступно, сохраняем файл туда для надежности
+                        # Сохраняем в Object Storage, если доступно
                         if obj_storage_available:
                             try:
-                                client = Client()
                                 with open(new_docx_path, 'rb') as f:
-                                    client.upload_from_file('История_России_подробная_презентация.docx', f)
-                                self.logger.info("Презентация успешно сохранена в Object Storage")
+                                    storage_client.upload_from_file('История_России_подробная_презентация.docx', f)
+                                self.logger.info("Новая презентация успешно сохранена в Object Storage")
                             except Exception as storage_err:
                                 self.logger.error(f"Ошибка при сохранении файла в Object Storage: {storage_err}")
                         
                         # Отправляем документ
+                        self.logger.info("Отправка пересозданной презентации")
                         with open(new_docx_path, 'rb') as new_docx_file:
                             sent_doc = context.bot.send_document(
                                 chat_id=update.effective_chat.id,
@@ -274,9 +334,11 @@ class CommandHandlers:
                                 timeout=60  # Увеличенный таймаут
                             )
                             self.message_manager.save_message_id(update, context, sent_doc.message_id)
+                            self.logger.info("Пересозданная презентация успешно отправлена")
                             
                     except Exception as retry_err:
                         self.logger.error(f"Повторная ошибка при создании и отправке DOCX: {retry_err}")
+                        # Информируем пользователя о проблеме и предлагаем ссылку на меню
                         query.message.reply_text(
                             "К сожалению, произошла ошибка при отправке файла презентации. Пожалуйста, попробуйте позже.",
                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
@@ -284,18 +346,72 @@ class CommandHandlers:
 
                 # Также отправляем обычный текстовый файл для совместимости
                 try:
-                    if os.path.exists('detailed_presentation.md') and os.path.getsize('detailed_presentation.md') > 0:
-                        with open('detailed_presentation.md', 'rb') as md_file:
+                    md_path = 'detailed_presentation.md'
+                    md_in_storage = False
+                    
+                    # Проверяем наличие MD-файла в Object Storage
+                    if obj_storage_available:
+                        try:
+                            md_in_storage = storage_client.exists(md_path)
+                            self.logger.info(f"MD-файл в Object Storage: {md_in_storage}")
+                        except Exception as md_check_error:
+                            self.logger.error(f"Ошибка при проверке MD-файла в Object Storage: {md_check_error}")
+                    
+                    # Пытаемся отправить из Object Storage если возможно
+                    if obj_storage_available and md_in_storage:
+                        self.logger.info("Отправка MD-файла из Object Storage")
+                        try:
+                            # Загружаем из Object Storage во временный буфер
+                            from io import BytesIO
+                            md_buffer = BytesIO()
+                            storage_client.download_to_file(md_path, md_buffer)
+                            md_buffer.seek(0)
+                            
+                            # Проверяем размер файла
+                            if md_buffer.getbuffer().nbytes > 0:
+                                # Отправляем из буфера
+                                md_buffer.name = 'История_России_подробная_презентация.md'
+                                sent_md = context.bot.send_document(
+                                    chat_id=update.effective_chat.id,
+                                    document=md_buffer,
+                                    filename='История_России_подробная_презентация.md',
+                                    caption="📄 Версия презентации в текстовом формате Markdown.",
+                                    timeout=30
+                                )
+                                self.message_manager.save_message_id(update, context, sent_md.message_id)
+                                self.logger.info("MD-файл успешно отправлен из Object Storage")
+                            else:
+                                raise ValueError("MD-файл из Object Storage пуст")
+                                
+                        except Exception as md_storage_send_error:
+                            self.logger.error(f"Ошибка при отправке MD-файла из Object Storage: {md_storage_send_error}")
+                            # Переходим к обычному методу отправки
+                            raise ValueError("Не удалось отправить MD-файл из Object Storage")
+                    
+                    # Если не удалось отправить из Object Storage, пробуем из локального файла
+                    if os.path.exists(md_path) and os.path.getsize(md_path) > 0:
+                        self.logger.info("Отправка MD-файла из локального хранилища")
+                        with open(md_path, 'rb') as md_file:
                             sent_md = context.bot.send_document(
                                 chat_id=update.effective_chat.id,
                                 document=md_file,
                                 filename='История_России_подробная_презентация.md',
                                 caption="📄 Версия презентации в текстовом формате Markdown.",
-                                timeout=30  # Увеличенный таймаут
+                                timeout=30
                             )
                             self.message_manager.save_message_id(update, context, sent_md.message_id)
+                            
+                            # Сохраняем в Object Storage для будущего использования, если он доступен
+                            if obj_storage_available and not md_in_storage:
+                                try:
+                                    with open(md_path, 'rb') as f:
+                                        storage_client.upload_from_file(md_path, f)
+                                    self.logger.info("MD-файл сохранен в Object Storage после успешной отправки")
+                                except Exception as md_backup_error:
+                                    self.logger.error(f"Не удалось сохранить MD-файл в Object Storage: {md_backup_error}")
                     else:
-                        raise ValueError("MD-файл не существует или пуст")
+                        raise ValueError(f"Локальный MD-файл не существует или пуст: {md_path}")
+                    
                 except Exception as md_err:
                     self.logger.error(f"Ошибка при отправке MD файла: {md_err}")
                     query.message.reply_text(
