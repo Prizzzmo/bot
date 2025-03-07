@@ -1342,7 +1342,7 @@ class CommandHandlers:
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
             self.logger.info(f"Пользователь {user_id} ответил верно на вопрос {current_question+1}")
         else:
-            sent_msg = update.message.reply_text("❌ Неправильно!")
+            sent_msg = update.message.reply_text(f"❌ Неправильно! Правильный ответ: {correct_answer}")
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
             self.logger.info(f"Пользователь {user_id} ответил неверно на вопрос {current_question+1}")
 
@@ -1371,78 +1371,87 @@ class CommandHandlers:
             current_question = context.user_data.get('current_question', 0)
             total_questions = len(display_questions)
             
-            # Форматируем текст вопроса для лучшего отображения
+            # Получаем текст вопроса
             question_text = display_questions[current_question]
             
             # Удаляем строки с правильным ответом из отображаемого текста
             question_text = re.sub(r'Правильный ответ:\s*\d+', '', question_text).strip()
             
-            # Проверяем, есть ли в тексте вопроса варианты ответов в формате "1) ..." или "1. ..."
-            has_options = re.search(r'\d[\)\.]\s+', question_text) is not None
+            # Выделяем основной вопрос и варианты ответов
+            lines = question_text.split('\n')
+            cleaned_lines = [line.strip() for line in lines if line.strip()]
             
-            # Разделяем текст на основной вопрос и варианты ответов
-            parts = question_text.split("\n")
-            main_question = parts[0].strip()
-            if not main_question.endswith('?') and len(parts) > 1:
-                # Если первая строка не заканчивается вопросительным знаком,
-                # ищем строку с вопросом
-                for i, part in enumerate(parts):
-                    if '?' in part:
-                        main_question = part.strip()
-                        parts = parts[i:]  # Начинаем с найденного вопроса
-                        break
+            # Находим вопрос (строка с вопросительным знаком или первая строка)
+            main_question = ""
+            for line in cleaned_lines:
+                if '?' in line:
+                    main_question = line
+                    break
             
-            # Ищем и форматируем варианты ответов
+            # Если вопрос не найден, берем первую строку
+            if not main_question and cleaned_lines:
+                main_question = cleaned_lines[0]
+                
+            # Ищем варианты ответов
             options = []
-            for line in parts[1:]:
-                line = line.strip()
-                if not line:
+            
+            # Сначала ищем стандартные форматы вариантов ответов (цифра с точкой или скобкой)
+            for line in cleaned_lines:
+                # Пропускаем строку с вопросом
+                if line == main_question:
                     continue
                     
-                # Проверяем разные форматы вариантов ответов
-                if re.match(r'^\d[\)\.]\s+', line):
-                    # Формат типа "1) ..." или "1. ..."
-                    options.append(line)
-                elif re.match(r'^[A-D][\)\.]\s+', line):
-                    # Формат типа "A) ..." или "A. ..."
-                    letter = line[0]
-                    number = ord(letter) - ord('A') + 1
-                    options.append(f"{number}) {line[2:].strip()}")
-                elif len(options) < 4 and not line.startswith('Правильный ответ'):
-                    # Если строка не соответствует известным форматам, но у нас меньше 4 вариантов,
-                    # добавляем её как вариант ответа
-                    options.append(f"{len(options)+1}) {line}")
+                # Проверяем разные форматы: 1) текст, 1. текст, A) текст, A. текст
+                if re.match(r'^\d[\)\.]\s+', line) or re.match(r'^[A-D][\)\.]\s+', line):
+                    # Преобразуем буквенные варианты в цифровые (A → 1, B → 2, etc.)
+                    if re.match(r'^[A-D][\)\.]\s+', line):
+                        letter = line[0]
+                        number = ord(letter) - ord('A') + 1
+                        text = line[2:].strip() if len(line) > 2 else f"Вариант {number}"
+                        options.append(f"{number}) {text}")
+                    else:
+                        options.append(line)
             
-            # Если варианты ответов не найдены, генерируем их искусственно
-            if not options or len(options) < 4:
-                # Создаем заполнители для вариантов ответов
+            # Если стандартные варианты не найдены, пытаемся распознать другие форматы
+            if not options:
+                # Рассматриваем каждую строку после вопроса как потенциальный вариант ответа
+                option_index = 0
+                for i, line in enumerate(cleaned_lines):
+                    if line == main_question:
+                        option_index = i + 1
+                        break
+                
+                # Берем до 4-х строк после вопроса как варианты ответов
+                for i in range(option_index, min(option_index + 4, len(cleaned_lines))):
+                    if i < len(cleaned_lines):
+                        options.append(f"{i - option_index + 1}) {cleaned_lines[i]}")
+            
+            # Если всё еще нет вариантов или их меньше 4, добавляем заполнители
+            if len(options) < 4:
                 for i in range(len(options), 4):
                     options.append(f"{i+1}) Вариант ответа {i+1}")
             
-            # Отправляем информацию о прогрессе теста
-            sent_msg1 = update.message.reply_text(
-                f"🧠 Вопрос {current_question+1} из {total_questions}:\n"
-                f"(правильно отвечено: {context.user_data.get('score', 0)} из {current_question})"
-            )
+            # Отправляем несколько сообщений для лучшего форматирования
+            
+            # 1. Сообщение с информацией о прогрессе теста
+            progress_text = (f"🧠 Вопрос {current_question+1} из {total_questions}\n"
+                            f"(правильно отвечено: {context.user_data.get('score', 0)} из {current_question})")
+            sent_msg1 = update.message.reply_text(progress_text)
             self.message_manager.save_message_id(update, context, sent_msg1.message_id)
-
-            # Отправляем текст вопроса отдельным сообщением
+            
+            # 2. Сообщение с текстом вопроса
             sent_msg2 = update.message.reply_text(main_question)
             self.message_manager.save_message_id(update, context, sent_msg2.message_id)
             
-            # Отправляем варианты ответов отдельным сообщением
-            options_text = ""
-            for option in options:
-                options_text += f"{option}\n"
-                
+            # 3. Отдельное сообщение с вариантами ответов
+            options_text = "\n".join(options)
             sent_msg3 = update.message.reply_text(options_text)
             self.message_manager.save_message_id(update, context, sent_msg3.message_id)
-
-            # Создаем клавиатуру с кнопкой для завершения теста
+            
+            # 4. Сообщение с инструкцией и кнопкой для завершения
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-
-            # Отправляем инструкцию для ответа
+            
             sent_msg4 = update.message.reply_text(
                 "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
                 reply_markup=reply_markup
