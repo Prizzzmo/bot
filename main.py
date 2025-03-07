@@ -10,7 +10,6 @@
 """
 
 import logging
-import os
 import traceback
 import sys
 from dotenv import load_dotenv

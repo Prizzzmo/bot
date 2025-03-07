@@ -1,6 +1,5 @@
 import telegram
 import re
-import random
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatAction
 from telegram.ext import ConversationHandler
@@ -8,11 +7,10 @@ from telegram.ext import ConversationHandler
 class CommandHandlers:
     """Класс для обработки команд и взаимодействий с пользователем"""
 
-    def __init__(self, ui_manager, api_client, message_manager, content_service, logger, config):
+    def __init__(self, ui_manager, api_client, message_manager, logger, config):
         self.ui_manager = ui_manager
         self.api_client = api_client
         self.message_manager = message_manager
-        self.content_service = content_service
         self.logger = logger
         self.config = config
 
