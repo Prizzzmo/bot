@@ -364,9 +364,9 @@ class CommandHandlers:
             
             context.bot.delete_message(chat_id=user_id, message_id=status_message.message_id)
             return self.MAP
-
-                # Удаляем сообщение о генерации
-                context.bot.delete_message(
+            
+            # Удаляем сообщение о генерации
+            context.bot.delete_message(
                     chat_id=user_id,
                     message_id=status_message.message_id
                 )
