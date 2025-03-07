@@ -48,6 +48,13 @@ class ConversationService:
             user_message = update.message.text
             user_id = update.message.from_user.id
             
+            # Отправляем индикатор набора текста и проверяем доступность чата
+            try:
+                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            except Exception as chat_error:
+                self.logger.warning(f"Не удалось отправить индикатор набора текста: {chat_error}")
+                # Продолжаем работу даже если не удалось отправить индикатор
+            
             # Сохраняем сообщение пользователя для контекста
             if 'conversation_history' not in user_data:
                 user_data['conversation_history'] = []
@@ -56,13 +63,6 @@ class ConversationService:
             user_data['conversation_history'].append(user_message)
             if len(user_data['conversation_history']) > 5:
                 user_data['conversation_history'] = user_data['conversation_history'][-5:]
-            
-            # Отправляем индикатор набора текста и проверяем доступность чата
-            try:
-                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            except Exception as chat_error:
-                self.logger.warning(f"Не удалось отправить индикатор набора текста: {chat_error}")
-                # Продолжаем работу даже если не удалось отправить индикатор
 
             # Определяем, связано ли сообщение с историей
             is_history_related = self._is_history_related(user_message, user_data)
@@ -81,13 +81,45 @@ class ConversationService:
                 [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
             ]
 
-            # Безопасная отправка сообщения с обработкой длинных ответов
+            # Проверяем, не был ли удален чат
+            if not update.effective_chat:
+                self.logger.error(f"Чат не доступен для пользователя {user_id}")
+                return None
+                
+            # Безопасная отправка нового сообщения (не редактирование)
             sent_msg = self._send_response_safely(update, response, keyboard)
             
             # Сохраняем ID сообщения для возможности удаления в будущем
             if sent_msg:
                 message_manager.save_message_id(update, context, sent_msg.message_id)
+            else:
+                self.logger.warning(f"Не удалось отправить ответное сообщение пользователю {user_id}")
                 
+        except telegram.error.BadRequest as e:
+            # Более конкретная обработка ошибки "Message to edit not found"
+            if "Message to edit not found" in str(e):
+                self.logger.error(f"Ошибка 'Message to edit not found': {e}")
+                try:
+                    # Отправляем новое сообщение вместо редактирования
+                    error_msg = update.message.reply_text(
+                        "Не удалось обработать ваш запрос из-за технической ошибки. Пожалуйста, задайте вопрос снова.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                    )
+                    message_manager.save_message_id(update, context, error_msg.message_id)
+                except Exception as reply_error:
+                    self.logger.error(f"Не удалось отправить сообщение об ошибке: {reply_error}")
+            else:
+                # Общая обработка BadRequest
+                self.logger.error(f"Ошибка BadRequest: {e}")
+                try:
+                    error_msg = update.message.reply_text(
+                        "Произошла ошибка при обработке вашего запроса. Попробуйте задать вопрос по-другому.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                    )
+                    message_manager.save_message_id(update, context, error_msg.message_id)
+                except Exception:
+                    pass
+                    
         except telegram.error.TelegramError as telegram_error:
             self.logger.error(f"Ошибка Telegram API при обработке беседы: {str(telegram_error)}")
             try:
@@ -337,7 +369,7 @@ class ConversationService:
     def _send_response_safely(self, update, response, keyboard):
         """
         Безопасно отправляет ответ пользователю с обработкой длинных сообщений 
-        и улучшенной обработкой ошибок
+        и улучшенной обработкой ошибок, избегая редактирования сообщений
         """
         if not update or not update.message:
             self.logger.error("Невозможно отправить сообщение: отсутствует объект update или message")
@@ -354,22 +386,26 @@ class ConversationService:
                 
                 # Отправляем первую часть без клавиатуры
                 try:
+                    # Используем только reply_text вместо edit_message_text
                     update.message.reply_text(parts[0], parse_mode=None)
                 except telegram.error.BadRequest as e:
                     self.logger.error(f"Ошибка при отправке первой части ответа: {e}")
                     # Пробуем отправить более короткую версию
                     try:
                         update.message.reply_text(parts[0][:1000] + "...", parse_mode=None)
-                    except:
-                        pass
+                    except Exception as inner_e:
+                        self.logger.error(f"Не удалось отправить сокращенную часть ответа: {inner_e}")
                 
                 # Отправляем средние части, если есть, с обработкой ошибок
                 for i, part in enumerate(parts[1:-1], 1):
                     try:
                         update.message.reply_text(part, parse_mode=None)
-                    except telegram.error.BadRequest:
-                        self.logger.warning(f"Не удалось отправить часть {i+1} ответа")
+                    except telegram.error.BadRequest as e:
+                        self.logger.warning(f"Не удалось отправить часть {i+1} ответа: {e}")
                         # Пропускаем проблемную часть и продолжаем
+                        continue
+                    except Exception as e:
+                        self.logger.error(f"Неожиданная ошибка при отправке части {i+1}: {e}")
                         continue
                 
                 # Последнюю часть отправляем с клавиатурой
@@ -382,7 +418,7 @@ class ConversationService:
                     return sent_msg
                 except telegram.error.BadRequest as e:
                     self.logger.error(f"Ошибка при отправке последней части ответа: {e}")
-                    # Отправляем финальное сообщение без содержимого
+                    # Отправляем финальное сообщение без содержимого, только с кнопками
                     try:
                         sent_msg = update.message.reply_text(
                             "Продолжение ответа не удалось отправить. Вы можете задать ещё вопрос или выбрать другое действие:",
@@ -390,11 +426,13 @@ class ConversationService:
                             parse_mode=None
                         )
                         return sent_msg
-                    except:
+                    except Exception as inner_e:
+                        self.logger.error(f"Ошибка при отправке финального сообщения: {inner_e}")
                         return None
             else:
                 # Отправляем весь ответ с клавиатурой
                 try:
+                    # Всегда используем новое сообщение вместо редактирования
                     sent_msg = update.message.reply_text(
                         response + "\n\n" + "Вы можете задать ещё вопрос или выбрать другое действие:",
                         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -412,7 +450,8 @@ class ConversationService:
                             parse_mode=None
                         )
                         return sent_msg
-                    except:
+                    except Exception as inner_e:
+                        self.logger.error(f"Ошибка при отправке сокращенного ответа: {inner_e}")
                         # Если и это не удалось, отправляем только кнопки
                         try:
                             sent_msg = update.message.reply_text(
@@ -421,7 +460,8 @@ class ConversationService:
                                 parse_mode=None
                             )
                             return sent_msg
-                        except:
+                        except Exception as btn_e:
+                            self.logger.error(f"Ошибка при отправке кнопок: {btn_e}")
                             return None
                 
         except telegram.error.BadRequest as e:
@@ -430,6 +470,20 @@ class ConversationService:
             try:
                 sent_msg = update.message.reply_text(
                     "Извините, произошла ошибка при отправке ответа. Выберите действие:",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]]),
+                    parse_mode=None
+                )
+                return sent_msg
+            except Exception as menu_e:
+                self.logger.error(f"Не удалось отправить кнопку меню: {menu_e}")
+                return None
+        
+        except telegram.error.TelegramError as e:
+            self.logger.error(f"Ошибка Telegram API при отправке ответа: {e}")
+            # Пробуем отправить минимальное сообщение с кнопкой возврата в меню
+            try:
+                sent_msg = update.message.reply_text(
+                    "Произошла ошибка. Вернитесь в главное меню.",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]]),
                     parse_mode=None
                 )
@@ -437,13 +491,18 @@ class ConversationService:
             except:
                 return None
         
-        except telegram.error.TelegramError as e:
-            self.logger.error(f"Ошибка Telegram API при отправке ответа: {e}")
-            return None
-        
         except Exception as e:
             self.logger.error(f"Неизвестная ошибка при отправке ответа: {e}")
-            return None
+            try:
+                # Последняя попытка отправить простое сообщение
+                sent_msg = update.message.reply_text(
+                    "Произошла ошибка. Попробуйте снова или вернитесь в меню.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]]),
+                    parse_mode=None
+                )
+                return sent_msg
+            except:
+                return None
 
     def _enhance_historical_response(self, response):
         """
