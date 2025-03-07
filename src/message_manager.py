@@ -1,3 +1,4 @@
+
 import time
 import telegram
 import threading
@@ -43,7 +44,8 @@ class MessageManager:
 
     def clear_chat_history(self, update, context, preserve_message_id=None):
         """
-        Оптимизированная функция для очистки истории чата.
+        Полностью переработанная функция для очистки истории чата.
+        Использует более надежный подход и агрессивную очистку сообщений.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
@@ -55,12 +57,12 @@ class MessageManager:
             self.logger.warning("Недостаточно данных для очистки чата")
             return
 
-        # Используем блокировку, чтобы предотвратить одновременные операции удаления
+        # Используем блокировку для предотвращения конкурентных операций удаления
         with self._deletion_lock:
             try:
                 chat_id = update.effective_chat.id
-
-                # Определяем активное сообщение, которое нужно сохранить
+                
+                # Получаем ID активного сообщения, которое нужно сохранить
                 active_message_id = preserve_message_id
                 if not active_message_id:
                     if update.message:
@@ -71,97 +73,104 @@ class MessageManager:
                 # Получаем список сохраненных сообщений
                 if 'previous_messages' not in context.user_data:
                     context.user_data['previous_messages'] = []
-                    return
-
+                
+                # Получаем все сохраненные ID сообщений и удаляем дубликаты
                 message_ids = list(set(context.user_data.get('previous_messages', [])))
-
+                
+                # Если нет сообщений для удаления, выходим
                 if not message_ids:
                     return
 
-                # Исключаем активное сообщение из удаления
+                # Исключаем текущее активное сообщение из удаления
                 if active_message_id and active_message_id in message_ids:
                     message_ids.remove(active_message_id)
-
-                # Сортировка: сначала новые сообщения, они с большей вероятностью будут удалены успешно
+                
+                # Сортируем сообщения от новых к старым для повышения вероятности успешного удаления
                 message_ids.sort(reverse=True)
-
-                # Ограничиваем количество удаляемых сообщений
-                max_deletions = min(len(message_ids), 150)
-                message_ids = message_ids[:max_deletions]
-
-                deleted_count = 0
-                failed_count = 0
-                error_counts = {}
-
-                # Оптимизированное удаление сообщений с использованием ThreadPoolExecutor
-                def delete_message(msg_id):
-                    nonlocal deleted_count, failed_count
-
+                
+                # Логи для отладки
+                self.logger.debug(f"Сообщения для удаления в чате {chat_id}: {len(message_ids)} сообщений")
+                
+                # Счетчики для отслеживания результатов
+                successful = 0
+                failed = 0
+                error_types = {}
+                
+                # Функция для удаления одного сообщения
+                def delete_single_message(msg_id):
+                    nonlocal successful, failed
                     try:
-                        context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-                        deleted_count += 1
+                        result = context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                        if result:
+                            successful += 1
                         return True
                     except telegram.error.TelegramError as e:
-                        # Классифицируем ошибку
+                        # Анализируем ошибку для более полной отладки
                         error_text = str(e).lower()
-                        error_type = "unknown"
-
+                        error_category = "unknown"
+                        
                         if "message to delete not found" in error_text:
-                            error_type = "not_found"
+                            error_category = "not_found"
                         elif "message can't be deleted" in error_text:
-                            error_type = "cannot_delete"
+                            error_category = "cannot_delete"
                         elif "forbidden" in error_text:
-                            error_type = "forbidden"
-                        elif "flood" in error_text:
-                            error_type = "flood_control"
-                            # При ошибке флуд-контроля, делаем паузу
+                            error_category = "forbidden"
+                        elif "too many requests" in error_text or "flood" in error_text:
+                            error_category = "rate_limit"
+                            # При ограничении частоты запросов делаем паузу
                             time.sleep(1)
-
-                        # Считаем типы ошибок
-                        if error_type not in error_counts:
-                            error_counts[error_type] = 0
-                        error_counts[error_type] += 1
-
-                        failed_count += 1
+                        
+                        # Подсчитываем типы ошибок для анализа
+                        if error_category not in error_types:
+                            error_types[error_category] = 0
+                        error_types[error_category] += 1
+                        
+                        failed += 1
                         return False
                     except Exception as e:
-                        failed_count += 1
+                        self.logger.error(f"Неожиданная ошибка при удалении сообщения {msg_id}: {e}")
+                        failed += 1
                         return False
-
-                # Удаляем сообщения пакетами, чтобы не превысить лимиты API
-                batch_size = 10
+                
+                # Разбиваем удаление на пакеты для снижения нагрузки на API
+                batch_size = 5  # Уменьшаем размер пакета для надежности
                 for i in range(0, len(message_ids), batch_size):
                     batch = message_ids[i:i+batch_size]
-
-                    with ThreadPoolExecutor(max_workers=5) as executor:
-                        futures = [executor.submit(delete_message, msg_id) for msg_id in batch]
-
-                        # Ждем завершения пакета с таймаутом
-                        for future in as_completed(futures, timeout=5):
+                    
+                    # Используем многопоточность для одновременного удаления нескольких сообщений
+                    with ThreadPoolExecutor(max_workers=3) as executor:  # Уменьшаем число рабочих потоков
+                        # Запускаем задачи удаления
+                        futures = [executor.submit(delete_single_message, msg_id) for msg_id in batch]
+                        
+                        # Ожидаем завершения всех задач с таймаутом
+                        for future in as_completed(futures, timeout=3):
                             try:
                                 future.result()
                             except Exception as e:
-                                self.logger.debug(f"Ошибка при удалении сообщения: {e}")
-
-                    # Небольшая пауза между пакетами
-                    if i + batch_size < len(message_ids):
-                        time.sleep(0.3)
-
-                # Обновляем список сообщений
+                                self.logger.error(f"Ошибка при обработке результата удаления: {e}")
+                    
+                    # Добавляем паузу между пакетами, чтобы избежать ограничений API
+                    time.sleep(0.5)
+                
+                # Обновляем список сохраненных сообщений
+                # Сохраняем только активное сообщение, если оно есть
                 if active_message_id:
                     context.user_data['previous_messages'] = [active_message_id]
                 else:
                     context.user_data['previous_messages'] = []
-
-                # Логируем результаты
-                if deleted_count > 0 or failed_count > 0:
-                    self.logger.info(
-                        f"Очистка чата {chat_id}: удалено {deleted_count}, не удалось {failed_count}, "
-                        f"ошибки: {error_counts}, сохранено: {active_message_id}"
-                    )
-
+                
+                # Логируем результаты операции
+                self.logger.info(
+                    f"Очистка чата {chat_id}: удалено {successful}, не удалось {failed}, "
+                    f"типы ошибок: {error_types}"
+                )
+                
             except Exception as e:
                 self.logger.error(f"Критическая ошибка при очистке чата: {str(e)}")
+                # В случае ошибки очищаем список сообщений принудительно
+                context.user_data['previous_messages'] = []
+                if 'active_message_id' and active_message_id:
+                    context.user_data['previous_messages'] = [active_message_id]
 
     def clean_all_messages_except_active(self, update, context):
         """
