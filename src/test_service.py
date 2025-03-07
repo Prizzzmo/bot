@@ -27,60 +27,93 @@ class TestService:
         Returns:
             dict: Данные теста с вопросами
         """
-        # Запрашиваем набор из 20 вопросов у API
-        prompt = f"Создай 20 вопросов для тестирования по теме '{topic}'. Каждый вопрос должен иметь 4 варианта ответа, четко пронумерованных от 1 до 4. После каждого вопроса с вариантами укажи правильный ответ в формате 'Правильный ответ: X', где X - число от 1 до 4. Пронумеруй все вопросы. Обязательно форматируй варианты ответов в виде '1) Вариант', '2) Вариант' и т.д. НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.)."
+        # Запрашиваем набор из 20 вопросов у API с очень четким форматированием
+        prompt = f"""Создай 20 вопросов для тестирования по теме '{topic}'. 
+Строго следуй следующему формату для каждого вопроса:
+
+Вопрос N: [Текст вопроса]
+1) [Вариант ответа 1]
+2) [Вариант ответа 2]
+3) [Вариант ответа 3]
+4) [Вариант ответа 4]
+Правильный ответ: [число от 1 до 4]
+
+Где N - номер вопроса (от 1 до 20).
+Каждый вопрос ДОЛЖЕН иметь ровно 4 варианта ответа.
+Каждый вариант ответа ДОЛЖЕН начинаться с цифры и символа ')'.
+После каждого набора вариантов ДОЛЖЕН быть указан правильный ответ в формате 'Правильный ответ: X', где X - число от 1 до 4.
+НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.)."""
+
         response = self.api_client.ask_grok(prompt, use_cache=False)
         
-        # Разделяем текст на вопросы, используя либо пустые строки, либо номера
-        raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', response)
-        original_questions = []
-        display_questions = []
+        # Разделяем текст на вопросы по паттерну "Вопрос N:" или просто по пустым строкам
+        raw_questions = re.split(r'(?:\n\s*\n)|(?:\nВопрос \d+:)', response)
+        
+        processed_questions = []
         
         for q in raw_questions:
             q = q.strip()
-            if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
-                # Удаляем начальные цифры, если они есть
-                q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
-                original_questions.append(q)
+            # Проверяем, что строка достаточно длинная и содержит вопрос
+            if q and len(q) > 10 and ('?' in q or 'вопрос' in q.lower()):
+                # Проверяем, есть ли варианты ответов в формате "1) ..."
+                has_options = bool(re.search(r'\n\s*\d\)\s+', q))
                 
-                # Создаем версию для отображения (без правильного ответа)
-                display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
-                display_questions.append(display_q)
-                
-        # Очищаем все вопросы от символов форматирования Markdown
-        sanitized_questions = []
-        for q in original_questions:
-            # Экранируем специальные символы Markdown
-            sanitized_q = q.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`')
-            sanitized_q = sanitized_q.replace('[', '\\[').replace(']', '\\]')
-            sanitized_q = sanitized_q.replace('(', '\\(').replace(')', '\\)')
-            sanitized_questions.append(sanitized_q)
+                if has_options:
+                    # Убеждаемся, что есть все 4 варианта
+                    options_count = len(re.findall(r'\n\s*\d\)\s+', q))
+                    if options_count >= 4:
+                        # Проверяем, есть ли правильный ответ
+                        if not re.search(r'Правильный ответ:\s*[1-4]', q):
+                            # Если нет, добавляем случайный
+                            correct_answer = random.randint(1, 4)
+                            q += f"\nПравильный ответ: {correct_answer}"
+                        
+                        # Экранируем специальные символы Markdown
+                        sanitized_q = q.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`')
+                        sanitized_q = sanitized_q.replace('[', '\\[').replace(']', '\\]')
+                        sanitized_q = sanitized_q.replace('(', '\\(').replace(')', '\\)')
+                        
+                        processed_questions.append(sanitized_q)
+                else:
+                    # Если вариантов нет, формируем их искусственно
+                    main_text = q.split('\n')[0] if '\n' in q else q
+                    artificial_q = f"{main_text}\n"
+                    artificial_q += "1) Первый вариант ответа\n"
+                    artificial_q += "2) Второй вариант ответа\n"
+                    artificial_q += "3) Третий вариант ответа\n"
+                    artificial_q += "4) Четвертый вариант ответа\n"
+                    artificial_q += f"Правильный ответ: {random.randint(1, 4)}"
+                    
+                    # Экранируем специальные символы Markdown
+                    sanitized_q = artificial_q.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`')
+                    sanitized_q = sanitized_q.replace('[', '\\[').replace(']', '\\]')
+                    sanitized_q = sanitized_q.replace('(', '\\(').replace(')', '\\)')
+                    
+                    processed_questions.append(sanitized_q)
         
-        # Валидация данных: проверяем наличие правильных ответов
-        valid_test = False
-        for question in sanitized_questions:
-            if re.search(r"Правильный ответ:\s*[1-4]", question):
-                valid_test = True
-                break
+        # Ограничиваем количество вопросов до 20
+        processed_questions = processed_questions[:20]
         
-        if not valid_test:
-            # Если правильных ответов нет, добавим их автоматически
-            self.logger.warning("В вопросах не найдены правильные ответы, добавляем их")
-            
-            new_questions = []
-            for i, q in enumerate(sanitized_questions):
-                # Добавляем правильный ответ к каждому вопросу, если его нет
-                if not re.search(r"Правильный ответ:", q):
-                    # Выбираем случайное число от 1 до 4
-                    correct_answer = random.randint(1, 4)
-                    q += f"\nПравильный ответ: {correct_answer}"
-                new_questions.append(q)
-            
-            sanitized_questions = new_questions
+        # Если вопросов меньше 20, добавляем дополнительные
+        while len(processed_questions) < 20:
+            q_num = len(processed_questions) + 1
+            artificial_q = f"Вопрос {q_num}: Дополнительный вопрос по теме '{topic}'?\n"
+            artificial_q += "1) Первый вариант ответа\n"
+            artificial_q += "2) Второй вариант ответа\n"
+            artificial_q += "3) Третий вариант ответа\n"
+            artificial_q += "4) Четвертый вариант ответа\n"
+            artificial_q += f"Правильный ответ: {random.randint(1, 4)}"
+            processed_questions.append(artificial_q)
+        
+        # Создаем версию для отображения без правильных ответов
+        display_questions = []
+        for q in processed_questions:
+            display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
+            display_questions.append(display_q)
         
         return {
-            "original_questions": sanitized_questions,
-            "display_questions": sanitized_questions
+            "original_questions": processed_questions,
+            "display_questions": display_questions
         }
     
     def format_question_text(self, question_text):
@@ -93,6 +126,8 @@ class TestService:
         Returns:
             dict: Словарь с основным вопросом и вариантами ответов
         """
+        self.logger.info(f"Форматирование вопроса: {question_text[:50]}...")
+        
         # Удаляем строки с правильным ответом из отображаемого текста
         question_text = re.sub(r'Правильный ответ:\s*\d+', '', question_text).strip()
         
@@ -100,7 +135,7 @@ class TestService:
         lines = question_text.split('\n')
         cleaned_lines = [line.strip() for line in lines if line.strip()]
         
-        # Находим вопрос (строка с вопросительным знаком или первая строка)
+        # Находим главный вопрос (строка с вопросительным знаком или первая строка)
         main_question = ""
         for line in cleaned_lines:
             if '?' in line:
@@ -110,109 +145,87 @@ class TestService:
         # Если вопрос не найден, берем первую строку
         if not main_question and cleaned_lines:
             main_question = cleaned_lines[0]
-            
-        # Ищем варианты ответов
+        
+        # Ищем варианты ответов с помощью регулярных выражений
+        option_pattern = r'(\d)\s*[\)\.]?\s+(.*)'
+        letter_pattern = r'([A-D])\s*[\)\.]?\s+(.*)'
+        
         options = []
+        option_lines = []
         
-        # Проверяем каждую строку на наличие вариантов ответов
-        option_patterns = [
-            r'^\d[\)\.]\s+', # 1) или 1. формат
-            r'^[A-D][\)\.]\s+', # A) или A. формат
-            r'^\(\d\)\s+', # (1) формат
-            r'^\([A-D]\)\s+', # (A) формат
-            r'^\d+\s*[-–—]\s+', # 1 - формат
-            r'^[A-D]\s*[-–—]\s+', # A - формат
-            r'^\s*\d[\)\.]\s+', # с отступом 1) формат
-            r'\b\d[\)\.]\s+', # в строке 1) формат
-        ]
-        
-        for line in cleaned_lines:
-            # Пропускаем строку с вопросом
-            if line == main_question:
-                continue
-                
-            # Проверяем все возможные форматы вариантов ответов
-            is_option = False
-            for pattern in option_patterns:
-                if re.match(pattern, line):
-                    is_option = True
-                    
-                    # Преобразуем все форматы в стандартный "1) Текст"
-                    if re.match(r'^[A-D]', line):  # Если начинается с буквы
-                        letter = line[0]
-                        number = ord(letter) - ord('A') + 1
-                        # Удаляем префикс и форматируем
-                        text = re.sub(r'^[A-D][\)\.\(\s-–—]+\s*', '', line).strip()
-                        options.append(f"{number}) {text}")
-                    else:  # Если начинается с цифры
-                        # Извлекаем номер
-                        match = re.match(r'^[(\s]*(\d+)[)\.\s-–—]+\s*', line)
-                        if match:
-                            number = match.group(1)
-                            # Удаляем префикс и форматируем
-                            text = re.sub(r'^[(\s]*\d+[)\.\s-–—]+\s*', '', line).strip()
-                            options.append(f"{number}) {text}")
-                        else:
-                            # Если не удалось извлечь номер, оставляем как есть
-                            options.append(line)
-                    break
+        # Сначала проверяем стандартный формат с новой строки "1) Вариант"
+        for line in question_text.split('\n'):
+            line = line.strip()
+            match_num = re.match(option_pattern, line)
+            match_letter = re.match(letter_pattern, line)
             
-            # Если строка не распознана как вариант, но содержит числа от 1 до 4, 
-            # то это может быть вариант ответа без явного форматирования
-            if not is_option and re.search(r'\b[1-4]\b', line):
-                for i in range(1, 5):
-                    if f" {i} " in f" {line} " or line.startswith(f"{i} "):
-                        text = re.sub(r'^\d+\s*', '', line).strip()
-                        options.append(f"{i}) {text}")
-                        is_option = True
-                        break
+            if match_num:
+                number = match_num.group(1)
+                text = match_num.group(2).strip()
+                option_lines.append((int(number), text))
+            elif match_letter:
+                letter = match_letter.group(1)
+                number = ord(letter) - ord('A') + 1
+                text = match_letter.group(2).strip()
+                option_lines.append((number, text))
         
-        # Если варианты всё еще не найдены, используем более агрессивный поиск
+        # Если нашли хотя бы 2 варианта ответа в ожидаемом формате
+        if len(option_lines) >= 2:
+            # Сортируем варианты по номеру
+            option_lines.sort(key=lambda x: x[0])
+            # Формируем список вариантов
+            for number, text in option_lines:
+                if 1 <= number <= 4:  # Проверяем, что номер в диапазоне 1-4
+                    options.append(f"{number}) {text}")
+        
+        # Если варианты не найдены, ищем их в тексте более агрессивно
         if not options:
-            # Ищем в исходном тексте строки, которые могут выглядеть как варианты ответов
-            option_lines = re.findall(r'\n\s*\d\)\s+.*|\n\s*\d\.\s+.*|\n\s*[A-D]\)\s+.*|\n\s*[A-D]\.\s+.*', question_text)
-            if option_lines and len(option_lines) >= 4:
-                for i, line in enumerate(option_lines[:4]):
-                    line = line.strip()
-                    if re.match(r'^[A-D]', line):  # Если вариант начинается с буквы
-                        letter = line[0]
+            # Ищем строки после вопроса, которые могут быть вариантами
+            option_texts = re.findall(r'\n\s*\d[\)\.]?\s+.*|\n\s*[A-D][\)\.]?\s+.*', question_text)
+            
+            if option_texts:
+                for i, opt in enumerate(option_texts[:4]):
+                    opt = opt.strip()
+                    match_num = re.match(option_pattern, opt)
+                    match_letter = re.match(letter_pattern, opt)
+                    
+                    if match_num:
+                        number = int(match_num.group(1))
+                        text = match_num.group(2).strip()
+                        options.append(f"{number}) {text}")
+                    elif match_letter:
+                        letter = match_letter.group(1)
                         number = ord(letter) - ord('A') + 1
-                        text = re.sub(r'^[A-D][\)\.\(\s-–—]+\s*', '', line).strip()
+                        text = match_letter.group(2).strip()
                         options.append(f"{number}) {text}")
                     else:
-                        # Если вариант начинается с цифры или другого символа
-                        match = re.match(r'^[(\s]*(\d+)[)\.\s-–—]+\s*', line)
-                        if match:
-                            number = match.group(1)
-                            text = re.sub(r'^[(\s]*\d+[)\.\s-–—]+\s*', '', line).strip()
-                            options.append(f"{number}) {text}")
-                        else:
-                            # Форматируем как стандартный вариант с номером
-                            options.append(f"{i+1}) {line}")
+                        # Если формат не распознан, используем порядковый номер
+                        options.append(f"{i+1}) {opt}")
         
-        # Если варианты всё еще не найдены, используем эвристический метод
+        # Если варианты всё ещё не найдены, создаем стандартные варианты
         if not options:
-            # Находим строки после вопроса
-            option_index = 0
-            for i, line in enumerate(cleaned_lines):
-                if line == main_question:
-                    option_index = i + 1
-                    break
-            
-            # Берем до 4-х строк после вопроса как варианты ответов
-            for i in range(option_index, min(option_index + 4, len(cleaned_lines))):
-                if i < len(cleaned_lines):
-                    # Форматируем каждую строку как вариант ответа
-                    options.append(f"{i - option_index + 1}) {cleaned_lines[i]}")
+            self.logger.warning(f"Варианты ответов не найдены в вопросе. Создаю стандартные варианты.")
+            options = [
+                "1) Первый вариант ответа",
+                "2) Второй вариант ответа",
+                "3) Третий вариант ответа",
+                "4) Четвертый вариант ответа"
+            ]
         
-        # Если всё еще нет вариантов или их меньше 4, добавляем заполнители
-        if len(options) < 4:
-            for i in range(len(options), 4):
-                options.append(f"{i+1}) Вариант ответа {i+1}")
+        # Убеждаемся, что у нас ровно 4 варианта ответа
+        while len(options) < 4:
+            options.append(f"{len(options) + 1}) Дополнительный вариант ответа")
         
-        # Ограничиваем количество вариантов до 4
+        # Ограничиваем до 4 вариантов
         options = options[:4]
+        
+        # Убеждаемся, что все варианты имеют правильный формат "номер) текст"
+        for i in range(len(options)):
+            if not re.match(r'^\d\)', options[i]):
+                options[i] = f"{i+1}) {options[i]}"
                 
+        self.logger.info(f"Сформированы варианты: {len(options)} вариантов")
+        
         return {
             "main_question": main_question,
             "options": options

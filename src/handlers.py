@@ -694,7 +694,7 @@ class CommandHandlers:
             try:
                 # Отправляем индикатор печати, пока генерируются вопросы
                 context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
-                
+
                 # Получаем тест через сервис тестирования
                 test_data = self.test_service.generate_test(topic)
 
@@ -730,37 +730,13 @@ class CommandHandlers:
                     # Форматируем текст первого вопроса для лучшего отображения
                     question_text = display_questions[0]
 
-                    # Проверяем, есть ли в тексте вопроса варианты ответов в формате ""1) ..."
-                    if re.search(r'\d\)\s+', question_text) or re.search(r'\d\.\s+', question_text):
-                        # Текст уже содержит форматированные варианты ответов
-                        formatted_text = question_text
-                    else:
-                        # Пытаемся извлечь и форматировать варианты ответов
-                        # Разделяем текст на основной вопрос и варианты ответов
-                        parts = question_text.split("\n")
-                        main_question = parts[0]
+                    # Форматируем вопрос и варианты ответов с помощью TestService
+                    formatted_question = self.test_service.format_question_text(question_text)
+                    main_question_text = formatted_question['main_question']
+                    options_text = "\n".join(formatted_question['options'])
 
-                        # Ищем строки с вариантами ответов, обычно они начинаются с цифр
-                        options = []
-                        for line in parts[1:]:
-                            line = line.strip()
-                            if line and (line.startswith("1") or line.startswith("2") or 
-                                  line.startswith("3") or line.startswith("4")):
-                                options.append(line)
-                            elif re.match(r'^[A-D][)\.]', line):
-                                # Преобразуем A) -> 1), B) -> 2) и т.д.
-                                letter = line[0]
-                                number = ord(letter) - ord('A') + 1
-                                options.append(f"{number}) {line[2:].strip()}")
-
-                        if options:
-                            # Если нашли варианты ответов, форматируем текст вопроса
-                            formatted_text = f"{main_question}\n\n"
-                            for option in options:
-                                formatted_text += f"{option}\n"
-                        else:
-                            # Если не нашли варианты ответов, используем исходный текст
-                            formatted_text = question_text
+                    # Создаем форматированный текст с вопросом и вариантами
+                    formatted_text = f"{main_question_text}\n\n{options_text}"
 
                     # Отправляем инфо о начале теста
                     query.message.reply_text(f"🧠 Вопрос 1 из {len(display_questions)}:")
@@ -1154,19 +1130,22 @@ class CommandHandlers:
             # Получаем текст вопроса
             question_text = display_questions[current_question]
 
-            # Используем сервис тестирования для форматирования вопроса
+            # Форматируем вопрос и варианты ответов с помощью TestService
             formatted_question = self.test_service.format_question_text(question_text)
+            main_question_text = formatted_question['main_question']
+            options_text = "\n".join(formatted_question['options'])
+
+            # Создаем форматированный текст с вопросом и вариантами
+            formatted_text = f"{main_question_text}\n\n{options_text}"
 
             # Получаем основной вопрос и варианты ответов
-            main_question = formatted_question['main_question']
-            options = formatted_question['options']
 
             # Отправляем несколько сообщений для лучшего форматирования
 
             # Вычисляем процент выполнения теста
             completion_percent = int((current_question / total_questions) * 100)
             progress_bar = "▓" * (completion_percent // 5) + "░" * (20 - (completion_percent // 5))
-            
+
             # 1. Сообщение с информацией о прогрессе теста
             progress_text = (f"🧠 Вопрос {current_question+1} из {total_questions}\n"
                             f"{progress_bar} {completion_percent}%\n"
@@ -1175,40 +1154,13 @@ class CommandHandlers:
             self.message_manager.save_message_id(update, context, sent_msg1.message_id)
 
             # 2. Сообщение с текстом вопроса
-            sent_msg2 = update.message.reply_text(main_question)
+            sent_msg2 = update.message.reply_text(main_question_text)
             self.message_manager.save_message_id(update, context, sent_msg2.message_id)
 
             # 3. Отдельное сообщение с вариантами ответов
-            # Проверяем, что у нас есть варианты ответов
-            if options and len(options) == 4:
-                options_text = "\n".join(options)
-                sent_msg3 = update.message.reply_text(options_text)
-                self.message_manager.save_message_id(update, context, sent_msg3.message_id)
-            else:
-                # Проверяем, есть ли варианты ответов в самом вопросе
-                pattern_options = []
-                option_lines = re.findall(r'\n\s*\d\)\s+.*', question_text)
-                if option_lines and len(option_lines) >= 4:
-                    # Используем найденные варианты ответов
-                    pattern_options = [line.strip() for line in option_lines[:4]]
-                
-                # Если нашли варианты в тексте вопроса
-                if pattern_options and len(pattern_options) == 4:
-                    options_text = "\n".join(pattern_options)
-                    sent_msg3 = update.message.reply_text(options_text)
-                else:
-                    # Если вариантов все еще нет, создаем стандартные
-                    standard_options = [
-                        "1) Первый вариант ответа",
-                        "2) Второй вариант ответа",
-                        "3) Третий вариант ответа",
-                        "4) Четвертый вариант ответа"
-                    ]
-                    options_text = "\n".join(standard_options)
-                    sent_msg3 = update.message.reply_text(
-                        "Варианты ответов:\n" + options_text + "\n\n⚠️ Примечание: варианты ответов могли быть сгенерированы автоматически из-за проблемы с форматированием."
-                    )
-                self.message_manager.save_message_id(update, context, sent_msg3.message_id)
+            sent_msg3 = update.message.reply_text(options_text)
+            self.message_manager.save_message_id(update, context, sent_msg3.message_id)
+
 
             # 4. Сообщение с инструкцией и кнопкой для завершения
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
@@ -1277,7 +1229,7 @@ class CommandHandlers:
             else:
                 assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
                 grade = "Неудовлетворительно"
-                
+
             # Определение уровня знаний по 20-балльной шкале для более точной оценки
             if total_questions == 20:
                 if score >= 18:  # 90-100%
@@ -1292,7 +1244,7 @@ class CommandHandlers:
                     level = "Базовый уровень"
                 else:  # < 50%
                     level = "Начальный уровень"
-                
+
                 # Добавляем уровень знаний к оценке
                 assessment = f"{assessment}\n\nУровень знаний: *{level}*"
 
