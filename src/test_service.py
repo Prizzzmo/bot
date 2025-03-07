@@ -29,7 +29,7 @@ class TestService:
         """
         # Запрашиваем набор из 20 вопросов у API
         prompt = f"Создай 20 вопросов для тестирования по теме '{topic}'. Каждый вопрос должен иметь 4 варианта ответа, четко пронумерованных от 1 до 4. После каждого вопроса с вариантами укажи правильный ответ в формате 'Правильный ответ: X', где X - число от 1 до 4. Пронумеруй все вопросы. Обязательно форматируй варианты ответов в виде '1) Вариант', '2) Вариант' и т.д. НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.)."
-        response = self.api_client.ask_grok(prompt, max_tokens=4000, use_cache=False)
+        response = self.api_client.ask_grok(prompt, use_cache=False)
         
         # Разделяем текст на вопросы, используя либо пустые строки, либо номера
         raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', response)
@@ -242,7 +242,7 @@ class TestService:
             prompt = f"На основе темы '{current_topic}' предложи 3 связанные темы по истории России, которые могут заинтересовать пользователя. Перечисли их в формате нумерованного списка без дополнительных пояснений."
 
             # Получаем ответ от API
-            similar_topics_text = api_client.ask_grok(prompt, max_tokens=150, temp=0.4)
+            similar_topics_text = api_client.ask_grok(prompt, use_cache=True)
 
             # Парсим темы
             similar_topics = []
