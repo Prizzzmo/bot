@@ -538,13 +538,62 @@ def button_handler(update, context):
             logger.error(f"Ошибка при чтении файла presentation.txt: {e}")
             presentation_text = "Информация о проекте временно недоступна."
 
-        # Отправляем информацию о проекте
-        query.edit_message_text(
-            "📋 *Информация о проекте*\n\n" + presentation_text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-        )
-        logger.info(f"Пользователь {user_id} просмотрел информацию о проекте")
+        # Разбиваем длинный текст на части (максимум 3000 символов)
+        max_length = 3000
+        parts = []
+        
+        # Заголовок добавляем только в первую часть
+        current_part = "📋 *Информация о проекте*\n\n"
+        
+        # Разбиваем текст по параграфам для сохранения форматирования
+        paragraphs = presentation_text.split('\n\n')
+        
+        for paragraph in paragraphs:
+            # Если добавление параграфа превысит максимальную длину
+            if len(current_part) + len(paragraph) + 2 > max_length:
+                # Сохраняем текущую часть
+                parts.append(current_part)
+                current_part = paragraph
+            else:
+                # Добавляем параграф с разделителем
+                if current_part and current_part != "📋 *Информация о проекте*\n\n":
+                    current_part += '\n\n' + paragraph
+                else:
+                    current_part += paragraph
+        
+        # Добавляем последнюю часть
+        if current_part:
+            parts.append(current_part)
+        
+        try:
+            # Отправляем первую часть с редактированием сообщения
+            query.edit_message_text(
+                parts[0][:4000],  # Ограничиваем длину для безопасности
+                parse_mode='Markdown',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+            )
+            
+            # Отправляем остальные части как новые сообщения
+            for part in parts[1:]:
+                query.message.reply_text(
+                    part[:4000],  # Ограничиваем длину для безопасности
+                    parse_mode='Markdown'
+                )
+                
+            logger.info(f"Пользователь {user_id} просмотрел информацию о проекте")
+        except telegram.error.BadRequest as e:
+            logger.error(f"Ошибка при отправке информации о проекте: {e}")
+            # Отправляем новое сообщение вместо редактирования
+            for part in parts:
+                query.message.reply_text(
+                    part[:4000],  # Ограничиваем длину для безопасности
+                    parse_mode='Markdown'
+                )
+            query.message.reply_text(
+                "Выберите действие:",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+            )
+        
         return TOPIC
     elif query.data == 'conversation':
         # Обработка кнопки беседы о истории России
