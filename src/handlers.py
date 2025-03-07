@@ -53,10 +53,6 @@ class CommandHandlers:
         user = update.message.from_user
         self.logger.info(f"Пользователь {user.id} ({user.first_name}) запустил бота")
 
-        # Очищаем историю чата дважды для надежности
-        self.message_manager.clear_chat_history(update, context)
-        self.message_manager.clear_chat_history(update, context)
-
         # Отправляем приветственное сообщение и сохраняем его ID
         sent_message = update.message.reply_text(
             f"👋 Здравствуйте, {user.first_name}!\n\n"
