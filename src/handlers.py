@@ -131,8 +131,6 @@ class CommandHandlers:
             for k in old_keys:
                 del self.callback_cache[k]
 
-        # Функция очистки чата удалена
-
         self.logger.info(f"Пользователь {user_id} нажал кнопку: {query_data}")
 
         if query_data == 'back_to_menu':
@@ -475,7 +473,6 @@ class CommandHandlers:
                     self.message_manager.save_message_id(update, context, sent_err.message_id)
 
             return self.TOPIC
-        # Обработчик кнопки скачивания презентации удален, т.к. файлы отправляются сразу
         elif query_data == 'history_map':
             # Обработка кнопки интерактивной карты
             user_id = query.from_user.id
@@ -1054,7 +1051,57 @@ class CommandHandlers:
                     reply_markup=self.ui_manager.main_menu()
                 )
             return self.CHOOSE_TOPIC
-        elif query_data == 'end_test' or query_data == 'cancel':
+        elif query_data == 'clear_chat_retry':
+            # Обработка повторной очистки чата через callback
+            self.logger.info(f"Пользователь {user_id} запросил повторную очистку чата")
+            query.answer("Начинаю повторную очистку...")
+
+            # Сначала обновляем сообщение с информацией о процессе
+            query.edit_message_text("⏳ Выполняю повторную очистку чата...")
+
+            # Выполняем очистку
+            success = self.message_manager.delete_chat_history(context.bot, update.effective_chat.id, user_id)
+
+            # Создаем клавиатуру для дополнительных действий
+            keyboard = [
+                [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Обновляем сообщение с результатом
+            if success:
+                query.edit_message_text(
+                    "✅ Повторная очистка чата успешно выполнена!",
+                    reply_markup=reply_markup
+                )
+            else:
+                query.edit_message_text(
+                    "⚠️ Повторная очистка выполнена частично. Некоторые сообщения могли остаться.",
+                    reply_markup=reply_markup
+                )
+
+            # Отправляем новое сообщение с главным меню
+            sent_msg = query.message.reply_text(
+                "Чат очищен. Что дальше?", 
+                reply_markup=self.ui_manager.main_menu()
+            )
+            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+            return self.TOPIC
+
+        elif query_data == 'admin_clear_all_chats' and hasattr(self, 'admin_panel'):
+            # Проверяем права администратора
+            if self.admin_panel.is_admin(user_id):
+                query.answer("Эта функция будет реализована в будущем")
+                query.edit_message_text(
+                    "⚙️ Функция очистки всех чатов находится в разработке. Текущая версия поддерживает очистку только текущего чата.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+                return self.TOPIC
+            else:
+                query.answer("У вас нет прав администратора")
+                return self.TOPIC
+
+        elif query_data == 'cancel' or query_data == 'end_test':
             if query_data == 'end_test':
                 self.logger.info(f"Пользователь {user_id} досрочно завершил тест")
                 query.edit_message_text("Тест завершен досрочно. Возвращаемся в главное меню.")
@@ -1086,8 +1133,6 @@ class CommandHandlers:
             query = update.callback_query
             query.answer()
             user_id = query.from_user.id
-
-            # Функция очистки чата удалена
 
             self.logger.info(f"Пользователь {user_id} выбирает тему через кнопку: {query.data}")
 
@@ -1316,8 +1361,6 @@ class CommandHandlers:
         user_id = update.message.from_user.id
         context.user_data['current_topic'] = topic
 
-        # Функция очистки чата удалена
-
         self.logger.info(f"Пользователь {user_id} ввел свою тему: {topic}")
 
         try:
@@ -1408,8 +1451,6 @@ class CommandHandlers:
         """
         user_answer = update.message.text.strip()
         user_id = update.message.from_user.id
-
-        # Функция очистки чата удалена
 
         # Получаем сохраненные данные теста
         questions = context.user_data.get('questions', [])
@@ -1805,28 +1846,28 @@ class CommandHandlers:
             self.admin_panel.handle_admin_command(update, context)
         else:
             update.message.reply_text("Административная панель недоступна")
-            
+
     def clear_chat_command(self, update, context):
         """
         Обрабатывает команду /clear для полной очистки чата.
-        
+
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
         """
         user = update.message.from_user
         chat_id = update.effective_chat.id
-        
+
         # Проверяем права администратора (если необходимо)
         is_admin = False
         if hasattr(self, 'admin_panel'):
             is_admin = self.admin_panel.is_admin(user.id)
-        
+
         # Только админы могут очищать чат (опционально)
         if is_admin:
             update.message.reply_text("🧹 Начинаю очистку истории чата...")
             success = self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
-            
+
             if success:
                 update.message.reply_text("✅ История чата успешно очищена!")
             else:
@@ -1835,7 +1876,7 @@ class CommandHandlers:
             # Обычные пользователи могут очищать только свою историю
             update.message.reply_text("🧹 Очищаю вашу историю чата...")
             success = self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
-            
+
             if success:
                 update.message.reply_text("✅ Ваша история чата успешно очищена!")
             else:

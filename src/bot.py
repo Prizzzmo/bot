@@ -68,6 +68,9 @@ class Bot:
 
             # Добавляем обработчик для команды администратора
             dp.add_handler(CommandHandler('admin', self.handlers.admin_command))
+            
+            # Добавляем обработчик для команды очистки чата
+            dp.add_handler(CommandHandler('clear', self.handlers.clear_chat_command))
 
             # Добавляем обработчик для обработки callback запросов администратора
             dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'))
