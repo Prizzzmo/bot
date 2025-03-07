@@ -1223,7 +1223,7 @@ def clear_chat_history(update, context, preserve_message_id=None):
         
         # Telegram имеет ограничения на частоту запросов (не более 30 в секунду)
         # Также учитываем, что старые сообщения (>48 часов) могут быть недоступны
-        max_messages_to_delete = min(len(message_ids), 100)
+        max_messages_to_delete = min(len(message_ids), 200)  # Увеличено с 100 до 200
         message_ids = message_ids[:max_messages_to_delete]
         
         # Словарь для отслеживания статуса удаления сообщений
