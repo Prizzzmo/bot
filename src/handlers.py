@@ -409,8 +409,12 @@ class CommandHandlers:
                                 query.edit_message_text(text, parse_mode='Markdown')
                             except telegram.error.BadRequest as e:
                                 self.logger.warning(f"Не удалось обновить сообщение о загрузке: {e}")
-                                sent_msg = query.message.reply_text(text, parse_mode='Markdown')
-                                self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                try:
+                                    # Отправляем новое сообщение вместо редактирования
+                                    sent_msg = query.message.reply_text(text, parse_mode='Markdown')
+                                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                except Exception as e2:
+                                    self.logger.error(f"Не удалось отправить новое сообщение: {e2}")
 
                         # Получаем информацию о теме
                         messages = self.content_service.get_topic_info(topic, update_message)

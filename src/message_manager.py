@@ -79,7 +79,8 @@ class MessageManager:
             return True
         except BadRequest as e:
             # Игнорируем ошибки для старых сообщений, которые нельзя удалить
-            if "Message to delete not found" in str(e) or "Message can't be deleted" in str(e):
+            if "Message to delete not found" in str(e) or "Message can't be deleted" in str(e) or "Message to edit not found" in str(e):
+                self.logger.debug(f"Сообщение {message_id} не найдено или не может быть удалено")
                 return False
             self.logger.warning(f"Ошибка при удалении сообщения {message_id}: {e}")
             return False
