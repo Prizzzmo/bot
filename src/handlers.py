@@ -392,18 +392,69 @@ class CommandHandlers:
                 map_path = self.history_map.generate_map_image(category=category)
 
                 if map_path and os.path.exists(map_path):
-                    # Отправляем изображение
-                    try:
-                        with open(map_path, 'rb') as img_file:
-                            context.bot.send_photo(
+                    # Проверяем размер файла карты перед отправкой
+                    valid_file = False
+                    if os.path.exists(map_path):
+                        try:
+                            file_size = os.path.getsize(map_path)
+                            if file_size > 0:
+                                valid_file = True
+                            else:
+                                self.logger.error(f"Файл карты {map_path} существует, но имеет нулевой размер")
+                        except Exception as size_error:
+                            self.logger.error(f"Ошибка при проверке размера файла карты: {size_error}")
+                    else:
+                        self.logger.error(f"Файл карты {map_path} не существует")
+
+                    # Отправляем изображение если файл валидный
+                    if valid_file:
+                        try:
+                            with open(map_path, 'rb') as img_file:
+                                context.bot.send_photo(
+                                    chat_id=user_id,
+                                    photo=img_file,
+                                    caption=f"🗺️ Карта исторических событий категории «{category}»",
+                                    parse_mode='HTML'
+                                )
+                        except Exception as img_error:
+                            self.logger.error(f"Ошибка при отправке изображения карты (Image_process_failed): {img_error}")
+                            context.bot.send_message(
                                 chat_id=user_id,
-                                photo=img_file,
-                                caption=f"🗺️ Карта исторических событий категории «{category}»",
+                                text=f"❌ Ошибка обработки изображения: Image_process_failed. Пробуем отправить стандартную карту.",
                                 parse_mode='HTML'
                             )
-                    except Exception as img_error:
-                        self.logger.error(f"Ошибка при отправке изображения карты: {img_error}")
-                        # Пробуем отправить резервное стандартное изображение
+                            # Пробуем отправить резервное стандартное изображение
+                            default_map_path = 'static/default_map.png'
+                            if os.path.exists(default_map_path):
+                                try:
+                                    with open(default_map_path, 'rb') as default_img:
+                                        context.bot.send_photo(
+                                            chat_id=user_id,
+                                            photo=default_img,
+                                            caption=f"🗺️ Стандартная карта (не удалось сгенерировать специальную карту для категории «{category}»)",
+                                            parse_mode='HTML'
+                                        )
+                                except Exception as e:
+                                    context.bot.send_message(
+                                        chat_id=user_id,
+                                        text=f"❌ Произошла ошибка при отправке карты: {str(e)}",
+                                        parse_mode='HTML'
+                                    )
+                            else:
+                                context.bot.send_message(
+                                    chat_id=user_id,
+                                    text=f"❌ Не удалось найти стандартную карту {default_map_path}",
+                                    parse_mode='HTML'
+                                )
+                    else:
+                        # Файл карты не найден или поврежден
+                        self.logger.error(f"Файл карты {map_path} поврежден или не существует")
+                        context.bot.send_message(
+                            chat_id=user_id,
+                            text=f"❌ Не удалось сгенерировать карту: Image_process_failed",
+                            parse_mode='HTML'
+                        )
+                        # Пробуем отправить стандартную карту
                         default_map_path = 'static/default_map.png'
                         if os.path.exists(default_map_path):
                             try:
