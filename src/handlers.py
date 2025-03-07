@@ -135,7 +135,7 @@ class CommandHandlers:
             try:
                 # Создаем клавиатуру с кнопками для первой части
                 keyboard_first = [
-                    [InlineKeyboardButton("📥 Скачать подробную презентацию", callback_data='download_detailed_presentation')],
+                    [InlineKeyboardButton("📥 Скачать презентацию в Word", callback_data='download_detailed_presentation')],
                     [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
                 ]
                 
@@ -151,7 +151,7 @@ class CommandHandlers:
                     # Добавляем кнопки к последней части
                     if i == len(parts[1:]):
                         keyboard_last = [
-                            [InlineKeyboardButton("📥 Скачать подробную презентацию", callback_data='download_detailed_presentation')],
+                            [InlineKeyboardButton("📥 Скачать презентацию в Word", callback_data='download_detailed_presentation')],
                             [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
                         ]
                         sent_msg = query.message.reply_text(
@@ -175,7 +175,7 @@ class CommandHandlers:
                     # Добавляем кнопки к последней части
                     if i == len(parts) - 1:
                         keyboard = [
-                            [InlineKeyboardButton("📥 Скачать подробную презентацию", callback_data='download_detailed_presentation')],
+                            [InlineKeyboardButton("📥 Скачать презентацию в Word", callback_data='download_detailed_presentation')],
                             [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
                         ]
                         sent_msg = query.message.reply_text(
@@ -195,23 +195,52 @@ class CommandHandlers:
         elif query.data == 'download_detailed_presentation':
             # Обработка кнопки скачивания подробной презентации
             try:
-                # Отправляем файл с подробной презентацией
-                with open('detailed_presentation.md', 'rb') as file:
+                # Показываем сообщение о подготовке файла
+                query.edit_message_text(
+                    "⏳ Подготавливаю подробную презентацию в формате Word...",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+                
+                # Импортируем функцию для создания DOCX и создаём презентацию
+                import sys
+                sys.path.append('.')
+                from create_presentation_doc import create_presentation_docx
+                
+                # Создаем Word документ
+                docx_path = create_presentation_docx('detailed_presentation.md', 'История_России_подробная_презентация.docx')
+                
+                # Отправляем файл в формате DOCX
+                with open(docx_path, 'rb') as docx_file:
                     context.bot.send_document(
                         chat_id=update.effective_chat.id,
-                        document=file,
-                        filename='История_России_подробная_презентация.md',
-                        caption="📚 Подробная презентация бота по истории России в текстовом формате."
+                        document=docx_file,
+                        filename='История_России_подробная_презентация.docx',
+                        caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word."
                     )
-                self.logger.info(f"Пользователь {user_id} скачал подробную презентацию")
+                
+                # Также отправляем обычный текстовый файл для совместимости
+                with open('detailed_presentation.md', 'rb') as md_file:
+                    context.bot.send_document(
+                        chat_id=update.effective_chat.id,
+                        document=md_file,
+                        filename='История_России_подробная_презентация.md',
+                        caption="📄 Версия презентации в текстовом формате Markdown."
+                    )
+                
+                self.logger.info(f"Пользователь {user_id} скачал подробную презентацию в формате Word и текстовом формате")
 
-                # Отправляем сообщение о успешной загрузке
-                query.answer("Презентация успешно отправлена!")
+                # Обновляем сообщение о успешной загрузке
+                query.edit_message_text(
+                    "✅ Презентация успешно отправлена в двух форматах:\n\n"
+                    "1. DOCX (Word) - с иллюстрациями и форматированием\n"
+                    "2. Markdown - текстовый формат для удобного просмотра\n\n"
+                    "Выберите дальнейшее действие:",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
             except Exception as e:
                 self.logger.error(f"Ошибка при отправке файла презентации: {e}")
-                query.answer("Ошибка при отправке презентации.")
-                query.message.reply_text(
-                    "К сожалению, произошла ошибка при отправке презентации. Пожалуйста, попробуйте позже.",
+                query.edit_message_text(
+                    f"К сожалению, произошла ошибка при создании или отправке презентации: {e}. Пожалуйста, попробуйте позже.",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
             return self.TOPIC
