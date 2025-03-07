@@ -681,7 +681,7 @@ class CommandHandlers:
 
                     self.logger.info(f"Пользователь {user_id} получил карту категории {category}")
                 else:
-                                        # Если не удалось сгенерировать карту, отправляем стандартную
+                                        #                    # Если не удалось сгенерировать карту, отправляем стандартную
                     default_map_path = 'static/default_map.png'
                     if os.path.exists(default_map_path):
                         try:
@@ -1127,38 +1127,110 @@ class CommandHandlers:
                                 self.logger.warning(f"Не удалось обновить сообщение о загрузке: {e}")
                                 query.message.reply_text(message, parse_mode='Markdown')
 
-
-                        # Получаем информацию о теме через сервис тем (теперь всегда возвращает список сообщений)
+                        # Получаем информацию о теме через сервис тем (возвращает список сообщений)
                         messages = self.topic_service.get_topic_info(topic, update_message)
 
                         # Проверяем, что мы получили список сообщений
                         if isinstance(messages, list) and messages:
                             try:
-                                # Оглавление с первой главой отправляем как первое сообщение
+                                # Сначала отправляем оглавление (первое сообщение)
                                 query.edit_message_text(
                                     messages[0],
                                     parse_mode='Markdown',
                                     disable_web_page_preview=True
                                 )
 
-                                # Сохраняем ID сообщений для будущей очистки чата
-                                sent_message_ids = []
-
-                                # Отправляем остальные главы как отдельные сообщения с задержкой
+                                # Отправляем каждую главу как отдельное сообщение
                                 import time
                                 for i, msg in enumerate(messages[1:], 1):
                                     try:
-                                        # Добавляем небольшую задержку между сообщениями для предотвращения лимитов API
-                                        if i > 1 and i % 3 == 0:  # Делаем паузу после каждого 3-го сообщения
-                                            time.sleep(0.5)
+                                        # Проверяем размер сообщения и разбиваем его при необходимости
+                                        if len(msg) > 4000:
+                                            # Сначала извлекаем заголовок с эмодзи и форматом главы
+                                            header_match = re.match(r'^(.+?ГЛАВА \d+:.+?\*)\n\n(┈+)\n\n', msg)
+                                            if header_match:
+                                                header = header_match.group(1) + "\n\n" + header_match.group(2) + "\n\n"
+                                                content = msg[len(header):]
 
-                                        sent_msg = query.message.reply_text(
-                                            msg, 
-                                            parse_mode='Markdown',
-                                            disable_web_page_preview=True
-                                        )
-                                        # Сохраняем ID сообщения
-                                        self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                                # Ищем футер с навигацией
+                                                footer_match = re.search(r'\n\n(•┈+•)\n\n(➡️.+|📝.+)$', msg)
+                                                footer = ""
+                                                if footer_match:
+                                                    footer = "\n\n" + footer_match.group(1) + "\n\n" + footer_match.group(2)
+                                                    content = content[:-(len(footer))]
+
+                                                # Разбиваем контент на части по 3500 символов (с запасом)
+                                                chunks = []
+                                                current_length = 0
+                                                current_chunk = ""
+
+                                                # Разбиваем по абзацам
+                                                paragraphs = content.split('\n\n')
+                                                for paragraph in paragraphs:
+                                                    if current_length + len(paragraph) + 4 <= 3500:
+                                                        if current_chunk:
+                                                            current_chunk += "\n\n" + paragraph
+                                                        else:
+                                                            current_chunk = paragraph
+                                                        current_length += len(paragraph) + 4
+                                                    else:
+                                                        chunks.append(current_chunk)
+                                                        current_chunk = paragraph
+                                                        current_length = len(paragraph)
+
+                                                if current_chunk:
+                                                    chunks.append(current_chunk)
+
+                                                # Определяем, из какой главы это сообщение
+                                                chapter_match = re.search(r'ГЛАВА (\d+):', header)
+                                                chapter_num = int(chapter_match.group(1)) if chapter_match else i
+
+                                                # Отправляем части сообщения
+                                                for j, chunk in enumerate(chunks, 1):
+                                                    # Добавляем информацию о части к заголовку
+                                                    part_header = header.replace("*\n\n", f"* (часть {j}/{len(chunks)})\n\n")
+
+                                                    # Для последней части добавляем футер, для остальных - примечание о продолжении
+                                                    if j == len(chunks):
+                                                        full_msg = part_header + chunk + footer
+                                                    else:
+                                                        full_msg = part_header + chunk + "\n\n_(продолжение следует...)_"
+
+                                                    # Добавляем задержку между сообщениями
+                                                    if i > 1 or j > 1:
+                                                        time.sleep(0.5)
+
+                                                    sent_msg = query.message.reply_text(
+                                                        full_msg, 
+                                                        parse_mode='Markdown',
+                                                        disable_web_page_preview=True
+                                                    )
+                                                    # Сохраняем ID сообщения
+                                                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                            else:
+                                                # Если не удалось извлечь заголовок, отправляем сообщение частями
+                                                chunks = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
+                                                for chunk in chunks:
+                                                    sent_msg = query.message.reply_text(
+                                                        chunk, 
+                                                        parse_mode='Markdown',
+                                                        disable_web_page_preview=True
+                                                    )
+                                                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                                    time.sleep(0.5)
+                                        else:
+                                            # Если сообщение не превышает лимит, отправляем его как есть
+                                            # Добавляем небольшую задержку между сообщениями
+                                            if i > 1:
+                                                time.sleep(0.5)
+
+                                            sent_msg = query.message.reply_text(
+                                                msg, 
+                                                parse_mode='Markdown',
+                                                disable_web_page_preview=True
+                                            )
+                                            # Сохраняем ID сообщения
+                                            self.message_manager.save_message_id(update, context, sent_msg.message_id)
                                     except telegram.error.RetryAfter as e:
                                         # Обработка ошибки превышения лимита запросов
                                         self.logger.warning(f"Превышен лимит запросов. Ожидание {e.retry_after} секунд")
@@ -1172,8 +1244,18 @@ class CommandHandlers:
                                         self.message_manager.save_message_id(update, context, sent_msg.message_id)
                                     except Exception as e:
                                         self.logger.error(f"Ошибка при отправке части сообщения: {e}")
+                                        # Пробуем отправить без форматирования
+                                        try:
+                                            sent_msg = query.message.reply_text(
+                                                msg, 
+                                                parse_mode=None,
+                                                disable_web_page_preview=True
+                                            )
+                                            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                        except Exception as e2:
+                                            self.logger.error(f"Вторая ошибка при отправке сообщения: {e2}")
 
-                                self.logger.info(f"Отправлено {len(messages)} сообщений по теме '{topic}'")
+                                self.logger.info(f"Отправлено {len(messages) + sum(1 for m in messages[1:] if len(m) > 4000)} сообщений по теме '{topic}'")
                             except Exception as e:
                                 self.logger.error(f"Ошибка при отправке сообщения: {e}")
                                 # В случае ошибки пробуем отправить как простой текст
@@ -1184,7 +1266,14 @@ class CommandHandlers:
 
                                 # Отправляем сообщения без форматирования
                                 for msg in messages:
-                                    query.message.reply_text(msg, parse_mode=None)
+                                    try:
+                                        query.message.reply_text(msg[:4000], parse_mode=None)
+                                        if len(msg) > 4000:
+                                            for i in range(4000, len(msg), 4000):
+                                                query.message.reply_text(msg[i:i+4000], parse_mode=None)
+                                                time.sleep(0.5)
+                                    except Exception as e_msg:
+                                        self.logger.error(f"Ошибка при отправке текста без форматирования: {e_msg}")
                         else:
                             # Обработка случая, когда messages не список или пустой
                             self.logger.warning(f"Некорректный формат ответа для темы: {topic}")
