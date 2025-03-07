@@ -1168,104 +1168,206 @@ def handle_conversation(update, context):
 
     return CONVERSATION
 
-# Улучшенная функция для очистки истории чата
+# Полностью переработанная функция очистки чата
 def clear_chat_history(update, context):
     """
     Очищает историю чата, удаляя предыдущие сообщения бота.
-    Улучшенная версия с повышенной производительностью и защитой от ошибок.
+    Комплексно переработанная версия с улучшенной обработкой ошибок и
+    оптимизацией для работы с API Telegram.
 
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
     """
-    if not update or not update.effective_chat:
+    # Проверка обязательных параметров
+    if not update or not update.effective_chat or not context:
+        logger.warning("Вызов очистки чата с неполными параметрами")
         return
         
     try:
         # Получаем ID чата
         chat_id = update.effective_chat.id
+        
+        # Проверка на наличие данных пользователя
+        if 'previous_messages' not in context.user_data:
+            context.user_data['previous_messages'] = []
+            return
 
-        # Получаем список сохраненных ID сообщений
+        # Получаем и сортируем список сохраненных ID сообщений (сначала новые)
         message_ids = context.user_data.get('previous_messages', [])
-
         if not message_ids:
             return
 
-        # Удаляем дубликаты и устаревшие сообщения (старше 48 часов)
-        # Telegram API не позволяет удалять сообщения старше 48 часов
-        import time
-        current_time = int(time.time())
-        message_ids = list(set(message_ids))  # Удаление дубликатов
+        # Удаляем дубликаты
+        message_ids = list(set(message_ids))
         
-        # Определяем максимальное количество сообщений для удаления за один запрос
-        max_messages = min(len(message_ids), 100)
+        # Сортируем по убыванию (сначала новые сообщения)
+        # Это важно, так как новые сообщения с большей вероятностью будут удалены успешно
+        message_ids.sort(reverse=True)
         
-        # Используем многопоточность для асинхронного удаления сообщений
-        import threading
+        # Ограничиваем количество сообщений для удаления
+        # Telegram имеет ограничения на частоту запросов
+        max_messages_to_delete = min(len(message_ids), 80)
+        message_ids = message_ids[:max_messages_to_delete]
         
-        def delete_messages_batch(msgs_batch):
-            nonlocal count_deleted
-            for msg_id in msgs_batch:
+        # Словарь для отслеживания статуса удаления сообщений
+        deletion_status = {msg_id: False for msg_id in message_ids}
+        
+        # Определяем типы ошибок для более точной обработки
+        telegram_error_types = {
+            'message to delete not found': 'already_deleted',
+            'message can\'t be deleted': 'permission_denied',
+            'message to edit not found': 'already_deleted',
+            'message is not modified': 'not_modified',
+            'message too long': 'message_too_long',
+            'bot was blocked by the user': 'user_blocked_bot',
+            'chat not found': 'chat_not_found',
+            'forbidden': 'forbidden',
+            'flood control': 'flood_control'
+        }
+        
+        # Функция для классификации ошибок Telegram
+        def classify_telegram_error(error_text):
+            error_text = str(error_text).lower()
+            for key, value in telegram_error_types.items():
+                if key in error_text:
+                    return value
+            return 'unknown_telegram_error'
+        
+        def delete_message_with_retry(msg_id, max_retries=2, delay=0.5):
+            """Удаляет сообщение с повторными попытками в случае ошибок скорости"""
+            nonlocal count_deleted, retry_count, failure_reasons
+            
+            for attempt in range(max_retries + 1):
                 try:
                     context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
                     count_deleted += 1
+                    deletion_status[msg_id] = True
+                    return True
+                except telegram.error.RetryAfter as ra:
+                    # Ошибка скорости - ждем и пробуем снова
+                    retry_count += 1
+                    retry_seconds = min(ra.retry_after + 0.5, 3)  # Не ждем больше 3 секунд
+                    logger.debug(f"Достигнут лимит скорости, ожидание {retry_seconds} сек перед повторной попыткой")
+                    time.sleep(retry_seconds)
+                    # Продолжаем цикл для следующей попытки
                 except telegram.error.TelegramError as te:
-                    # Более точная обработка ошибок Telegram
-                    if "message to delete not found" in str(te).lower():
-                        # Сообщение уже удалено или недоступно
-                        pass
-                    elif "message can't be deleted" in str(te).lower():
-                        # Сообщение не может быть удалено по правам доступа
-                        pass
+                    # Анализируем причину ошибки
+                    error_type = classify_telegram_error(str(te))
+                    
+                    # Считаем различные типы ошибок
+                    if error_type not in failure_reasons:
+                        failure_reasons[error_type] = 0
+                    failure_reasons[error_type] += 1
+                    
+                    # Некоторые ошибки не требуют повторных попыток
+                    if error_type in ['already_deleted', 'permission_denied', 'not_modified']:
+                        return False
+                    
+                    # Для других ошибок пробуем повторить с задержкой
+                    if attempt < max_retries:
+                        time.sleep(delay)
                     else:
-                        logger.warning(f"Telegram error при удалении сообщения {msg_id}: {te}")
+                        return False
                 except Exception as e:
-                    # Другие ошибки
-                    pass
+                    # Общие ошибки
+                    logger.debug(f"Не удалось удалить сообщение {msg_id}: {str(e)}")
+                    return False
+            
+            return False
         
-        # Удаляем сообщения асинхронно в нескольких потоках
+        # Оптимизированное удаление сообщений: деление на пакеты и многопоточность
+        # с защитой от ошибок API Telegram
+        import time
+        import threading
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         count_deleted = 0
-        batch_size = 10  # Оптимальный размер пакета для Telegram API
-        threads = []
+        retry_count = 0
+        failure_reasons = {}
         
-        # Создаем и запускаем потоки для удаления сообщений
-        for i in range(0, min(max_messages, len(message_ids)), batch_size):
-            batch = message_ids[i:i+batch_size]
-            thread = threading.Thread(target=delete_messages_batch, args=(batch,))
-            thread.daemon = True  # Фоновый поток
-            threads.append(thread)
-            thread.start()
+        # Размер пакета для удаления (Telegram имеет ограничения на частоту запросов)
+        batch_size = 5
         
-        # Ждем завершения всех потоков, но не более 3 секунд
-        for thread in threads:
-            thread.join(timeout=0.5)
+        # Используем ThreadPoolExecutor вместо обычных потоков для лучшего контроля
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            # Разбиваем сообщения на пакеты для избежания ограничений API
+            for i in range(0, len(message_ids), batch_size):
+                batch = message_ids[i:i+batch_size]
+                
+                # Запускаем удаление для каждого сообщения в пакете
+                futures = {executor.submit(delete_message_with_retry, msg_id): msg_id for msg_id in batch}
+                
+                # Ждем выполнения всех задач в пакете с таймаутом
+                for future in as_completed(futures, timeout=5):
+                    msg_id = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        logger.debug(f"Ошибка при удалении сообщения {msg_id}: {str(e)}")
+                
+                # Небольшая задержка между пакетами
+                if i + batch_size < len(message_ids):
+                    time.sleep(0.5)
         
-        # Очищаем список предыдущих сообщений
-        context.user_data['previous_messages'] = []
-
-        if count_deleted > 0:
-            logger.info(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений")
+        # Обновляем список предыдущих сообщений, оставляя только те, которые не удалось удалить
+        new_message_list = []
+        for msg_id in context.user_data.get('previous_messages', []):
+            if msg_id not in deletion_status or not deletion_status[msg_id]:
+                new_message_list.append(msg_id)
+        
+        # Ограничиваем размер списка
+        max_saved_messages = 50
+        if len(new_message_list) > max_saved_messages:
+            new_message_list = new_message_list[-max_saved_messages:]
+        
+        context.user_data['previous_messages'] = new_message_list
+        
+        # Логирование результатов с подробной информацией
+        if count_deleted > 0 or failure_reasons:
+            log_message = f"Очистка чата {chat_id}: удалено {count_deleted} из {len(message_ids)} сообщений"
+            if retry_count:
+                log_message += f", повторных попыток: {retry_count}"
+            if failure_reasons:
+                log_message += f", причины ошибок: {failure_reasons}"
+            logger.info(log_message)
+            
     except Exception as e:
-        logger.error(f"Ошибка при очистке истории чата: {str(e)}")
+        logger.error(f"Критическая ошибка при очистке истории чата: {str(e)}")
 
-# Функция для сохранения ID сообщения
+# Улучшенная функция для сохранения ID сообщения
 def save_message_id(update, context, message_id):
     """
     Сохраняет ID сообщения в список предыдущих сообщений.
+    Улучшенная версия с проверкой дубликатов и валидацией ID.
 
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
         message_id (int): ID сообщения для сохранения
     """
+    if not context or not hasattr(context, 'user_data'):
+        logger.warning("Попытка сохранить ID сообщения без контекста пользователя")
+        return
+        
+    if not message_id or not isinstance(message_id, int):
+        logger.warning(f"Попытка сохранить некорректный ID сообщения: {message_id}")
+        return
+        
+    # Инициализация списка, если его нет
     if 'previous_messages' not in context.user_data:
         context.user_data['previous_messages'] = []
-
-    context.user_data['previous_messages'].append(message_id)
-
-    # Ограничиваем список последними 50 сообщениями
-    if len(context.user_data['previous_messages']) > 50:
-        context.user_data['previous_messages'] = context.user_data['previous_messages'][-50:]
+    
+    # Проверка на дубликаты перед добавлением
+    if message_id not in context.user_data['previous_messages']:
+        context.user_data['previous_messages'].append(message_id)
+        
+    # Ограничиваем список последними сообщениями
+    max_saved_messages = 50
+    if len(context.user_data['previous_messages']) > max_saved_messages:
+        # Усовершенствованный способ хранения - оставляем последние сообщения,
+        # так как они с большей вероятностью будут успешно удалены
+        context.user_data['previous_messages'] = context.user_data['previous_messages'][-max_saved_messages:]
 
 # Обработчик ошибок
 def error_handler(update, context):
