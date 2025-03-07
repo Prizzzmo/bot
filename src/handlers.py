@@ -133,21 +133,31 @@ class CommandHandlers:
                 parts.append(current_part)
 
             try:
+                # Создаем клавиатуру с кнопками для первой части
+                keyboard_first = [
+                    [InlineKeyboardButton("📥 Скачать подробную презентацию", callback_data='download_detailed_presentation')],
+                    [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+                ]
+                
                 # Отправляем первую часть с редактированием сообщения
                 query.edit_message_text(
                     parts[0][:4000],  # Ограничиваем длину для безопасности
                     parse_mode='Markdown',
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                    reply_markup=InlineKeyboardMarkup(keyboard_first)
                 )
 
                 # Отправляем остальные части как новые сообщения
                 for i, part in enumerate(parts[1:], 1):
-                    # Добавляем кнопку главного меню только к последней части
+                    # Добавляем кнопки к последней части
                     if i == len(parts[1:]):
+                        keyboard_last = [
+                            [InlineKeyboardButton("📥 Скачать подробную презентацию", callback_data='download_detailed_presentation')],
+                            [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+                        ]
                         sent_msg = query.message.reply_text(
                             part[:4000],  # Ограничиваем длину для безопасности
                             parse_mode='Markdown',
-                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                            reply_markup=InlineKeyboardMarkup(keyboard_last)
                         )
                     else:
                         sent_msg = query.message.reply_text(
@@ -162,12 +172,16 @@ class CommandHandlers:
                 self.logger.error(f"Ошибка при отправке информации о проекте: {e}")
                 # Отправляем новое сообщение вместо редактирования
                 for i, part in enumerate(parts):
-                    # Добавляем кнопку главного меню к последней части
+                    # Добавляем кнопки к последней части
                     if i == len(parts) - 1:
+                        keyboard = [
+                            [InlineKeyboardButton("📥 Скачать подробную презентацию", callback_data='download_detailed_presentation')],
+                            [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+                        ]
                         sent_msg = query.message.reply_text(
                             part[:4000],  # Ограничиваем длину для безопасности
                             parse_mode='Markdown',
-                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                            reply_markup=InlineKeyboardMarkup(keyboard)
                         )
                     else:
                         sent_msg = query.message.reply_text(
