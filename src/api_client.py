@@ -4,8 +4,9 @@ import threading
 import telegram
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from src.base_client import BaseAPIClient
 
-class APIClient:
+class APIClient(BaseAPIClient):
     """Класс для взаимодействия с API Gemini с оптимизацией пула соединений"""
 
     def __init__(self, api_key, api_cache, logger):
@@ -29,6 +30,19 @@ class APIClient:
         session.mount("http://", adapter)
         return session
 
+    def send_request(self, prompt, **kwargs):
+        """
+        Отправляет запрос к API.
+        
+        Args:
+            prompt (str): Текст запроса
+            **kwargs: Дополнительные параметры запроса
+            
+        Returns:
+            str: Ответ от API
+        """
+        return self.ask_grok(prompt, **kwargs)
+        
     def ask_grok(self, prompt, temp=0.3, max_tokens=1024, use_cache=True, max_retries=3, retry_delay=2):
         """
         Отправляет запрос к Gemini API и возвращает ответ с оптимизированным пулингом соединений.

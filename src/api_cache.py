@@ -3,8 +3,10 @@ import json
 import os
 from datetime import datetime
 import hashlib
+import threading
+from src.interfaces import ICache
 
-class APICache:
+class APICache(ICache):
     """
     Оптимизированный класс для кэширования ответов API.
     Поддерживает сохранение и загрузку кэша из файла.

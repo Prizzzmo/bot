@@ -1,12 +1,14 @@
 import logging
 import os
 import time
+import threading
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 from src.config import ERROR_DESCRIPTIONS
+from src.interfaces import ILogger
 
-class Logger:
+class Logger(ILogger):
     """Класс для управления логированием приложения"""
 
     def __init__(self):

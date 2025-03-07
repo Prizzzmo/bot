@@ -1,90 +1,54 @@
+import logging
 import os
-from src.config import Config, MAP
-from src.logger import Logger
-from src.api_cache import APICache
-from src.api_client import APIClient
-from src.message_manager import MessageManager
-from src.ui_manager import UIManager
-from src.content_service import ContentService
-from src.handlers import CommandHandlers
-from src.bot import Bot, BotManager
-import fcntl
+import traceback
+import sys
+from dotenv import load_dotenv
 
-def is_bot_already_running():
-    """Проверяет, запущен ли уже бот, используя механизм блокировки файла"""
-    lockfile = "/tmp/history_bot.lock"
-    try:
-        fd = open(lockfile, 'w')
-        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return fd  # Возвращаем файловый дескриптор для сохранения блокировки
-    except IOError:
-        return False  # Бот уже запущен
+from src.config import Config
+from src.factory import BotFactory
 
 def main():
-    # Создаем экземпляр логгера
-    logger = Logger()
+    """Главная функция для запуска бота"""
+    try:
+        # Загружаем переменные окружения из .env файла
+        load_dotenv()
 
-    # Загружаем конфигурацию
-    config = Config()
+        # Настраиваем логирование
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler()
+            ]
+        )
+        logger = logging.getLogger(__name__)
 
-    # Создаем пул процессов для асинхронных и тяжелых задач
-    from concurrent.futures import ThreadPoolExecutor
-    # Ограничиваем количество потоков для экономии ресурсов
-    thread_pool = ThreadPoolExecutor(max_workers=3)
+        # Загружаем конфигурацию
+        config = Config()
 
-    # Создаем необходимые сервисы
-    ui_manager = UIManager(logger)
-    # Создаем кэш для API запросов с оптимизированными параметрами
-    api_cache = APICache(logger, max_size=200, save_interval=10)
-    api_client = APIClient(config.gemini_api_key, api_cache, logger)
-    message_manager = MessageManager(logger)
-    # Передаем пул потоков в сервис контента для асинхронных операций
-    content_service = ContentService(api_client, logger)
-    content_service.thread_pool = thread_pool
+        # Проверяем валидность конфигурации
+        if not config.validate():
+            logger.error("Ошибка в конфигурации! Проверьте .env файл.")
+            return
 
-    # Инициализируем сервис аналитики
-    from src.analytics import Analytics
-    analytics = Analytics(logger)
+        # Создаем экземпляр бота через фабрику
+        bot = BotFactory.create_bot(config)
 
-    # Инициализируем карту исторических событий
-    from src.history_map import HistoryMap
+        # Настраиваем бота
+        if not bot.setup():
+            logger.error("Ошибка при настройке бота!")
+            return
 
-    history_map = HistoryMap(logger)
-
-    logger.info("Инициализирована карта исторических событий")
-
-    # Создаем обработчик команд
-    handlers = CommandHandlers(ui_manager, api_client, message_manager, content_service, logger, config)
-    # Прикрепляем карту к обработчику
-    handlers.history_map = history_map
-
-    # Создаем и настраиваем бота
-    bot = Bot(config, logger, handlers)
-    if bot.setup():
-        logger.info("Бот успешно настроен")
+        # Запускаем бота
         bot.run()
-    else:
-        logger.error("Не удалось настроить бота")
 
+    except Exception as e:
+        if logger:
+            logger.error(f"Критическая ошибка: {e}")
+            logger.error(traceback.format_exc())
+        else:
+            print(f"Критическая ошибка: {e}")
+            print(traceback.format_exc())
 
 if __name__ == "__main__":
-    # Проверяем, запущен ли уже бот
-    lock_fd = is_bot_already_running()
-
-    if not lock_fd:
-        print("Бот уже запущен! Завершение работы.")
-        exit(1)
-
-    # Инициализируем логгер
-    logger = Logger()
-    logger.info("Запуск бота и веб-сервера логов...")
-
-    # Загружаем токен и API ключ
-    #load_dotenv()  # Загружаем переменные окружения из .env файла
-    config = Config()
-
-    # Инициализируем LRU-кэш для API
-    api_cache = APICache(logger)
-
-    bot_manager = BotManager()
-    bot_manager.run()
+    main()

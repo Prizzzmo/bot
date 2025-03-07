@@ -3,8 +3,9 @@ import threading
 import re
 import random
 import time
+from src.interfaces import IContentProvider
 
-class ContentService:
+class ContentService(IContentProvider):
     """Класс для обработки и получения образовательного контента"""
     
     def __init__(self, api_client, logger):
