@@ -72,11 +72,7 @@ class BotFactory:
             message_manager=message_manager,
             content_service=content_service,
             logger=logger,
-            config=config,
-            state_manager=state_manager,
-            admin_panel=admin_panel,
-            analytics_service=analytics_service,
-            history_map_service=history_map_service
+            config=config
         )
         
         # Создаем веб-сервер
