@@ -1,4 +1,3 @@
-
 import telegram
 import re
 import random
@@ -7,7 +6,7 @@ from telegram.ext import ConversationHandler
 
 class CommandHandlers:
     """Класс для обработки команд и взаимодействий с пользователем"""
-    
+
     def __init__(self, ui_manager, api_client, message_manager, content_service, logger, config):
         self.ui_manager = ui_manager
         self.api_client = api_client
@@ -15,7 +14,7 @@ class CommandHandlers:
         self.content_service = content_service
         self.logger = logger
         self.config = config
-        
+
         # Импортируем константы состояний из config
         from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
         self.TOPIC = TOPIC
@@ -23,7 +22,7 @@ class CommandHandlers:
         self.TEST = TEST
         self.ANSWER = ANSWER
         self.CONVERSATION = CONVERSATION
-    
+
     def start(self, update, context):
         """
         Обрабатывает команду /start, показывает приветствие и главное меню.
@@ -65,7 +64,7 @@ class CommandHandlers:
         )
         self.message_manager.save_message_id(update, context, sent_msg.message_id)
         return self.TOPIC
-    
+
     def button_handler(self, update, context):
         """
         Обрабатывает нажатия на кнопки меню.
@@ -109,13 +108,13 @@ class CommandHandlers:
             # Разбиваем длинный текст на части (максимум 3000 символов)
             max_length = 3000
             parts = []
-            
+
             # Заголовок добавляем только в первую часть
             current_part = "📋 *Информация о проекте*\n\n"
-            
+
             # Разбиваем текст по параграфам для сохранения форматирования
             paragraphs = presentation_text.split('\n\n')
-            
+
             for paragraph in paragraphs:
                 # Если добавление параграфа превысит максимальную длину
                 if len(current_part) + len(paragraph) + 2 > max_length:
@@ -128,11 +127,11 @@ class CommandHandlers:
                         current_part += '\n\n' + paragraph
                     else:
                         current_part += paragraph
-            
+
             # Добавляем последнюю часть
             if current_part:
                 parts.append(current_part)
-            
+
             try:
                 # Отправляем первую часть с редактированием сообщения
                 query.edit_message_text(
@@ -140,7 +139,7 @@ class CommandHandlers:
                     parse_mode='Markdown',
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
-                
+
                 # Отправляем остальные части как новые сообщения
                 for i, part in enumerate(parts[1:], 1):
                     # Добавляем кнопку главного меню только к последней части
@@ -157,7 +156,7 @@ class CommandHandlers:
                         )
                     # Сохраняем ID сообщения
                     self.message_manager.save_message_id(update, context, sent_msg.message_id)
-                    
+
                 self.logger.info(f"Пользователь {user_id} просмотрел информацию о проекте")
             except telegram.error.BadRequest as e:
                 self.logger.error(f"Ошибка при отправке информации о проекте: {e}")
@@ -177,7 +176,7 @@ class CommandHandlers:
                         )
                     # Сохраняем ID сообщения
                     self.message_manager.save_message_id(update, context, sent_msg.message_id)
-            
+
             return self.TOPIC
         elif query.data == 'conversation':
             # Обработка кнопки беседы о истории России
@@ -245,14 +244,14 @@ class CommandHandlers:
             try:
                 # Получаем тест через сервис контента
                 test_data = self.content_service.generate_test(topic)
-                
+
                 valid_questions = test_data['original_questions']
                 display_questions = test_data['display_questions']
 
                 context.user_data['questions'] = valid_questions
                 context.user_data['current_question'] = 0
                 context.user_data['score'] = 0
-                
+
                 # Сохраняем оригинальные вопросы для проверки ответов
                 context.user_data['original_questions'] = valid_questions
                 # Сохраняем очищенные вопросы для отображения
@@ -322,7 +321,7 @@ class CommandHandlers:
         elif query.data == 'custom_topic':
             query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
             return self.CHOOSE_TOPIC
-            
+
     def choose_topic(self, update, context):
         """
         Обрабатывает выбор темы пользователем из списка или ввод своей темы.
@@ -415,7 +414,7 @@ class CommandHandlers:
                 return self.TOPIC
         # Возвращаем CHOOSE_TOPIC, если не обработано другими условиями
         return self.CHOOSE_TOPIC
-    
+
     def handle_custom_topic(self, update, context):
         """
         Обрабатывает ввод пользователем своей темы.
@@ -457,7 +456,7 @@ class CommandHandlers:
             self.logger.log_error(e, f"Ошибка при обработке пользовательской темы для пользователя {user_id}")
             update.message.reply_text(f"Произошла ошибка: {e}. Попробуй еще раз.", reply_markup=self.ui_manager.main_menu())
         return self.TOPIC
-    
+
     def handle_answer(self, update, context):
         """
         Обрабатывает ответы пользователя на вопросы теста.
@@ -559,11 +558,11 @@ class CommandHandlers:
             )
             self.logger.info(f"Пользователь {user_id} завершил тест с результатом {score}/{total_questions} ({percentage:.1f}%)")
             return self.TOPIC
-    
+
     def handle_conversation(self, update, context):
         """
         Обрабатывает сообщения пользователя в режиме беседы с оптимизацией.
-        
+
         Также обрабатывает ввод ID нового администратора, если его ожидает админ-панель.
 
         Args:
@@ -643,7 +642,7 @@ class CommandHandlers:
             )
 
         return self.CONVERSATION
-    
+
     def clear_command(self, update, context):
         """
         Обрабатывает команду /clear для очистки истории чата.
@@ -654,18 +653,18 @@ class CommandHandlers:
         """
         user_id = update.message.from_user.id
         self.logger.info(f"Пользователь {user_id} запросил очистку чата")
-        
+
         # Вызываем очистку чата
         self.message_manager.clear_all(update, context)
-        
+
         # Отправляем новое сообщение после очистки
         update.message.reply_text(
             "Чат очищен! Выберите действие:",
-            reply_markup=self.ui_manager.main_menu()
+            reply_markup=self.uimanager.main_menu()
         )
-        
+
         return self.TOPIC
-        
+
     def admin_command(self, update, context):
         """
         Обрабатывает команду /admin для доступа к административной панели.
@@ -679,7 +678,7 @@ class CommandHandlers:
             self.admin_panel.handle_admin_command(update, context)
         else:
             update.message.reply_text("Административная панель недоступна")
-    
+
     def admin_callback(self, update, context):
         """
         Обрабатывает нажатия на кнопки в административной панели.
@@ -689,7 +688,7 @@ class CommandHandlers:
             context (telegram.ext.CallbackContext): Контекст разговора
         """
         query = update.callback_query
-        
+
         # Проверяем наличие и передаем обработку в админ-панель
         if hasattr(self, 'admin_panel'):
             # Обрабатываем все callback-запросы, начинающиеся с admin_
@@ -704,33 +703,35 @@ class CommandHandlers:
                     self.admin_panel.handle_admin_callback(update, context)
                 return True
         return False
-    
+
     def error_handler(self, update, context):
         """
-        Обработчик ошибок: записывает их в журнал с комментариями и информирует пользователя.
-
-        Args:
-            update (telegram.Update): Объект обновления Telegram
-            context (telegram.ext.CallbackContext): Контекст разговора
+        Обрабатывает ошибки, возникающие во время работы бота.
         """
+        ERROR_DESCRIPTIONS = {
+            "NetworkError": "Проблема с сетевым подключением",
+            "Unauthorized": "Недействительный токен бота",
+            "TelegramError": "Общая ошибка Telegram API",
+            "TimedOut": "Превышено время ожидания ответа от Telegram",
+            "BadRequest": "Неверный запрос к Telegram API",
+            "Forbidden": "Доступ запрещен",
+            "ChatMigrated": "Чат был перемещен",
+            "RetryAfter": "Превышен лимит запросов, повторите позже"
+        }
+
         error = context.error
         error_type = type(error).__name__
 
-        # Используем расширенное логирование ошибок
-        user_info = f"пользователь {update.effective_user.id}" if update and update.effective_user else "неизвестный пользователь"
-        additional_info = f"Ошибка для {user_info} в обновлении {update}" if update else "Ошибка без контекста обновления"
-
-        self.logger.log_error(error, additional_info)
-
-        if update and update.effective_message:
-            # Формируем информативное сообщение для пользователя
-            error_message = f"❌ Произошла ошибка: {error}"
-
-            # Добавляем пользователю пояснение для известных типов ошибок
+        try:
             if error_type in ERROR_DESCRIPTIONS:
-                error_message += f"\n{ERROR_DESCRIPTIONS[error_type]}"
+                error_message = f"❌ Произошла ошибка: {error}\n{ERROR_DESCRIPTIONS[error_type]}"
+            else:
+                error_message = f"❌ Произошла неизвестная ошибка: {error}"
 
-            update.effective_message.reply_text(
-                error_message,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-            )
+            if update and update.effective_message:
+                update.effective_message.reply_text(
+                    error_message,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+        except Exception as e:
+            self.logger.log_error(e, "Ошибка в обработчике ошибок")
