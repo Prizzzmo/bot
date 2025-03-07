@@ -518,8 +518,8 @@ def button_handler(update, context):
 
     user_id = query.from_user.id
 
-    # Очищаем историю чата перед новым действием
-    clear_chat_history(update, context)
+    # Очищаем историю чата полностью перед новым действием
+    clean_all_messages_except_active(update, context)
 
     logger.info(f"Пользователь {user_id} нажал кнопку: {query.data}")
 
@@ -1169,16 +1169,18 @@ def handle_conversation(update, context):
     return CONVERSATION
 
 # Полностью переработанная функция очистки чата
-def clear_chat_history(update, context):
+def clear_chat_history(update, context, preserve_message_id=None):
     """
-    Очищает историю чата, удаляя предыдущие сообщения бота,
-    но сохраняет активное сообщение.
-    Комплексно переработанная версия с улучшенной обработкой ошибок и
-    оптимизацией для работы с API Telegram.
+    Очищает историю чата, удаляя все предыдущие сообщения бота.
+    
+    Функция выполняет полную очистку истории сообщений в чате, с возможностью
+    сохранения одного конкретного сообщения (если указан его ID).
+    Оптимизирована для работы с API Telegram с учетом ограничений по частоте запросов.
 
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
+        preserve_message_id (int, optional): ID сообщения, которое нужно сохранить
     """
     # Проверка обязательных параметров
     if not update or not update.effective_chat or not context:
@@ -1189,19 +1191,20 @@ def clear_chat_history(update, context):
         # Получаем ID чата
         chat_id = update.effective_chat.id
         
-        # Получаем ID активного сообщения
-        active_message_id = None
-        if update.message:
-            active_message_id = update.message.message_id
-        elif update.callback_query and update.callback_query.message:
-            active_message_id = update.callback_query.message.message_id
+        # Получаем ID активного сообщения (по умолчанию текущее сообщение или то, что нужно сохранить)
+        active_message_id = preserve_message_id
+        if not active_message_id:
+            if update.message:
+                active_message_id = update.message.message_id
+            elif update.callback_query and update.callback_query.message:
+                active_message_id = update.callback_query.message.message_id
         
         # Проверка на наличие данных пользователя
         if 'previous_messages' not in context.user_data:
             context.user_data['previous_messages'] = []
             return
 
-        # Получаем и сортируем список сохраненных ID сообщений (сначала новые)
+        # Получаем и очищаем список сохраненных ID сообщений
         message_ids = context.user_data.get('previous_messages', [])
         if not message_ids:
             return
@@ -1209,7 +1212,7 @@ def clear_chat_history(update, context):
         # Удаляем дубликаты
         message_ids = list(set(message_ids))
         
-        # Исключаем активное сообщение из списка удаления
+        # Исключаем активное сообщение из списка удаления, если оно есть
         if active_message_id and active_message_id in message_ids:
             message_ids.remove(active_message_id)
             logger.debug(f"Активное сообщение {active_message_id} исключено из очистки")
@@ -1218,9 +1221,9 @@ def clear_chat_history(update, context):
         # Это важно, так как новые сообщения с большей вероятностью будут удалены успешно
         message_ids.sort(reverse=True)
         
-        # Ограничиваем количество сообщений для удаления
-        # Telegram имеет ограничения на частоту запросов
-        max_messages_to_delete = min(len(message_ids), 80)
+        # Telegram имеет ограничения на частоту запросов (не более 30 в секунду)
+        # Также учитываем, что старые сообщения (>48 часов) могут быть недоступны
+        max_messages_to_delete = min(len(message_ids), 100)
         message_ids = message_ids[:max_messages_to_delete]
         
         # Словарь для отслеживания статуса удаления сообщений
@@ -1251,7 +1254,7 @@ def clear_chat_history(update, context):
             """Удаляет сообщение с повторными попытками в случае ошибок скорости"""
             nonlocal count_deleted, retry_count, failure_reasons
             
-            # Проверяем, не является ли это активным сообщением
+            # Повторная проверка, не является ли это активным сообщением
             if msg_id == active_message_id:
                 logger.debug(f"Пропуск удаления активного сообщения {msg_id}")
                 return False
@@ -1328,33 +1331,15 @@ def clear_chat_history(update, context):
                 if i + batch_size < len(message_ids):
                     time.sleep(0.5)
         
-        # Обновляем список предыдущих сообщений, оставляя только активное сообщение и те, которые не удалось удалить
-        new_message_list = []
-        for msg_id in context.user_data.get('previous_messages', []):
-            # Если это активное сообщение или сообщение не удалось удалить
-            if msg_id == active_message_id or (msg_id not in deletion_status or not deletion_status[msg_id]):
-                new_message_list.append(msg_id)
-        
-        # Ограничиваем размер списка
-        max_saved_messages = 50
-        if len(new_message_list) > max_saved_messages:
-            # Убедимся, что активное сообщение остается в списке
-            if active_message_id in new_message_list:
-                new_message_list.remove(active_message_id)
-                # Ограничиваем остальные сообщения
-                if len(new_message_list) > max_saved_messages - 1:
-                    new_message_list = new_message_list[-(max_saved_messages-1):]
-                # Возвращаем активное сообщение в список
-                new_message_list.append(active_message_id)
-            else:
-                # Если активного сообщения нет в списке, просто ограничиваем размер
-                new_message_list = new_message_list[-max_saved_messages:]
-        
-        context.user_data['previous_messages'] = new_message_list
+        # Очищаем список предыдущих сообщений полностью, оставляя только активное сообщение
+        if active_message_id:
+            context.user_data['previous_messages'] = [active_message_id]
+        else:
+            context.user_data['previous_messages'] = []
         
         # Логирование результатов с подробной информацией
         if count_deleted > 0 or failure_reasons:
-            log_message = f"Очистка чата {chat_id}: удалено {count_deleted} из {len(message_ids)} сообщений, активное сообщение: {active_message_id}"
+            log_message = f"Полная очистка чата {chat_id}: удалено {count_deleted} из {len(message_ids)} сообщений, сохранено сообщение: {active_message_id}"
             if retry_count:
                 log_message += f", повторных попыток: {retry_count}"
             if failure_reasons:
@@ -1362,7 +1347,26 @@ def clear_chat_history(update, context):
             logger.info(log_message)
             
     except Exception as e:
-        logger.error(f"Критическая ошибка при очистке истории чата: {str(e)}")
+        logger.error(f"Критическая ошибка при полной очистке истории чата: {str(e)}")
+
+# Функция для очистки всех сообщений кроме активного
+def clean_all_messages_except_active(update, context):
+    """
+    Удобная функция для полной очистки чата, оставляя только текущее активное сообщение.
+    
+    Args:
+        update (telegram.Update): Объект обновления Telegram
+        context (telegram.ext.CallbackContext): Контекст разговора
+    """
+    # Определяем ID активного сообщения
+    active_message_id = None
+    if update.message:
+        active_message_id = update.message.message_id
+    elif update.callback_query and update.callback_query.message:
+        active_message_id = update.callback_query.message.message_id
+    
+    # Запускаем полную очистку с сохранением активного сообщения
+    clear_chat_history(update, context, preserve_message_id=active_message_id)
 
 # Улучшенная функция для сохранения ID сообщения
 def save_message_id(update, context, message_id):
