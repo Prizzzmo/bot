@@ -285,10 +285,9 @@ class CommandHandlers:
             user_id = query.from_user.id
             self.logger.info(f"Пользователь {user_id} выбрал категорию карты: {category}")
 
-            # Добавляем клавиатуру с выбором формата карты
+            # Добавляем клавиатуру для получения карты
             keyboard = [
-                [InlineKeyboardButton("🔗 Ссылка на карту", callback_data=f'map_url_{category}')],
-                [InlineKeyboardButton("🖼️ Изображение карты", callback_data=f'map_img_{category}')],
+                [InlineKeyboardButton("🖼️ Получить карту", callback_data=f'map_img_{category}')],
                 [InlineKeyboardButton("🔙 Назад к категориям", callback_data='history_map')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -305,15 +304,45 @@ class CommandHandlers:
 
         elif query_data.startswith('map_url_'):
             category = query_data.replace('map_url_', '')
-            map_url = self.history_map.generate_map_url(category=category)
-
-            # Отправляем сообщение с URL карты
-            context.bot.send_message(
+            
+            # Генерируем и отправляем изображение карты вместо URL
+            status_message = context.bot.send_message(
                 chat_id=user_id,
-                text=f"🗺️ Вот карта с историческими событиями категории «{category}»:\n\n{map_url}",
+                text=f"🔄 Генерация изображения карты для категории «{category}»...",
                 parse_mode='HTML'
             )
-            self.logger.info(f"Пользователь {user_id} получил ссылку на карту категории {category}")
+            
+            map_image_path = self.history_map.generate_map_image(category=category)
+            
+            if map_image_path and os.path.exists(map_image_path):
+                # Отправляем изображение карты
+                with open(map_image_path, 'rb') as img:
+                    context.bot.send_photo(
+                        chat_id=user_id,
+                        photo=img,
+                        caption=f"🗺️ Карта исторических событий категории «{category}»",
+                        parse_mode='HTML'
+                    )
+                    
+                # Удаляем сообщение о генерации
+                context.bot.delete_message(
+                    chat_id=user_id,
+                    message_id=status_message.message_id
+                )
+                
+                # Удаляем изображение карты после отправки
+                os.remove(map_image_path)
+                
+                self.logger.info(f"Пользователь {user_id} получил изображение карты категории {category}")
+            else:
+                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
+                context.bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=status_message.message_id,
+                    text=f"❌ Не удалось сгенерировать изображение карты для категории «{category}». Попробуйте позже.",
+                    parse_mode='HTML'
+                )
+                self.logger.error(f"Не удалось сгенерировать изображение карты категории {category} для пользователя {user_id}")
             return self.MAP
 
         elif query_data.startswith('map_img_'):
@@ -363,25 +392,47 @@ class CommandHandlers:
         elif query_data == 'map_random':
             # Получаем случайные события
             random_events = self.history_map.get_random_events(5)
-            map_url = self.history_map.generate_map_url(events=random_events)
-
-            # Отправляем сообщение с URL карты
-            context.bot.send_message(
+            
+            # Отправляем сообщение о генерации
+            status_message = context.bot.send_message(
                 chat_id=user_id,
-                text=f"🗺️ Вот карта со случайными историческими событиями:\n\n{map_url}",
+                text="🔄 Генерация изображения карты со случайными событиями...",
                 parse_mode='HTML'
             )
-            self.logger.info(f"Пользователь {user_id} получил ссылку на карту со случайными событиями")
-
-            # Добавляем кнопку для получения карты в виде изображения
-            keyboard = [[InlineKeyboardButton("🖼️ Получить изображение карты", callback_data='map_image')]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            context.bot.send_message(
-                chat_id=user_id,
-                text="Или вы можете получить изображение карты:",
-                reply_markup=reply_markup
-            )
+            
+            # Генерируем изображение карты
+            map_image_path = self.history_map.generate_map_image(events=random_events)
+            
+            if map_image_path and os.path.exists(map_image_path):
+                # Отправляем изображение карты
+                with open(map_image_path, 'rb') as img:
+                    context.bot.send_photo(
+                        chat_id=user_id,
+                        photo=img,
+                        caption="🗺️ Карта со случайными историческими событиями России",
+                        parse_mode='HTML'
+                    )
+                
+                # Удаляем сообщение о генерации
+                context.bot.delete_message(
+                    chat_id=user_id,
+                    message_id=status_message.message_id
+                )
+                
+                # Удаляем изображение карты после отправки
+                os.remove(map_image_path)
+                
+                self.logger.info(f"Пользователь {user_id} получил изображение карты со случайными событиями")
+            else:
+                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
+                context.bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=status_message.message_id,
+                    text="❌ Не удалось сгенерировать изображение карты. Попробуйте позже.",
+                    parse_mode='HTML'
+                )
+                self.logger.error(f"Не удалось сгенерировать изображение карты для пользователя {user_id}")
+            
             return self.MAP
 
         elif query_data == 'map_image':

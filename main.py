@@ -46,15 +46,12 @@ def main():
     from src.analytics import Analytics
     analytics = Analytics(logger)
 
-    # Создаем карту исторических событий и запускаем веб-сервер
+    # Инициализируем карту исторических событий
     from src.history_map import HistoryMap
-    from src.web_server import MapServer
 
     history_map = HistoryMap(logger)
-    map_server = MapServer(history_map, logger)
-    map_server.run()
 
-    logger.info("Веб-сервер с интерактивной картой запущен на порту 8080")
+    logger.info("Инициализирована карта исторических событий")
 
     # Создаем обработчик команд
     handlers = CommandHandlers(ui_manager, api_client, message_manager, content_service, logger, config)
@@ -83,11 +80,11 @@ if __name__ == "__main__":
     logger.info("Запуск бота и веб-сервера логов...")
 
     # Загружаем токен и API ключ
-    #load_dotenv()  # Загружаем переменные окружения из .env файла  - This line is commented out because it's not in the original code and the changes don't explicitly mention it.
+    #load_dotenv()  # Загружаем переменные окружения из .env файла
     config = Config()
 
     # Инициализируем LRU-кэш для API
     api_cache = APICache(logger)
 
-    bot_manager = BotManager() # Initialize BotManager here
+    bot_manager = BotManager()
     bot_manager.run()

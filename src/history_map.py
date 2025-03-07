@@ -187,7 +187,10 @@ class HistoryMap:
 
     def generate_map_url(self, category=None, events=None, timeframe=None):
         """
-        Генерирует URL для интерактивной карты с дополнительными опциями.
+        Генерирует URL для описания карты (веб-сервер удален).
+        
+        Данная функция сохранена для совместимости. В текущей версии 
+        вместо URL следует использовать функцию generate_map_image.
 
         Args:
             category (str, optional): Категория событий
@@ -195,22 +198,26 @@ class HistoryMap:
             timeframe (tuple, optional): Временной диапазон в формате (начало, конец) - годы
 
         Returns:
-            str: URL для просмотра карты
+            str: Информационное сообщение о карте
         """
-        base_url = "https://" + os.environ.get("REPL_SLUG", "history-map") + "." + os.environ.get("REPL_OWNER", "repl") + ".repl.co:8080/map"
-
+        from src.web_server import get_base_url
+        base_url = get_base_url()
+        
+        message = f"Карта исторических событий теперь доступна только в виде изображений."
+        
         if category:
-            return f"{base_url}?category={category}"
-
+            return f"{message} Выбранная категория: {category}"
         if events:
-            event_ids = ','.join(str(event['id']) for event in events)
-            return f"{base_url}?events={event_ids}"
-
+            if isinstance(events, list):
+                event_count = len(events)
+            else:
+                event_count = len(events.split(','))
+            return f"{message} Выбрано событий: {event_count}"
         if timeframe:
             start, end = timeframe
-            return f"{base_url}?timeframe={start}-{end}"
-
-        return base_url
+            return f"{message} Временной диапазон: {start}-{end}"
+            
+        return message
         
     def generate_map_image(self, category=None, events=None, timeframe=None):
         """
