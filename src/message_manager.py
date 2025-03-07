@@ -150,7 +150,7 @@ class MessageManager:
             try:
                 status_message = bot.send_message(
                     chat_id=chat_id,
-                    text="🧹 Начинаю очистку чата..."
+                    text="🧹 Начинаю очистку чата (удаление предыдущих сообщений)..."
                 )
             except Exception as e:
                 self.logger.error(f"Ошибка при отправке начального сообщения: {e}")
@@ -174,8 +174,8 @@ class MessageManager:
                 # Из текущего обновления - гарантированно существующие сообщения
                 if status_message and status_message.message_id:
                     current_id = status_message.message_id
-                    # Добавляем диапазон сообщений вокруг текущего (10 до и 10 после)
-                    for i in range(current_id - 10, current_id + 10):
+                    # Добавляем только предыдущие сообщения (10 до текущего)
+                    for i in range(current_id - 10, current_id):
                         if i > 0 and i not in message_ids:
                             message_ids.append(i)
             except Exception as e:
@@ -198,9 +198,9 @@ class MessageManager:
             # Если нет сообщений для удаления, генерируем диапазон последних сообщений
             if not message_ids:
                 self.logger.info("Нет сохраненных ID, создаем диапазон последних сообщений")
-                # Создаем диапазон ID для удаления: пробуем удалить последние 50 сообщений
+                # Создаем диапазон ID для удаления: пробуем удалить только предыдущие сообщения
                 if status_message and status_message.message_id:
-                    for i in range(status_message.message_id - 50, status_message.message_id + 10):
+                    for i in range(status_message.message_id - 50, status_message.message_id):
                         if i > 0:
                             message_ids.append(i)
                 else:
