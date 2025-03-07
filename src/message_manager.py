@@ -127,39 +127,9 @@ class MessageManager:
         
         return sent_message_ids
 
-    def clean_chat(self, bot, chat_id):
+    def clean_chat(self, bot, chat_id, user_id=None):
         """
-        Полностью очищает чат с использованием метода Telegram API deleteChat.
-        
-        Args:
-            bot: Объект бота Telegram
-            chat_id: ID чата для очистки
-            
-        Returns:
-            bool: Успешность выполнения операции
-        """
-        try:
-            self.logger.info(f"Попытка полной очистки чата {chat_id}")
-            
-            def delete_chat_func():
-                return bot.delete_chat(chat_id=chat_id)
-            
-            result = self.request_queue.enqueue(delete_chat_func)
-            
-            if result:
-                self.logger.info(f"Чат {chat_id} успешно очищен")
-                return True
-            else:
-                self.logger.warning(f"Не удалось очистить чат {chat_id}")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Ошибка при очистке чата {chat_id}: {e}")
-            return False
-    
-    def delete_chat_history(self, bot, chat_id, user_id=None):
-        """
-        Улучшенная функция для удаления истории чата с использованием метода delete_messages API Telegram.
+        Оптимизированная функция для удаления истории чата с использованием метода delete_messages API Telegram.
         
         Args:
             bot: Объект бота Telegram
@@ -323,6 +293,9 @@ class MessageManager:
             except:
                 pass
             return False
+    
+    # Алиас для совместимости со старым кодом
+    delete_chat_history = clean_chat
 
     def __del__(self):
         """Завершаем очередь запросов при удалении объекта"""
