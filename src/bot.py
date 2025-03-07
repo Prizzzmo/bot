@@ -110,8 +110,11 @@ class Bot:
             self.logger.info(f"Запуск веб-сервера логов на порту {PORT}")
             httpd = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
             
-            # Запускаем сервер в отдельном потоке
-            httpd.serve_forever()
+            # Запускаем сервер
+            try:
+                httpd.serve_forever()
+            except Exception as e:
+                self.logger.error(f"Ошибка в веб-сервере: {e}")
         except Exception as e:
             self.logger.error(f"Ошибка при запуске веб-сервера логов: {e}")
 

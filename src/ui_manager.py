@@ -1,114 +1,90 @@
-
 import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 class UIManager:
-    """Класс для управления пользовательским интерфейсом"""
-    
+    """Класс для управления пользовательским интерфейсом бота"""
+
     def __init__(self, logger):
         self.logger = logger
-    
-    def main_menu(self):
-        """
-        Создает главное меню в виде кнопок.
 
-        Returns:
-            InlineKeyboardMarkup: Клавиатура с кнопками меню
-        """
+    def get_main_menu_keyboard(self):
+        """Возвращает клавиатуру главного меню"""
         keyboard = [
-            [InlineKeyboardButton("🔍 Выбрать тему", callback_data='topic')],
-            [InlineKeyboardButton("✅ Пройти тест", callback_data='test')],
-            [InlineKeyboardButton("💬 Беседа о истории России", callback_data='conversation')],
-            [InlineKeyboardButton("ℹ️ Информация о проекте", callback_data='project_info')],
-            [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
+            [InlineKeyboardButton("Изучение истории", callback_data="topic")],
+            [InlineKeyboardButton("Тесты", callback_data="test")],
+            [InlineKeyboardButton("Беседа с ботом", callback_data="conversation")]
         ]
         return InlineKeyboardMarkup(keyboard)
-    
-    def parse_topics(self, topics_text):
-        """
-        Парсит текст с темами и возвращает отформатированный список тем с оптимизацией.
 
-        Args:
-            topics_text (str): Текст с темами от API
+    def get_topics_keyboard(self, page=0):
+        """Возвращает клавиатуру с историческими темами"""
+        topics = [
+            "Древняя Русь", "Киевская Русь", "Монгольское иго",
+            "Московское царство", "Российская империя", "Революция 1917",
+            "СССР", "Великая Отечественная война", "Современная Россия"
+        ]
 
-        Returns:
-            list: Список отформатированных тем
-        """
-        filtered_topics = []
+        # Определяем количество тем на странице и пагинацию
+        topics_per_page = 3
+        start_idx = page * topics_per_page
+        end_idx = min(start_idx + topics_per_page, len(topics))
 
-        # Оптимизированное регулярное выражение для более эффективного извлечения тем
-        pattern = r'(?:^\d+[.):]\s*|^[*•-]\s*|^[а-яА-Я\w]+[:.]\s*)(.+?)$'
-
-        # Используем множество для быстрой проверки дубликатов
-        unique_topics_set = set()
-
-        for line in topics_text.split('\n'):
-            line = line.strip()
-            if not line or len(line) <= 1:
-                continue
-
-            # Пытаемся извлечь тему с помощью регулярного выражения
-            match = re.search(pattern, line, re.MULTILINE)
-            if match:
-                topic_text = match.group(1).strip()
-                if topic_text and topic_text not in unique_topics_set:
-                    filtered_topics.append(topic_text)
-                    unique_topics_set.add(topic_text)
-            # Если регулярное выражение не сработало, используем упрощенную версию
-            elif '.' in line or ':' in line:
-                parts = line.split('.', 1) if '.' in line else line.split(':', 1)
-                if len(parts) > 1:
-                    topic_text = parts[1].strip()
-                    if topic_text and topic_text not in unique_topics_set:
-                        filtered_topics.append(topic_text)
-                        unique_topics_set.add(topic_text)
-            # Простая эвристика для строк, начинающихся с цифры
-            elif line[0].isdigit():
-                i = 1
-                while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
-                    i += 1
-                if i < len(line):
-                    topic_text = line[i:].strip()
-                    if topic_text and topic_text not in unique_topics_set:
-                        filtered_topics.append(topic_text)
-                        unique_topics_set.add(topic_text)
-            else:
-                if line not in unique_topics_set:
-                    filtered_topics.append(line)
-                    unique_topics_set.add(line)
-
-        # Ограничиваем до 30 тем
-        return filtered_topics[:30]
-    
-    def create_topics_keyboard(self, topics):
-        """
-        Создает клавиатуру с кнопками для выбора темы.
-
-        Args:
-            topics (list): Список тем
-
-        Returns:
-            InlineKeyboardMarkup: Клавиатура с кнопками
-        """
+        # Формируем клавиатуру
         keyboard = []
+        for i in range(start_idx, end_idx):
+            keyboard.append([InlineKeyboardButton(topics[i], callback_data=f"topic_{topics[i]}")])
 
-        for i, topic in enumerate(topics, 1):
-            # Проверяем, что тема не пустая
-            if topic and len(topic.strip()) > 0:
-                # Ограничиваем длину темы в кнопке
-                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
-                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
-            else:
-                # Если тема пустая, добавляем заполнитель
-                keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
+        # Кнопки навигации
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"page_{page-1}"))
+        if end_idx < len(topics):
+            nav_buttons.append(InlineKeyboardButton("Далее ➡️", callback_data=f"page_{page+1}"))
+        if nav_buttons:
+            keyboard.append(nav_buttons)
 
-        # Добавляем кнопку для ввода своей темы и показать больше тем
-        keyboard.append([
-            InlineKeyboardButton("📝 Своя тема", callback_data='custom_topic'),
-            InlineKeyboardButton("🔄 Больше тем", callback_data='more_topics')
-        ])
-
-        # Добавляем кнопку возврата в меню
-        keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
+        # Дополнительные кнопки
+        keyboard.append([InlineKeyboardButton("Своя тема", callback_data="custom_topic")])
+        keyboard.append([InlineKeyboardButton("Назад в меню", callback_data="back_to_menu")])
 
         return InlineKeyboardMarkup(keyboard)
+
+    def get_test_keyboard(self):
+        """Возвращает клавиатуру для тестов"""
+        keyboard = [
+            [InlineKeyboardButton("Лёгкий тест", callback_data="test_easy")],
+            [InlineKeyboardButton("Средний тест", callback_data="test_medium")],
+            [InlineKeyboardButton("Сложный тест", callback_data="test_hard")],
+            [InlineKeyboardButton("Назад в меню", callback_data="back_to_menu")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def get_back_to_menu_keyboard(self):
+        """Возвращает клавиатуру с кнопкой возврата в меню"""
+        keyboard = [[InlineKeyboardButton("Назад в меню", callback_data="back_to_menu")]]
+        return InlineKeyboardMarkup(keyboard)
+
+    def format_message(self, text, max_length=4000):
+        """Форматирует сообщение, разбивая его на части, если оно слишком длинное"""
+        if len(text) <= max_length:
+            return [text]
+
+        # Разбиваем на части по абзацам
+        parts = []
+        current_part = ""
+        paragraphs = text.split("\n\n")
+
+        for paragraph in paragraphs:
+            if len(current_part) + len(paragraph) + 2 <= max_length:
+                if current_part:
+                    current_part += "\n\n"
+                current_part += paragraph
+            else:
+                if current_part:
+                    parts.append(current_part)
+                current_part = paragraph
+
+        if current_part:
+            parts.append(current_part)
+
+        return parts

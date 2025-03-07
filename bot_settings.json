@@ -1,7 +1,10 @@
 
 {
-    "auto_update_topics": true,
-    "collect_statistics": true,
-    "developer_mode": false,
-    "private_mode": false
+    "version": "1.0.0",
+    "description": "Бот для изучения истории России",
+    "start_message": "Привет! Я бот по истории России. Выберите, что вы хотите сделать.",
+    "max_message_length": 4000,
+    "default_temperature": 0.6,
+    "default_max_tokens": 1024,
+    "cache_enabled": true
 }

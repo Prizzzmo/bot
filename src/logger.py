@@ -1,18 +1,18 @@
-
 import logging
 import os
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
+import threading # Added import
 
 from src.config import ERROR_DESCRIPTIONS
 
 class Logger:
     """Класс для управления логированием приложения"""
-    
+
     def __init__(self):
         self.logger = None
         self.setup_logging()
-    
+
     def clean_logs(self):
         """
         Очищает лог-файлы при запуске бота.
@@ -46,7 +46,7 @@ class Logger:
             print(f"Ошибка при очистке логов: {e}")
             # Возвращаем стандартные пути в случае ошибки
             return "logs", f"logs/bot_log_{datetime.now().strftime('%Y%m%d')}.log"
-    
+
     def setup_logging(self):
         """
         Настраивает систему логирования для бота.
@@ -86,9 +86,9 @@ class Logger:
         logger.addHandler(console_handler)
 
         print(f"Логирование настроено. Сохраняются только записи о запуске и ошибках.")
-        self.logger = loggerf.logger = logger
+        self.logger = logger
         return logger
-    
+
     def log_error(self, error, additional_info=None):
         """
         Логирует ошибку с дополнительной информацией и комментариями.
@@ -109,7 +109,7 @@ class Logger:
 
         if additional_info:
             self.logger.error(f"Дополнительная информация: {additional_info}")
-    
+
     def info(self, message):
         """Логирование информационного сообщения о запуске"""
         # Логируем только сообщения о запуске и критичные операции
@@ -117,20 +117,20 @@ class Logger:
         if any(keyword in message.lower() for keyword in important_keywords):
             self.logger.info(message)
             print(message)
-    
+
     def warning(self, message):
         """Логирование только важных предупреждений"""
         pass
-    
+
     def error(self, message):
         """Логирование ошибки"""
         self.logger.error(message)
         print(f"ОШИБКА: {message}")
-    
+
     def debug(self, message):
         """Логирование отладочных сообщений отключено"""
         pass
-    
+
     def critical(self, message):
         """Логирование критической ошибки"""
         self.logger.critical(message)

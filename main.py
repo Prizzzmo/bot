@@ -72,8 +72,13 @@ def main():
             logger.critical(f"Бот не был запущен из-за критической ошибки: {e}")
 
 if __name__ == '__main__':
-    # Проверяем и завершаем другие экземпляры бота перед запуском
-    check_running_instances()
-    
-    # Напрямую вызываем main(), так как BotManager просто вызывает его
-    main()
+    try:
+        # Проверяем и завершаем другие экземпляры бота перед запуском
+        check_running_instances()
+        
+        # Запускаем бота 
+        main()
+    except Exception as e:
+        print(f"Критическая ошибка при запуске бота: {e}")
+        import traceback
+        traceback.print_exc()

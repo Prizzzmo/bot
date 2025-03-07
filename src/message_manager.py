@@ -14,6 +14,66 @@ class MessageManager:
     def __init__(self, logger):
         self.logger = logger
         self._deletion_lock = threading.Lock()
+        self.message_ids = {}
+
+    def clear_chat(self, update: Update, context: CallbackContext):
+        """Очищает сообщения в чате, в котором был вызван метод"""
+        if not update or not update.effective_chat:
+            return
+
+        chat_id = update.effective_chat.id
+        try:
+            with self._deletion_lock:
+                if chat_id in self.message_ids:
+                    for msg_id in self.message_ids[chat_id]:
+                        try:
+                            context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                            time.sleep(0.1)  # Небольшая задержка для защиты от флуда
+                        except BadRequest as e:
+                            # Игнорируем сообщения, которые не могут быть удалены
+                            self.logger.warning(f"Не удалось удалить сообщение {msg_id}: {e}")
+                    # Очищаем список сообщений для чата
+                    self.message_ids[chat_id] = []
+            
+            # Отправляем сообщение об успешной очистке
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Чат очищен."
+            )
+        except Exception as e:
+            self.logger.log_error(e, f"Ошибка при очистке чата {chat_id}")
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Произошла ошибка при очистке чата."
+            )
+
+    def save_message_id(self, update, context, message_id=None):
+        """Сохраняет ID сообщения для последующего удаления"""
+        if not update or not update.effective_chat:
+            return
+            
+        chat_id = update.effective_chat.id
+        
+        # Если message_id не передан, используем ID текущего сообщения
+        if not message_id and update.message:
+            message_id = update.message.message_id
+        elif not message_id and update.callback_query and update.callback_query.message:
+            message_id = update.callback_query.message.message_id
+            
+        if message_id:
+            with self._deletion_lock:
+                if chat_id not in self.message_ids:
+                    self.message_ids[chat_id] = []
+                if message_id not in self.message_ids[chat_id]:
+                    self.message_ids[chat_id].append(message_id)
+
+
+class MessageManager:
+    """Класс для управления сообщениями в чате"""
+
+    def __init__(self, logger):
+        self.logger = logger
+        self._deletion_lock = threading.Lock()
 
     def clear_chat(self, update: Update, context: CallbackContext):
         """
