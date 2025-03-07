@@ -701,17 +701,23 @@ class CommandHandlers:
                     # Преобразуем текст в список вопросов, разделенных пустыми строками или номерами
                     raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data)
                     processed_questions = []
+                    display_questions = []
                     
                     for q in raw_questions:
                         q = q.strip()
                         if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
                             # Удаляем любые начальные цифры в начале вопроса
                             q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
+                            
+                            # Сохраняем оригинальный вопрос с правильным ответом
                             processed_questions.append(q)
+                            
+                            # Создаем вопрос для отображения (без правильного ответа)
+                            display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
+                            display_questions.append(display_q)
                             
                     if processed_questions:
                         valid_questions = processed_questions
-                        display_questions = processed_questions
                     else:
                         raise ValueError("Не удалось извлечь вопросы из текстового формата")
                 
@@ -723,7 +729,13 @@ class CommandHandlers:
                             isinstance(test_data['display_questions'], list) and
                             len(test_data['original_questions']) > 0):
                             valid_questions = test_data['original_questions']
-                            display_questions = test_data['display_questions']
+                            
+                            # Создаем отображаемые вопросы без правильных ответов
+                            display_questions = []
+                            for q in test_data['original_questions']:
+                                # Удаляем строку с правильным ответом из отображаемого вопроса
+                                display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
+                                display_questions.append(display_q)
                         else:
                             raise ValueError("Пустой список вопросов или неверный формат вопросов")
                             
@@ -738,12 +750,19 @@ class CommandHandlers:
                         # Проверяем тип content - список
                         if isinstance(test_data['content'], list) and len(test_data['content']) > 0:
                             valid_questions = test_data['content']
-                            display_questions = test_data['content']
+                            
+                            # Создаем отображаемые вопросы без правильных ответов
+                            display_questions = []
+                            for q in test_data['content']:
+                                display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
+                                display_questions.append(display_q)
+                                
                         # Проверяем тип content - строка (требует парсинга)
                         elif isinstance(test_data['content'], str) and len(test_data['content']) > 0:
                             # Разделяем текст на вопросы, используя пустые строки или номера вопросов как разделители
                             raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data['content'])
                             processed_questions = []
+                            display_processed = []
                             
                             for q in raw_questions:
                                 q = q.strip()
@@ -752,9 +771,13 @@ class CommandHandlers:
                                     q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
                                     processed_questions.append(q)
                                     
+                                    # Создаем вопрос для отображения без правильного ответа
+                                    display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
+                                    display_processed.append(display_q)
+                                    
                             if processed_questions:
                                 valid_questions = processed_questions
-                                display_questions = processed_questions
+                                display_questions = display_processed
                             else:
                                 raise ValueError("Не удалось извлечь вопросы из текстового формата в поле content")
                         else:
@@ -895,8 +918,48 @@ class CommandHandlers:
                 
                 # Проверяем существование первого вопроса
                 if len(display_questions) > 0:
-                    # Отправляем без Markdown форматирования
-                    query.message.reply_text(display_questions[0])
+                    # Форматируем текст первого вопроса для лучшего отображения
+                    question_text = display_questions[0]
+                    
+                    # Проверяем, есть ли в тексте вопроса варианты ответов в формате "1) ..."
+                    if re.search(r'\d\)\s+', question_text) or re.search(r'\d\.\s+', question_text):
+                        # Текст уже содержит форматированные варианты ответов
+                        formatted_text = question_text
+                    else:
+                        # Пытаемся извлечь и форматировать варианты ответов
+                        # Разделяем текст на основной вопрос и варианты ответов
+                        parts = question_text.split("\n")
+                        main_question = parts[0]
+                        
+                        # Ищем строки с вариантами ответов, обычно они начинаются с цифр
+                        options = []
+                        for line in parts[1:]:
+                            line = line.strip()
+                            if line and (line.startswith("1") or line.startswith("2") or 
+                                  line.startswith("3") or line.startswith("4")):
+                                options.append(line)
+                            elif re.match(r'^[A-D][)\.]', line):
+                                # Преобразуем A) -> 1), B) -> 2) и т.д.
+                                letter = line[0]
+                                number = ord(letter) - ord('A') + 1
+                                options.append(f"{number}) {line[2:].strip()}")
+                        
+                        if options:
+                            # Если нашли варианты ответов, форматируем текст вопроса
+                            formatted_text = f"{main_question}\n\n"
+                            for option in options:
+                                formatted_text += f"{option}\n"
+                        else:
+                            # Если не нашли варианты ответов, используем исходный текст
+                            formatted_text = question_text
+                    
+                    # Отправляем инфо о начале теста
+                    query.message.reply_text(f"🧠 Вопрос 1 из {len(display_questions)}:")
+                    
+                    # Отправляем отформатированный текст вопроса
+                    query.message.reply_text(formatted_text)
+                    
+                    # Отправляем инструкцию для ответа
                     query.message.reply_text(
                         "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
                         reply_markup=reply_markup
@@ -1294,7 +1357,7 @@ class CommandHandlers:
 
     def _show_next_question(self, update, context, display_questions):
         """
-        Показывает следующий вопрос теста.
+        Показывает следующий вопрос теста с форматированным отображением вариантов ответов.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
@@ -1308,12 +1371,52 @@ class CommandHandlers:
             current_question = context.user_data.get('current_question', 0)
             total_questions = len(display_questions)
             
-            # Отправляем номер вопроса
-            sent_msg1 = update.message.reply_text(f"Вопрос {current_question+1} из {total_questions}:")
+            # Форматируем текст вопроса для лучшего отображения
+            question_text = display_questions[current_question]
+            
+            # Проверяем, есть ли в тексте вопроса варианты ответов в формате "1) ..."
+            if re.search(r'\d\)\s+', question_text) or re.search(r'\d\.\s+', question_text):
+                # Текст уже содержит форматированные варианты ответов
+                formatted_text = question_text
+            else:
+                # Пытаемся извлечь и форматировать варианты ответов
+                # Разделяем текст на основной вопрос и варианты ответов
+                parts = question_text.split("\n")
+                main_question = parts[0]
+                
+                # Ищем строки с вариантами ответов, обычно они начинаются с цифр
+                options = []
+                for line in parts[1:]:
+                    line = line.strip()
+                    if line and (line.startswith("1") or line.startswith("2") or 
+                           line.startswith("3") or line.startswith("4")):
+                        # Если строка начинается с цифры, добавляем её как вариант ответа
+                        options.append(line)
+                    elif re.match(r'^[A-D][)\.]', line):
+                        # Или если строка начинается с A), B), C), D)
+                        # Преобразуем A) -> 1), B) -> 2) и т.д.
+                        letter = line[0]
+                        number = ord(letter) - ord('A') + 1
+                        options.append(f"{number}) {line[2:].strip()}")
+                
+                if options:
+                    # Если нашли варианты ответов, форматируем текст вопроса
+                    formatted_text = f"{main_question}\n\n"
+                    for option in options:
+                        formatted_text += f"{option}\n"
+                else:
+                    # Если не нашли варианты ответов, используем исходный текст
+                    formatted_text = question_text
+            
+            # Отправляем информацию о прогрессе теста
+            sent_msg1 = update.message.reply_text(
+                f"🧠 Вопрос {current_question+1} из {total_questions}:\n"
+                f"(правильно отвечено: {context.user_data.get('score', 0)} из {current_question})"
+            )
             self.message_manager.save_message_id(update, context, sent_msg1.message_id)
 
-            # Отправляем текст вопроса
-            sent_msg2 = update.message.reply_text(display_questions[current_question])
+            # Отправляем отформатированный текст вопроса
+            sent_msg2 = update.message.reply_text(formatted_text)
             self.message_manager.save_message_id(update, context, sent_msg2.message_id)
 
             # Создаем клавиатуру с кнопкой для завершения теста
@@ -1362,22 +1465,37 @@ class CommandHandlers:
                 
             topic = context.user_data.get('current_topic', 'выбранной теме')
 
-            # Оценка усвоенного материала
+            # Оценка усвоенного материала с дополнительными категориями для 20 вопросов
             if percentage >= 90:
                 assessment = "🏆 Отлично! Ты прекрасно усвоил материал."
+                grade = "Превосходно"
+            elif percentage >= 80:
+                assessment = "🥇 Очень хорошо! Ты хорошо знаешь эту тему."
+                grade = "Отлично"
             elif percentage >= 70:
                 assessment = "👍 Хорошо! Ты неплохо усвоил материал, но есть над чем поработать."
+                grade = "Хорошо" 
+            elif percentage >= 60:
+                assessment = "🎓 Выше среднего. Основы темы освоены, но требуется углубление знаний."
+                grade = "Выше среднего"
             elif percentage >= 50:
                 assessment = "👌 Удовлетворительно. Рекомендуется повторить материал."
+                grade = "Удовлетворительно"
+            elif percentage >= 40:
+                assessment = "📖 Ниже среднего. Требуется серьезное повторение материала."
+                grade = "Ниже среднего"
             else:
                 assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
+                grade = "Неудовлетворительно"
 
             # Получаем рекомендации похожих тем
             similar_topics = self.recommend_similar_topics(topic, context)
 
             # Формируем сообщение с результатами
             result_message = f"🎯 Тест по теме '*{topic}*' завершен!\n\n"
-            result_message += f"Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n{assessment}\n\n"
+            result_message += f"Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n"
+            result_message += f"*Оценка:* {grade}\n\n"
+            result_message += f"{assessment}\n\n"
 
             # Добавляем рекомендации, если они есть
             if similar_topics:
