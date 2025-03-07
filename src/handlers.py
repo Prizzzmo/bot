@@ -23,6 +23,23 @@ class CommandHandlers:
         self.TEST = TEST
         self.ANSWER = ANSWER
         self.CONVERSATION = CONVERSATION
+        
+    def clear_all(self, update, context):
+        """
+        Обрабатывает команду /clear_all, полностью очищает чат.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+
+        Returns:
+            None
+        """
+        user = update.message.from_user
+        self.logger.info(f"Пользователь {user.id} запросил полную очистку чата")
+        
+        # Вызываем метод полной очистки чата
+        self.message_manager.clean_all_messages(update, context)
     
     def start(self, update, context):
         """
