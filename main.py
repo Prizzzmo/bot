@@ -65,7 +65,7 @@ def main():
     api_cache = APICache(logger)
     api_client = APIClient(config.gemini_api_key, api_cache, logger)
     message_manager = MessageManager(logger)
-    content_service = ContentService(api_client, logger, config)
+    content_service = ContentService(api_client, logger)
 
     # Создаем карту исторических событий
     from src.history_map import HistoryMap
