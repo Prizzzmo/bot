@@ -1374,39 +1374,55 @@ class CommandHandlers:
             # Форматируем текст вопроса для лучшего отображения
             question_text = display_questions[current_question]
             
-            # Проверяем, есть ли в тексте вопроса варианты ответов в формате "1) ..."
-            if re.search(r'\d\)\s+', question_text) or re.search(r'\d\.\s+', question_text):
-                # Текст уже содержит форматированные варианты ответов
-                formatted_text = question_text
-            else:
-                # Пытаемся извлечь и форматировать варианты ответов
-                # Разделяем текст на основной вопрос и варианты ответов
-                parts = question_text.split("\n")
-                main_question = parts[0]
-                
-                # Ищем строки с вариантами ответов, обычно они начинаются с цифр
-                options = []
-                for line in parts[1:]:
-                    line = line.strip()
-                    if line and (line.startswith("1") or line.startswith("2") or 
-                           line.startswith("3") or line.startswith("4")):
-                        # Если строка начинается с цифры, добавляем её как вариант ответа
-                        options.append(line)
-                    elif re.match(r'^[A-D][)\.]', line):
-                        # Или если строка начинается с A), B), C), D)
-                        # Преобразуем A) -> 1), B) -> 2) и т.д.
-                        letter = line[0]
-                        number = ord(letter) - ord('A') + 1
-                        options.append(f"{number}) {line[2:].strip()}")
-                
-                if options:
-                    # Если нашли варианты ответов, форматируем текст вопроса
-                    formatted_text = f"{main_question}\n\n"
-                    for option in options:
-                        formatted_text += f"{option}\n"
-                else:
-                    # Если не нашли варианты ответов, используем исходный текст
-                    formatted_text = question_text
+            # Удаляем строки с правильным ответом из отображаемого текста
+            question_text = re.sub(r'Правильный ответ:\s*\d+', '', question_text).strip()
+            
+            # Проверяем, есть ли в тексте вопроса варианты ответов в формате "1) ..." или "1. ..."
+            has_options = re.search(r'\d[\)\.]\s+', question_text) is not None
+            
+            # Разделяем текст на основной вопрос и варианты ответов
+            parts = question_text.split("\n")
+            main_question = parts[0].strip()
+            if not main_question.endswith('?') and len(parts) > 1:
+                # Если первая строка не заканчивается вопросительным знаком,
+                # ищем строку с вопросом
+                for i, part in enumerate(parts):
+                    if '?' in part:
+                        main_question = part.strip()
+                        parts = parts[i:]  # Начинаем с найденного вопроса
+                        break
+            
+            # Ищем и форматируем варианты ответов
+            options = []
+            for line in parts[1:]:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                # Проверяем разные форматы вариантов ответов
+                if re.match(r'^\d[\)\.]\s+', line):
+                    # Формат типа "1) ..." или "1. ..."
+                    options.append(line)
+                elif re.match(r'^[A-D][\)\.]\s+', line):
+                    # Формат типа "A) ..." или "A. ..."
+                    letter = line[0]
+                    number = ord(letter) - ord('A') + 1
+                    options.append(f"{number}) {line[2:].strip()}")
+                elif len(options) < 4 and not line.startswith('Правильный ответ'):
+                    # Если строка не соответствует известным форматам, но у нас меньше 4 вариантов,
+                    # добавляем её как вариант ответа
+                    options.append(f"{len(options)+1}) {line}")
+            
+            # Если варианты ответов не найдены, генерируем их искусственно
+            if not options or len(options) < 4:
+                # Создаем заполнители для вариантов ответов
+                for i in range(len(options), 4):
+                    options.append(f"{i+1}) Вариант ответа {i+1}")
+            
+            # Формируем отформатированный текст вопроса
+            formatted_text = f"{main_question}\n\n"
+            for option in options:
+                formatted_text += f"{option}\n"
             
             # Отправляем информацию о прогрессе теста
             sent_msg1 = update.message.reply_text(
