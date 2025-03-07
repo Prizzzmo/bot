@@ -240,21 +240,22 @@ class HistoryMap:
             timeframe (tuple, optional): Временной диапазон в формате (начало, конец) - годы
             
         Returns:
-            str: Путь к сгенерированному изображению карты
+            str: Путь к сгенерированному изображению карты или текстовое представление
         """
         import folium
         import tempfile
         import io
         import time
-        from selenium import webdriver
-        from selenium.webdriver.chrome.service import Service
-        from selenium.webdriver.chrome.options import Options
-        from webdriver_manager.chrome import ChromeDriverManager
-        from PIL import Image
+        from PIL import Image, ImageDraw, ImageFont
         
         # Определяем события для отображения на карте
         if category:
-            display_events = self.get_events_by_category(category)
+            try:
+                display_events = self.get_events_by_category(category)
+            except Exception as e:
+                self.logger.error(f"Ошибка при получении событий по категории: {e}")
+                # Создаем резервный список событий
+                display_events = []
         elif events:
             if isinstance(events, list):
                 display_events = events
@@ -268,79 +269,62 @@ class HistoryMap:
                     display_events = self.get_all_events()
         else:
             display_events = self.get_all_events()
-            
-        # Создаем объект карты с центром на территории России
-        map_obj = folium.Map(location=[65, 97], zoom_start=3, tiles='OpenStreetMap')
         
-        # Добавляем маркеры для каждого события
-        for event in display_events:
-            if 'location' in event and 'lat' in event['location'] and 'lng' in event['location']:
-                # Создаем всплывающее окно с информацией о событии
-                popup_html = f"""
-                <div style="width: 200px;">
-                    <h3>{event['title']}</h3>
-                    <p><strong>Дата:</strong> {event['date']}</p>
-                    <p><strong>Категория:</strong> {event['category']}</p>
-                    <p>{event['description']}</p>
-                </div>
-                """
+        # Создаем директорию для сохранения карт, если она не существует
+        os.makedirs('generated_maps', exist_ok=True)
+        
+        # Создаем уникальное имя файла для карты
+        timestamp = int(time.time())
+        map_image_path = f"generated_maps/map_{timestamp}.png"
+        
+        # Создаем простое изображение с текстовой информацией о событиях
+        width, height = 1200, 800
+        image = Image.new('RGB', (width, height), color=(255, 255, 255))
+        draw = ImageDraw.Draw(image)
+        
+        # Заголовок
+        title = "Карта исторических событий России"
+        if category:
+            title += f" - {category}"
+        
+        # Рисуем заголовок
+        draw.rectangle([(0, 0), (width, 60)], fill=(50, 50, 100))
+        draw.text((width//2, 30), title, fill=(255, 255, 255), anchor="mm")
+        
+        # Отображаем список событий
+        y_pos = 100
+        for i, event in enumerate(display_events[:15]):  # Ограничиваем до 15 событий
+            if isinstance(event, dict) and 'title' in event:
+                title = event.get('title', 'Неизвестное событие')
+                date = event.get('date', 'Неизвестная дата')
+                description = event.get('description', '')
                 
-                # Добавляем маркер на карту
-                folium.Marker(
-                    location=[event['location']['lat'], event['location']['lng']],
-                    popup=folium.Popup(popup_html, max_width=300),
-                    tooltip=event['title']
-                ).add_to(map_obj)
+                # Ограничиваем длину описания
+                if len(description) > 100:
+                    description = description[:97] + "..."
                 
-        # Создаем временный файл для сохранения HTML-карты
-        with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as tmp:
-            map_path = tmp.name
-            map_obj.save(map_path)
+                event_text = f"{i+1}. {title} ({date})"
+                draw.text((50, y_pos), event_text, fill=(0, 0, 0))
+                
+                if description:
+                    draw.text((70, y_pos + 25), description, fill=(100, 100, 100))
+                
+                y_pos += 60
+                
+                # Добавляем разделитель
+                draw.line([(50, y_pos - 15), (width - 50, y_pos - 15)], fill=(200, 200, 200), width=1)
         
-        # Настраиваем опции запуска Chrome в headless-режиме
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1200,800")
+        # Если нет событий
+        if not display_events:
+            draw.text((width//2, height//2), "События не найдены", fill=(100, 100, 100), anchor="mm")
         
-        # Создаем driver для WebKit
-        try:
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            # Открываем HTML-файл с картой
-            driver.get(f"file://{map_path}")
-            
-            # Даем время для полной загрузки карты
-            time.sleep(2)
-            
-            # Создаем директорию для сохранения карт, если она не существует
-            os.makedirs('generated_maps', exist_ok=True)
-            
-            # Создаем уникальное имя файла для карты
-            timestamp = int(time.time())
-            map_image_path = f"generated_maps/map_{timestamp}.png"
-            
-            # Делаем скриншот карты
-            driver.save_screenshot(map_image_path)
-            
-            # Обрезаем изображение для удаления ненужных элементов
-            img = Image.open(map_image_path)
-            img = img.crop((0, 0, 1200, 800))  # Обрезаем до размера 1200x800
-            img.save(map_image_path)
-            
-            # Закрываем драйвер
-            driver.quit()
-            
-            # Удаляем временный HTML-файл
-            os.unlink(map_path)
-            
-            self.logger.info(f"Изображение карты успешно сгенерировано: {map_image_path}")
-            return map_image_path
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка при генерации изображения карты: {e}")
-            # В случае ошибки возвращаем None
-            return None
+        # Информация внизу карты
+        footer_text = "Исторический бот - текстовое представление карты"
+        draw.rectangle([(0, height-40), (width, height)], fill=(50, 50, 100))
+        draw.text((width//2, height-20), footer_text, fill=(255, 255, 255), anchor="mm")
+        
+        # Сохраняем изображение
+        image.save(map_image_path)
+        
+        self.logger.info(f"Текстовое представление карты сгенерировано: {map_image_path}")
+        return map_image_path

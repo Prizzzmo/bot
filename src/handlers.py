@@ -1053,7 +1053,7 @@ class CommandHandlers:
             context (telegram.ext.CallbackContext): Контекст разговора
         """
         # Словарь с описаниями распространенных ошибок
-        ERROR_DESCRIPTIONS = {
+        self.ERROR_DESCRIPTIONS = {
             'BadRequest': 'Ошибка в запросе к Telegram API. Возможно, слишком длинное сообщение.',
             'Unauthorized': 'Ошибка авторизации бота. Проверьте токен бота.',
             'TimedOut': 'Превышено время ожидания ответа от Telegram API. Попробуйте позже.',
@@ -1081,8 +1081,8 @@ class CommandHandlers:
             error_message = f"❌ Произошла ошибка: {error}"
 
             # Добавляем пользователю пояснение для известных типов ошибок
-            if error_type in ERROR_DESCRIPTIONS:
-                error_message += f"\n{ERROR_DESCRIPTIONS[error_type]}"
+            if error_type in self.ERROR_DESCRIPTIONS:
+                error_message += f"\n{self.ERROR_DESCRIPTIONS[error_type]}"
 
             update.effective_message.reply_text(
                 error_message,
