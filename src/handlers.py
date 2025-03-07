@@ -831,7 +831,7 @@ class CommandHandlers:
                         messages = self.content_service.get_topic_info(topic, update_message)
 
                         # Отправляем сообщения, проверяя возможность редактирования
-                        if messages:
+                        if messages and len(messages) > 0:
                             try:
                                 # Пробуем отредактировать первое сообщение
                                 query.edit_message_text(messages[0], parse_mode='Markdown')
@@ -843,6 +843,13 @@ class CommandHandlers:
                             # Отправляем остальные сообщения как новые
                             for msg in messages[1:]:
                                 query.message.reply_text(msg, parse_mode='Markdown')
+                        else:
+                            # Обработка случая, когда список сообщений пуст
+                            self.logger.warning(f"Получен пустой список сообщений для темы: {topic}")
+                            query.edit_message_text(
+                                f"К сожалению, не удалось получить информацию по теме *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
+                                parse_mode='Markdown'
+                            )
 
                         query.message.reply_text("Выбери следующее действие:", reply_markup=self.ui_manager.main_menu())
                         self.logger.info(f"Пользователю {user_id} успешно отправлена информация по теме: {topic}")
@@ -893,9 +900,18 @@ class CommandHandlers:
             # Получаем информацию о теме
             messages = self.content_service.get_topic_info(topic, update_message)
 
-            # Отправляем все сообщения
-            for msg in messages:
-                update.message.reply_text(msg, parse_mode='Markdown')
+            # Проверяем, получены ли сообщения
+            if messages and len(messages) > 0:
+                # Отправляем все сообщения
+                for msg in messages:
+                    update.message.reply_text(msg, parse_mode='Markdown')
+            else:
+                # Обработка случая, когда список сообщений пуст
+                self.logger.warning(f"Получен пустой список сообщений для темы: {topic}")
+                update.message.reply_text(
+                    f"К сожалению, не удалось получить информацию по теме *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
+                    parse_mode='Markdown'
+                )
 
             update.message.reply_text("Выбери следующее действие:", reply_markup=self.ui_manager.main_menu())
             self.logger.info(f"Пользователю {user_id} успешно отправлена информация по теме: {topic}")
