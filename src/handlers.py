@@ -1320,7 +1320,8 @@ class CommandHandlers:
     def handle_conversation(self, update, context):
         """
         Обрабатывает сообщения пользователя в режиме беседы с использованием
-        отдельного сервиса для обработки сообщений.
+        отдельного сервиса для обработки сообщений. Используется улучшенный подход
+        без редактирования сообщений для предотвращения ошибок.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
@@ -1355,15 +1356,9 @@ class CommandHandlers:
                     history_map=self.history_map
                 )
             
-            # Отправляем индикатор набора для лучшего UX
-            try:
-                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            except Exception as e:
-                self.logger.warning(f"Не удалось отправить индикатор набора: {e}")
-            
             # Обрабатываем сообщение и получаем результат
             self.logger.debug(f"Передача сообщения в ConversationService для пользователя {user_id}")
-            result = self.conversation_service.handle_conversation(update, context, self.message_manager)
+            self.conversation_service.handle_conversation(update, context, self.message_manager)
             
             # Если ожидаем тему для карты, возвращаем состояние MAP
             if context.user_data.get('waiting_for_map_topic', False):
@@ -1373,26 +1368,12 @@ class CommandHandlers:
             # В остальных случаях остаемся в режиме беседы
             return self.CONVERSATION
             
-        except telegram.error.BadRequest as e:
-            # Специфическая обработка ошибок Telegram API
-            self.logger.error(f"Ошибка BadRequest при обработке беседы: {str(e)}")
-            try:
-                # Отправляем новое сообщение вместо редактирования
-                error_msg = update.message.reply_text(
-                    "Произошла техническая ошибка. Пожалуйста, вернитесь в главное меню и начните беседу заново.",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-                )
-                self.message_manager.save_message_id(update, context, error_msg.message_id)
-            except Exception as reply_error:
-                self.logger.error(f"Не удалось отправить сообщение об ошибке: {reply_error}")
-            
-            return self.CONVERSATION
-            
         except Exception as e:
             self.logger.error(f"Ошибка при обработке беседы: {str(e)}")
             try:
+                # Отправляем простое сообщение об ошибке без редактирования старого
                 error_msg = update.message.reply_text(
-                    "Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте еще раз или вернитесь в меню.",
+                    "Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте задать другой вопрос или вернитесь в меню.",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
                 self.message_manager.save_message_id(update, context, error_msg.message_id)
