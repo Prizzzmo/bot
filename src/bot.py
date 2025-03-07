@@ -1,17 +1,16 @@
-
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 
 from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
 
 class Bot:
     """Класс для управления Telegram ботом"""
-    
+
     def __init__(self, config, logger, command_handlers):
         self.config = config
         self.logger = logger
         self.handlers = command_handlers
         self.updater = None
-        
+
     def setup(self):
         """Настройка бота и диспетчера"""
         try:
@@ -50,18 +49,29 @@ class Bot:
             # Добавляем обработчики
             dp.add_error_handler(self.handlers.error_handler)
             dp.add_handler(conv_handler)
-            
+
             return True
         except Exception as e:
             self.logger.log_error(e, "Ошибка при настройке бота")
             return False
-    
+
     def run(self):
-        """Запуск бота"""
+        """Запускает бота и веб-сервер для логов"""
+        self.logger.info("Запуск бота и веб-сервера логов...")
+
+        # Запуск фонового процесса для веб-сервера
+        threading.Thread(target=self.run_log_server, daemon=True).start()
+
         try:
+            # Включаем сбор обновлений для реагирования на сообщения, запускаем бота
+            # Установка более длинного таймаута и включение clean=True для обработки конфликтов
+            self.updater.start_polling(timeout=30, clean=True, drop_pending_updates=True)
             self.logger.info("Бот успешно запущен")
-            self.updater.start_polling(timeout=30, read_latency=2.0, drop_pending_updates=True)
+
+            # Остаемся в режиме работы до получения Ctrl+C
             self.updater.idle()
         except Exception as e:
-            self.logger.log_error(e, "Критическая ошибка при запуске бота")
-            self.logger.critical(f"Бот не был запущен из-за критической ошибки: {e}")
+            self.logger.error(f"Ошибка запуска бота: {e}")
+            # Попытка принудительного завершения updater если он был создан
+            if hasattr(self, 'updater'):
+                self.updater.stop()

@@ -112,8 +112,9 @@ class Logger:
     
     def info(self, message):
         """Логирование информационного сообщения о запуске"""
-        # Логируем только сообщения о запуске
-        if "запуск" in message.lower() or "старт" in message.lower() or "инициализ" in message.lower():
+        # Логируем только сообщения о запуске и критичные операции
+        important_keywords = ["запуск", "старт", "инициализ", "остановк", "завершен", "конфликт"]
+        if any(keyword in message.lower() for keyword in important_keywords):
             self.logger.info(message)
             print(message)
     

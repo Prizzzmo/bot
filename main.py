@@ -1,3 +1,4 @@
+import os
 from src.config import Config
 from src.logger import Logger
 from src.api_cache import APICache
@@ -6,7 +7,17 @@ from src.message_manager import MessageManager
 from src.ui_manager import UIManager
 from src.content_service import ContentService
 from src.handlers import CommandHandlers
-from src.bot import Bot
+from src.bot import Bot, BotManager
+
+
+def check_running_instances():
+    """Checks for other running instances of the bot and terminates them."""
+    # Implement logic to check for and terminate other instances.  This is placeholder code.
+    # Replace with actual implementation using process IDs, file locks, or other methods.
+    print("Checking for other running instances...")
+    # ... (Implementation to check and terminate other instances) ...
+    pass
+
 
 def main():
     """
@@ -60,4 +71,8 @@ def main():
             logger.critical(f"Бот не был запущен из-за критической ошибки: {e}")
 
 if __name__ == '__main__':
-    main()
+    # Проверяем и завершаем другие экземпляры бота перед запуском
+    check_running_instances()
+
+    bot_manager = BotManager() # Initialize BotManager here
+    bot_manager.run()
