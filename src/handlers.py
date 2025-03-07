@@ -436,27 +436,42 @@ class CommandHandlers:
             categories = self.history_map.get_categories()
             keyboard = []
             
-            # Показываем следующие 10 категорий или оставшиеся
-            remaining_categories = categories[10:] if len(categories) > 10 else []
-            category_buttons = []
-            for i, category in enumerate(remaining_categories):
-                category_buttons.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
-                # Создаем ряды по 2 кнопки
-                if i % 2 == 1 or i == len(remaining_categories)-1:
-                    keyboard.append(category_buttons)
-                    category_buttons = []
+            # Проверяем есть ли дополнительные категории
+            if len(categories) > 10:
+                # Показываем следующие категории
+                remaining_categories = categories[10:]
+                category_buttons = []
+                for i, category in enumerate(remaining_categories):
+                    category_buttons.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
+                    # Создаем ряды по 2 кнопки
+                    if i % 2 == 1 or i == len(remaining_categories)-1:
+                        keyboard.append(category_buttons)
+                        category_buttons = []
+            else:
+                # Если дополнительных категорий нет, показываем сообщение
+                keyboard.append([InlineKeyboardButton("⚠️ Дополнительных категорий нет", callback_data='history_map')])
             
             # Добавляем навигационные кнопки
             keyboard.append([InlineKeyboardButton("◀️ Назад к основным категориям", callback_data='history_map')])
             keyboard.append([InlineKeyboardButton("🔍 Поиск по теме", callback_data='map_search_topic')])
             keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
             
-            query.edit_message_text(
-                "🗺️ *Дополнительные категории исторических событий*\n\n"
-                "Выберите одну из дополнительных категорий для отображения на карте.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode='Markdown'
-            )
+            try:
+                query.edit_message_text(
+                    "🗺️ *Дополнительные категории исторических событий*\n\n"
+                    "Выберите одну из дополнительных категорий для отображения на карте.",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+            except Exception as e:
+                self.logger.error(f"Ошибка при редактировании сообщения с дополнительными категориями: {e}")
+                # Если не удалось отредактировать, отправляем новое сообщение
+                query.message.reply_text(
+                    "🗺️ *Дополнительные категории исторических событий*\n\n"
+                    "Выберите одну из дополнительных категорий для отображения на карте.",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
             return self.MAP
             
         elif query_data == 'map_search_topic':
