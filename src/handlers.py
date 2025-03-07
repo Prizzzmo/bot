@@ -1185,17 +1185,29 @@ class CommandHandlers:
                 sent_msg3 = update.message.reply_text(options_text)
                 self.message_manager.save_message_id(update, context, sent_msg3.message_id)
             else:
-                # Если вариантов нет или их неправильное количество, создаем стандартные
-                standard_options = [
-                    "1) Первый вариант ответа",
-                    "2) Второй вариант ответа",
-                    "3) Третий вариант ответа",
-                    "4) Четвертый вариант ответа"
-                ]
-                options_text = "\n".join(standard_options)
-                sent_msg3 = update.message.reply_text(
-                    "Варианты ответов:\n" + options_text + "\n\n⚠️ Примечание: варианты ответов могли быть сгенерированы автоматически из-за проблемы с форматированием."
-                )
+                # Проверяем, есть ли варианты ответов в самом вопросе
+                pattern_options = []
+                option_lines = re.findall(r'\n\s*\d\)\s+.*', question_text)
+                if option_lines and len(option_lines) >= 4:
+                    # Используем найденные варианты ответов
+                    pattern_options = [line.strip() for line in option_lines[:4]]
+                
+                # Если нашли варианты в тексте вопроса
+                if pattern_options and len(pattern_options) == 4:
+                    options_text = "\n".join(pattern_options)
+                    sent_msg3 = update.message.reply_text(options_text)
+                else:
+                    # Если вариантов все еще нет, создаем стандартные
+                    standard_options = [
+                        "1) Первый вариант ответа",
+                        "2) Второй вариант ответа",
+                        "3) Третий вариант ответа",
+                        "4) Четвертый вариант ответа"
+                    ]
+                    options_text = "\n".join(standard_options)
+                    sent_msg3 = update.message.reply_text(
+                        "Варианты ответов:\n" + options_text + "\n\n⚠️ Примечание: варианты ответов могли быть сгенерированы автоматически из-за проблемы с форматированием."
+                    )
                 self.message_manager.save_message_id(update, context, sent_msg3.message_id)
 
             # 4. Сообщение с инструкцией и кнопкой для завершения

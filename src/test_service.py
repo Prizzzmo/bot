@@ -122,6 +122,8 @@ class TestService:
             r'^\([A-D]\)\s+', # (A) формат
             r'^\d+\s*[-–—]\s+', # 1 - формат
             r'^[A-D]\s*[-–—]\s+', # A - формат
+            r'^\s*\d[\)\.]\s+', # с отступом 1) формат
+            r'\b\d[\)\.]\s+', # в строке 1) формат
         ]
         
         for line in cleaned_lines:
@@ -164,6 +166,29 @@ class TestService:
                         options.append(f"{i}) {text}")
                         is_option = True
                         break
+        
+        # Если варианты всё еще не найдены, используем более агрессивный поиск
+        if not options:
+            # Ищем в исходном тексте строки, которые могут выглядеть как варианты ответов
+            option_lines = re.findall(r'\n\s*\d\)\s+.*|\n\s*\d\.\s+.*|\n\s*[A-D]\)\s+.*|\n\s*[A-D]\.\s+.*', question_text)
+            if option_lines and len(option_lines) >= 4:
+                for i, line in enumerate(option_lines[:4]):
+                    line = line.strip()
+                    if re.match(r'^[A-D]', line):  # Если вариант начинается с буквы
+                        letter = line[0]
+                        number = ord(letter) - ord('A') + 1
+                        text = re.sub(r'^[A-D][\)\.\(\s-–—]+\s*', '', line).strip()
+                        options.append(f"{number}) {text}")
+                    else:
+                        # Если вариант начинается с цифры или другого символа
+                        match = re.match(r'^[(\s]*(\d+)[)\.\s-–—]+\s*', line)
+                        if match:
+                            number = match.group(1)
+                            text = re.sub(r'^[(\s]*\d+[)\.\s-–—]+\s*', '', line).strip()
+                            options.append(f"{number}) {text}")
+                        else:
+                            # Форматируем как стандартный вариант с номером
+                            options.append(f"{i+1}) {line}")
         
         # Если варианты всё еще не найдены, используем эвристический метод
         if not options:
