@@ -1120,8 +1120,13 @@ class CommandHandlers:
                         self.logger.info(f"Пользователь {user_id} выбрал тему: {topic}")
 
                         # Функция для обновления сообщения о загрузке
-                        def update_message(text):
-                            query.edit_message_text(text, parse_mode='Markdown')
+                        def update_message(message):
+                            try:
+                                query.edit_message_text(message, parse_mode='Markdown')
+                            except Exception as e:
+                                self.logger.warning(f"Не удалось обновить сообщение о загрузке: {e}")
+                                query.message.reply_text(message, parse_mode='Markdown')
+
 
                         # Получаем информацию о теме через сервис тем (теперь всегда возвращает список сообщений)
                         messages = self.topic_service.get_topic_info(topic, update_message)
@@ -1231,8 +1236,8 @@ class CommandHandlers:
             update.message.reply_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
 
             # Функция для обновления сообщения о загрузке
-            def update_message(text):
-                update.message.reply_text(text, parse_mode='Markdown')
+            def update_message(message):
+                update.message.reply_text(message, parse_mode='Markdown')
 
             # Получаем информацию о теме через сервис тем (теперь всегда возвращает список сообщений)
             messages = self.topic_service.get_topic_info(topic, update_message)
@@ -1342,7 +1347,7 @@ class CommandHandlers:
                 "⚠️ Пожалуйста, введите номер ответа (от 1 до 4).\n"
                 "Попробуйте снова:"
             )
-            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+            self.message_manager.save_message_id(update, context, context, sent_msg.message_id)
             return self.ANSWER
 
         # Используем сервис тестирования для получения правильного ответа
@@ -1783,3 +1788,92 @@ class CommandHandlers:
                 error_message,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
             )
+    def _send_topic_info(self, update, context, topic):
+        """Отправляет информацию по теме"""
+        try:
+            # Создаем функцию обратного вызова для обновления статуса
+            def status_callback(message):
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=message,
+                    parse_mode='Markdown'
+                )
+
+            # Отправляем начальное сообщение о подготовке материала
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"🔎 *Готовлю информацию по теме:* {topic}\n\nМатериал будет разделен на 5 глав, каждая глава будет отправлена отдельным сообщением.",
+                parse_mode='Markdown'
+            )
+
+            # Получаем информацию из сервиса
+            messages = context.bot_data['topic_service'].get_topic_info(topic, status_callback)
+
+            # Проверяем, есть ли содержимое
+            if not messages or len(messages) <= 1:
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=f"⚠️ Не удалось получить полную информацию по теме '{topic}'. Пожалуйста, попробуйте другую тему.",
+                    parse_mode='Markdown'
+                )
+                return self.back_to_menu(update, context)
+
+            # Отправляем сообщение о начале передачи глав
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"📚 *Начинаю отправку глав по теме:* {topic}",
+                parse_mode='Markdown'
+            )
+
+            # Отправляем каждую главу с небольшой задержкой
+            import time
+            for i, message in enumerate(messages):
+                # Отправляем сообщение
+                sent_message = context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=message,
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True  # Отключаем предпросмотр ссылок
+                )
+
+                # Добавляем задержку между сообщениями, чтобы они приходили по порядку
+                if i < len(messages) - 1:
+                    time.sleep(1)  # 1 секунда между сообщениями
+
+                # Сохраняем ID последнего сообщения в каждой главе для возможности последующей навигации
+                context.user_data.setdefault('chapter_messages', {})
+                if i > 0:  # Пропускаем оглавление (первое сообщение)
+                    context.user_data['chapter_messages'][i] = sent_message.message_id
+
+            # Отправляем кнопки для навигации и взаимодействия
+            buttons = [
+                [InlineKeyboardButton("📝 Пройти тест по теме", callback_data=f"start_test_{topic}")],
+                [InlineKeyboardButton("📊 Сохранить в изученные", callback_data=f"mark_as_learned_{topic}")],
+                [InlineKeyboardButton("🏠 Вернуться в меню", callback_data="back_to_menu")]
+            ]
+
+            # Добавляем кнопку для создания презентации, если такая возможность есть
+            if hasattr(context.bot_data, 'presentation_service'):
+                buttons.insert(1, [InlineKeyboardButton("📑 Создать презентацию", callback_data=f"create_presentation_{topic}")])
+
+            reply_markup = InlineKeyboardMarkup(buttons)
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="✅ *Материал по теме успешно отправлен*\n\nЧто бы вы хотели сделать дальше?",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+            # Логируем успешную отправку информации
+            self.logger.info(f"Отправлена информация по теме '{topic}' пользователю {update.effective_user.id}")
+
+            return TOPIC
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при отправке информации по теме: {e}")
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"⚠️ Произошла ошибка при получении информации по теме. Пожалуйста, попробуйте позже или выберите другую тему.\n\nОшибка: {str(e)}",
+                parse_mode='Markdown'
+            )
+            return self.back_to_menu(update, context)
