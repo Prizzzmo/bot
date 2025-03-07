@@ -14,7 +14,7 @@ from src.admin_panel import AdminPanel
 from src.handlers import CommandHandlers
 from src.bot import Bot
 from src.analytics import AnalyticsService
-from src.history_map import HistoryMapService
+from src.history_map import HistoryMap
 from src.web_server import WebServer
 
 class BotFactory:
@@ -60,7 +60,7 @@ class BotFactory:
         analytics_service = AnalyticsService(logger)
         
         # Создаем сервис исторических карт
-        history_map_service = HistoryMapService(logger)
+        history_map_service = HistoryMap(logger)
         
         # Создаем админ-панель
         admin_panel = AdminPanel(logger, config)
