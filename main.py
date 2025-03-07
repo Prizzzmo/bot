@@ -380,7 +380,8 @@ def start(update, context):
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} ({user.first_name}) запустил бота")
 
-    # Очищаем историю чата
+    # Очищаем историю чата дважды для надежности
+    clear_chat_history(update, context)
     clear_chat_history(update, context)
 
     # Отправляем приветственное сообщение и сохраняем его ID
@@ -518,7 +519,8 @@ def button_handler(update, context):
 
     user_id = query.from_user.id
 
-    # Очищаем историю чата полностью перед новым действием
+    # Очищаем историю чата полностью перед новым действием (двойной вызов)
+    clean_all_messages_except_active(update, context)
     clean_all_messages_except_active(update, context)
 
     logger.info(f"Пользователь {user_id} нажал кнопку: {query.data}")
@@ -873,7 +875,8 @@ def choose_topic(update, context):
         query.answer()
         user_id = query.from_user.id
 
-        # Очищаем историю чата перед новым действием
+        # Очищаем историю чата перед новым действием (двойной вызов)
+        clear_chat_history(update, context)
         clear_chat_history(update, context)
 
         logger.info(f"Пользователь {user_id} выбирает тему через кнопку: {query.data}")
@@ -962,7 +965,8 @@ def handle_custom_topic(update, context):
     user_id = update.message.from_user.id
     context.user_data['current_topic'] = topic
 
-    # Очищаем историю чата перед обработкой новой темы
+    # Очищаем историю чата перед обработкой новой темы (двойной вызов)
+    clear_chat_history(update, context)
     clear_chat_history(update, context)
 
     logger.info(f"Пользователь {user_id} ввел свою тему: {topic}")
@@ -1003,7 +1007,8 @@ def handle_answer(update, context):
     user_answer = update.message.text.strip()
     user_id = update.message.from_user.id
 
-    # Очищаем историю чата перед ответом на новый вопрос
+    # Очищаем историю чата перед ответом на новый вопрос (двойной вызов)
+    clear_chat_history(update, context)
     clear_chat_history(update, context)
 
     questions = context.user_data.get('questions', [])
@@ -1105,7 +1110,8 @@ def handle_conversation(update, context):
     user_message = update.message.text
     user_id = update.message.from_user.id
 
-    # Очищаем историю чата перед ответом на новое сообщение
+    # Очищаем историю чата перед ответом на новое сообщение (двойной вызов)
+    clear_chat_history(update, context)
     clear_chat_history(update, context)
 
     logger.info(f"Пользователь {user_id} отправил сообщение в режиме беседы: {user_message[:50]}...")
