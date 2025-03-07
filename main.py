@@ -46,7 +46,13 @@ def main():
     from src.analytics import Analytics
     analytics = Analytics(logger)
 
-    # Создаем карту исторических событий с ленивой загрузкой
+    # Создаем карту исторических событий и запускаем веб-сервер
+    from src.history_map import HistoryMap
+    from src.web_server import MapServer
+    
+    history_map = HistoryMap(logger)
+    map_server = MapServer(history_map, logger)
+    map_server.run()ой загрузкой
     from src.history_map import HistoryMap
     history_map = HistoryMap(logger)
 

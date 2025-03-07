@@ -14,7 +14,10 @@ class CommandHandlers:
         self.content_service = content_service
         self.logger = logger
         self.config = config
-        self.history_map = None  # Будет установлено позже
+        
+        # Инициализируем карту исторических событий
+        from src.history_map import HistoryMap
+        self.history_map = HistoryMap(logger)
 
         # Импортируем константы состояний из config
         from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION, MAP
