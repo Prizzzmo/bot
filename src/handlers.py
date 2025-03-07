@@ -857,10 +857,6 @@ class CommandHandlers:
                                 f"Произошла ошибка при обработке данных для темы *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
                                 parse_mode='Markdown'
                             )
-                            query.edit_message_text(
-                                f"К сожалению, не удалось получить информацию по теме *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
-                                parse_mode='Markdown'
-                            )
 
                         query.message.reply_text("Выбери следующее действие:", reply_markup=self.ui_manager.main_menu())
                         self.logger.info(f"Пользователю {user_id} успешно отправлена информация по теме: {topic}")
