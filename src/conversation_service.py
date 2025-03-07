@@ -15,6 +15,8 @@ class ConversationService:
         """
         Обрабатывает сообщения пользователя в режиме беседы с улучшенным распознаванием
         исторических тем и оптимизацией производительности.
+        
+        Улучшенная обработка ошибок для предотвращения проблем с сообщениями.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
@@ -24,6 +26,11 @@ class ConversationService:
         Returns:
             int: Следующее состояние разговора
         """
+        # Проверяем наличие обновления и сообщения
+        if not update or not update.message:
+            self.logger.error("Получен некорректный объект обновления")
+            return None
+            
         # Обработка специальных состояний (карта, админ) с оптимизацией
         user_data = context.user_data
 
@@ -36,23 +43,27 @@ class ConversationService:
             # Передаем обработку в админ-панель
             return None  # Это будет обработано в handlers.py
 
-        # Основная логика обработки обычных сообщений
-        user_message = update.message.text
-        user_id = update.message.from_user.id
-        
-        # Сохраняем сообщение пользователя для контекста
-        if 'conversation_history' not in user_data:
-            user_data['conversation_history'] = []
-            
-        # Ограничиваем историю до последних 5 сообщений для оптимизации
-        user_data['conversation_history'].append(user_message)
-        if len(user_data['conversation_history']) > 5:
-            user_data['conversation_history'] = user_data['conversation_history'][-5:]
-
-        # Отправляем индикатор набора текста сразу
-        context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-
         try:
+            # Основная логика обработки обычных сообщений
+            user_message = update.message.text
+            user_id = update.message.from_user.id
+            
+            # Сохраняем сообщение пользователя для контекста
+            if 'conversation_history' not in user_data:
+                user_data['conversation_history'] = []
+                
+            # Ограничиваем историю до последних 5 сообщений для оптимизации
+            user_data['conversation_history'].append(user_message)
+            if len(user_data['conversation_history']) > 5:
+                user_data['conversation_history'] = user_data['conversation_history'][-5:]
+            
+            # Отправляем индикатор набора текста и проверяем доступность чата
+            try:
+                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            except Exception as chat_error:
+                self.logger.warning(f"Не удалось отправить индикатор набора текста: {chat_error}")
+                # Продолжаем работу даже если не удалось отправить индикатор
+
             # Определяем, связано ли сообщение с историей
             is_history_related = self._is_history_related(user_message, user_data)
             
@@ -77,17 +88,32 @@ class ConversationService:
             if sent_msg:
                 message_manager.save_message_id(update, context, sent_msg.message_id)
                 
+        except telegram.error.TelegramError as telegram_error:
+            self.logger.error(f"Ошибка Telegram API при обработке беседы: {str(telegram_error)}")
+            try:
+                # Проверяем, что чат доступен для отправки
+                error_msg = update.message.reply_text(
+                    "Произошла техническая ошибка при обработке вашего вопроса. Попробуйте вернуться в главное меню и начать беседу заново.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+                message_manager.save_message_id(update, context, error_msg.message_id)
+            except Exception:
+                self.logger.error("Не удалось отправить сообщение об ошибке Telegram API")
+            
         except Exception as e:
             self.logger.error(f"Ошибка при обработке беседы: {str(e)}")
-            # Упрощенное сообщение об ошибке
-            error_msg = update.message.reply_text(
-                "Произошла ошибка при обработке вашего вопроса. Попробуйте переформулировать или вернитесь в меню.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]])
-            )
-            message_manager.save_message_id(update, context, error_msg.message_id)
+            try:
+                # Отправляем новое сообщение вместо редактирования старого
+                error_msg = update.message.reply_text(
+                    "Произошла ошибка при обработке вашего вопроса. Попробуйте переформулировать или вернитесь в меню.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]])
+                )
+                message_manager.save_message_id(update, context, error_msg.message_id)
+            except Exception as reply_error:
+                self.logger.error(f"Не удалось отправить сообщение об ошибке: {reply_error}")
 
-        # Возвращаем CONVERSATION для продолжения беседы
-        # Конкретное значение будет использовано в handlers.py
+        # Возвращаем None для продолжения беседы
+        # Конкретное значение CONVERSATION будет использовано в handlers.py
         return None  
 
     def _handle_map_topic(self, update, context):
@@ -309,44 +335,111 @@ class ConversationService:
         )
 
     def _send_response_safely(self, update, response, keyboard):
-        """Безопасно отправляет ответ пользователю с обработкой длинных сообщений"""
+        """
+        Безопасно отправляет ответ пользователю с обработкой длинных сообщений 
+        и улучшенной обработкой ошибок
+        """
+        if not update or not update.message:
+            self.logger.error("Невозможно отправить сообщение: отсутствует объект update или message")
+            return None
+            
         try:
-            # Если ответ слишком длинный, разбиваем на части
-            if len(response) > 3500:
-                parts = [response[i:i+3500] for i in range(0, len(response), 3500)]
+            # Проверяем и очищаем ответ, если он пустой или некорректный
+            if not response or not isinstance(response, str):
+                response = "Извините, не удалось получить ответ на ваш вопрос. Попробуйте задать другой вопрос."
+                
+            # Если ответ слишком длинный, разбиваем на части (с более строгим лимитом)
+            if len(response) > 3000:
+                parts = [response[i:i+3000] for i in range(0, len(response), 3000)]
                 
                 # Отправляем первую часть без клавиатуры
-                update.message.reply_text(parts[0], parse_mode=None)
+                try:
+                    update.message.reply_text(parts[0], parse_mode=None)
+                except telegram.error.BadRequest as e:
+                    self.logger.error(f"Ошибка при отправке первой части ответа: {e}")
+                    # Пробуем отправить более короткую версию
+                    try:
+                        update.message.reply_text(parts[0][:1000] + "...", parse_mode=None)
+                    except:
+                        pass
                 
-                # Отправляем средние части, если есть
-                for part in parts[1:-1]:
-                    update.message.reply_text(part, parse_mode=None)
+                # Отправляем средние части, если есть, с обработкой ошибок
+                for i, part in enumerate(parts[1:-1], 1):
+                    try:
+                        update.message.reply_text(part, parse_mode=None)
+                    except telegram.error.BadRequest:
+                        self.logger.warning(f"Не удалось отправить часть {i+1} ответа")
+                        # Пропускаем проблемную часть и продолжаем
+                        continue
                 
                 # Последнюю часть отправляем с клавиатурой
-                sent_msg = update.message.reply_text(
-                    parts[-1] + "\n\n" + "Вы можете задать ещё вопрос или выбрать другое действие:",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                    parse_mode=None
-                )
-                return sent_msg
+                try:
+                    sent_msg = update.message.reply_text(
+                        parts[-1] + "\n\n" + "Вы можете задать ещё вопрос или выбрать другое действие:",
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        parse_mode=None
+                    )
+                    return sent_msg
+                except telegram.error.BadRequest as e:
+                    self.logger.error(f"Ошибка при отправке последней части ответа: {e}")
+                    # Отправляем финальное сообщение без содержимого
+                    try:
+                        sent_msg = update.message.reply_text(
+                            "Продолжение ответа не удалось отправить. Вы можете задать ещё вопрос или выбрать другое действие:",
+                            reply_markup=InlineKeyboardMarkup(keyboard),
+                            parse_mode=None
+                        )
+                        return sent_msg
+                    except:
+                        return None
             else:
                 # Отправляем весь ответ с клавиатурой
+                try:
+                    sent_msg = update.message.reply_text(
+                        response + "\n\n" + "Вы можете задать ещё вопрос или выбрать другое действие:",
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        parse_mode=None
+                    )
+                    return sent_msg
+                except telegram.error.BadRequest as e:
+                    self.logger.error(f"Ошибка при отправке ответа: {e}")
+                    # Пробуем отправить сокращенный ответ
+                    try:
+                        short_response = response[:1000] + "... (ответ сокращен из-за технических ограничений)"
+                        sent_msg = update.message.reply_text(
+                            short_response + "\n\n" + "Вы можете задать ещё вопрос или выбрать другое действие:",
+                            reply_markup=InlineKeyboardMarkup(keyboard),
+                            parse_mode=None
+                        )
+                        return sent_msg
+                    except:
+                        # Если и это не удалось, отправляем только кнопки
+                        try:
+                            sent_msg = update.message.reply_text(
+                                "Не удалось отформатировать ответ. Выберите действие:",
+                                reply_markup=InlineKeyboardMarkup(keyboard),
+                                parse_mode=None
+                            )
+                            return sent_msg
+                        except:
+                            return None
+                
+        except telegram.error.BadRequest as e:
+            self.logger.error(f"Ошибка запроса при отправке ответа: {e}")
+            # В случае проблем отправляем только кнопки без текста
+            try:
                 sent_msg = update.message.reply_text(
-                    response + "\n\n" + "Вы можете задать ещё вопрос или выбрать другое действие:",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    "Извините, произошла ошибка при отправке ответа. Выберите действие:",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]]),
                     parse_mode=None
                 )
                 return sent_msg
-                
-        except telegram.error.BadRequest as e:
-            self.logger.error(f"Ошибка при отправке ответа: {e}")
-            # В случае проблем отправляем упрощенную версию
-            sent_msg = update.message.reply_text(
-                "Извините, произошла ошибка при форматировании ответа. Попробуйте задать вопрос иначе или вернитесь в меню.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]]),
-                parse_mode=None
-            )
-            return sent_msg
+            except:
+                return None
+        
+        except telegram.error.TelegramError as e:
+            self.logger.error(f"Ошибка Telegram API при отправке ответа: {e}")
+            return None
         
         except Exception as e:
             self.logger.error(f"Неизвестная ошибка при отправке ответа: {e}")

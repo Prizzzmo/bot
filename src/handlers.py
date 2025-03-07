@@ -1329,6 +1329,14 @@ class CommandHandlers:
         Returns:
             int: Следующее состояние разговора
         """
+        # Проверка входных параметров
+        if not update or not update.effective_user:
+            self.logger.error("Получен некорректный объект обновления")
+            return self.CONVERSATION
+
+        user_id = update.effective_user.id
+        self.logger.info(f"Обработка сообщения в режиме беседы от пользователя {user_id}")
+        
         # Обработка ввода ID нового администратора
         if hasattr(self, 'admin_panel') and context.user_data.get('waiting_for_admin_id', False):
             self.admin_panel.process_new_admin_id(update, context)
@@ -1340,29 +1348,57 @@ class CommandHandlers:
             
             # Инициализируем сервис, если он еще не создан
             if not hasattr(self, 'conversation_service'):
+                self.logger.info("Инициализация ConversationService")
                 self.conversation_service = ConversationService(
                     api_client=self.api_client, 
                     logger=self.logger,
                     history_map=self.history_map
                 )
             
+            # Отправляем индикатор набора для лучшего UX
+            try:
+                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            except Exception as e:
+                self.logger.warning(f"Не удалось отправить индикатор набора: {e}")
+            
             # Обрабатываем сообщение и получаем результат
+            self.logger.debug(f"Передача сообщения в ConversationService для пользователя {user_id}")
             result = self.conversation_service.handle_conversation(update, context, self.message_manager)
             
             # Если ожидаем тему для карты, возвращаем состояние MAP
             if context.user_data.get('waiting_for_map_topic', False):
+                self.logger.info(f"Переход в режим карты для пользователя {user_id}")
                 return self.MAP
                 
             # В остальных случаях остаемся в режиме беседы
             return self.CONVERSATION
             
+        except telegram.error.BadRequest as e:
+            # Специфическая обработка ошибок Telegram API
+            self.logger.error(f"Ошибка BadRequest при обработке беседы: {str(e)}")
+            try:
+                # Отправляем новое сообщение вместо редактирования
+                error_msg = update.message.reply_text(
+                    "Произошла техническая ошибка. Пожалуйста, вернитесь в главное меню и начните беседу заново.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+                self.message_manager.save_message_id(update, context, error_msg.message_id)
+            except Exception as reply_error:
+                self.logger.error(f"Не удалось отправить сообщение об ошибке: {reply_error}")
+            
+            return self.CONVERSATION
+            
         except Exception as e:
             self.logger.error(f"Ошибка при обработке беседы: {str(e)}")
-            error_msg = update.message.reply_text(
-                "Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте еще раз.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-            )
-            self.message_manager.save_message_id(update, context, error_msg.message_id)
+            try:
+                error_msg = update.message.reply_text(
+                    "Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте еще раз или вернитесь в меню.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+                self.message_manager.save_message_id(update, context, error_msg.message_id)
+            except Exception as reply_error:
+                self.logger.error(f"Критическая ошибка: не удалось отправить сообщение об ошибке: {reply_error}")
+                
             return self.CONVERSATION
 
     def recommend_similar_topics(self, current_topic, context):
