@@ -11,3 +11,5 @@ webdriver-manager
 pillow
 python-telegram-bot==13.7
 requests
+docx
+pillow

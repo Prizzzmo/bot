@@ -242,33 +242,30 @@ class HistoryMap:
         Returns:
             str: Путь к сгенерированному изображению карты или текстовое представление
         """
-        import folium
-        import tempfile
-        import io
         import time
         from PIL import Image, ImageDraw, ImageFont
         
         # Определяем события для отображения на карте
-        if category:
-            try:
+        try:
+            if category and isinstance(category, str):
                 display_events = self.get_events_by_category(category)
-            except Exception as e:
-                self.logger.error(f"Ошибка при получении событий по категории: {e}")
-                # Создаем резервный список событий
-                display_events = []
-        elif events:
-            if isinstance(events, list):
-                display_events = events
+                self.logger.info(f"Получено {len(display_events)} событий для категории {category}")
+            elif events:
+                if isinstance(events, list):
+                    display_events = events
+                else:
+                    try:
+                        ids = [int(id_) for id_ in str(events).split(',')]
+                        display_events = [self.get_event_by_id(id_) for id_ in ids]
+                        display_events = [event for event in display_events if event]
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при обработке параметра events: {e}")
+                        display_events = self.get_all_events()
             else:
-                try:
-                    ids = [int(id_) for id_ in events.split(',')]
-                    display_events = [self.get_event_by_id(id_) for id_ in ids]
-                    display_events = [event for event in display_events if event]
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке параметра events: {e}")
-                    display_events = self.get_all_events()
-        else:
-            display_events = self.get_all_events()
+                display_events = self.get_all_events()
+        except Exception as e:
+            self.logger.error(f"Ошибка при получении событий: {e}")
+            display_events = []
         
         # Создаем директорию для сохранения карт, если она не существует
         os.makedirs('generated_maps', exist_ok=True)
@@ -277,54 +274,70 @@ class HistoryMap:
         timestamp = int(time.time())
         map_image_path = f"generated_maps/map_{timestamp}.png"
         
-        # Создаем простое изображение с текстовой информацией о событиях
-        width, height = 1200, 800
-        image = Image.new('RGB', (width, height), color=(255, 255, 255))
-        draw = ImageDraw.Draw(image)
-        
-        # Заголовок
-        title = "Карта исторических событий России"
-        if category:
-            title += f" - {category}"
-        
-        # Рисуем заголовок
-        draw.rectangle([(0, 0), (width, 60)], fill=(50, 50, 100))
-        draw.text((width//2, 30), title, fill=(255, 255, 255), anchor="mm")
-        
-        # Отображаем список событий
-        y_pos = 100
-        for i, event in enumerate(display_events[:15]):  # Ограничиваем до 15 событий
-            if isinstance(event, dict) and 'title' in event:
-                title = event.get('title', 'Неизвестное событие')
-                date = event.get('date', 'Неизвестная дата')
-                description = event.get('description', '')
-                
-                # Ограничиваем длину описания
-                if len(description) > 100:
-                    description = description[:97] + "..."
-                
-                event_text = f"{i+1}. {title} ({date})"
-                draw.text((50, y_pos), event_text, fill=(0, 0, 0))
-                
-                if description:
-                    draw.text((70, y_pos + 25), description, fill=(100, 100, 100))
-                
-                y_pos += 60
-                
-                # Добавляем разделитель
-                draw.line([(50, y_pos - 15), (width - 50, y_pos - 15)], fill=(200, 200, 200), width=1)
-        
-        # Если нет событий
-        if not display_events:
-            draw.text((width//2, height//2), "События не найдены", fill=(100, 100, 100), anchor="mm")
-        
-        # Информация внизу карты
-        footer_text = "Исторический бот - текстовое представление карты"
-        draw.rectangle([(0, height-40), (width, height)], fill=(50, 50, 100))
-        draw.text((width//2, height-20), footer_text, fill=(255, 255, 255), anchor="mm")
-        
-        # Сохраняем изображение
-        image.save(map_image_path)
-        
-        self.logger.info(f"Текстовое представление карты сгенерировано: {map_image_path}")
-        return map_image_path
+        try:
+            # Создаем простое изображение с текстовой информацией о событиях
+            width, height = 1200, 800
+            image = Image.new('RGB', (width, height), color=(255, 255, 255))
+            draw = ImageDraw.Draw(image)
+            
+            # Заголовок
+            title = "Карта исторических событий России"
+            if category:
+                title += f" - {category}"
+            
+            # Рисуем заголовок
+            draw.rectangle([(0, 0), (width, 60)], fill=(50, 50, 100))
+            draw.text((width//2, 30), title, fill=(255, 255, 255), anchor="mm")
+            
+            # Отображаем список событий
+            y_pos = 100
+            for i, event in enumerate(display_events[:15]):  # Ограничиваем до 15 событий
+                if isinstance(event, dict) and 'title' in event:
+                    title = event.get('title', 'Неизвестное событие')
+                    date = event.get('date', 'Неизвестная дата')
+                    description = event.get('description', '')
+                    location = event.get('location', {})
+                    
+                    # Ограничиваем длину описания
+                    if len(description) > 100:
+                        description = description[:97] + "..."
+                    
+                    event_text = f"{i+1}. {title} ({date})"
+                    draw.text((50, y_pos), event_text, fill=(0, 0, 0))
+                    
+                    loc_text = ""
+                    if location:
+                        lat = location.get('lat', '')
+                        lng = location.get('lng', '')
+                        if lat and lng:
+                            loc_text = f"Координаты: {lat}, {lng}"
+                    
+                    if description:
+                        draw.text((70, y_pos + 25), description, fill=(100, 100, 100))
+                        if loc_text:
+                            draw.text((70, y_pos + 45), loc_text, fill=(100, 100, 100))
+                    elif loc_text:
+                        draw.text((70, y_pos + 25), loc_text, fill=(100, 100, 100))
+                    
+                    y_pos += 70  # Увеличиваем отступ
+                    
+                    # Добавляем разделитель
+                    draw.line([(50, y_pos - 15), (width - 50, y_pos - 15)], fill=(200, 200, 200), width=1)
+            
+            # Если нет событий
+            if not display_events:
+                draw.text((width//2, height//2), "События не найдены", fill=(100, 100, 100), anchor="mm")
+            
+            # Информация внизу карты
+            footer_text = "Исторический бот - текстовое представление карты"
+            draw.rectangle([(0, height-40), (width, height)], fill=(50, 50, 100))
+            draw.text((width//2, height-20), footer_text, fill=(255, 255, 255), anchor="mm")
+            
+            # Сохраняем изображение
+            image.save(map_image_path)
+            
+            self.logger.info(f"Карта с событиями сгенерирована: {map_image_path}")
+            return map_image_path
+        except Exception as e:
+            self.logger.error(f"Ошибка при генерации изображения карты: {e}")
+            return None
