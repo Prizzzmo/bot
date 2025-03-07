@@ -17,6 +17,8 @@ from src.history_map import HistoryMap
 from src.web_server import WebServer
 from src.test_service import TestService
 from src.topic_service import TopicService
+from src.conversation_service import ConversationService #Added import
+
 
 class BotFactory:
     """
@@ -54,7 +56,7 @@ class BotFactory:
         # Создаем сервисы для тестов и тем
         test_service = TestService(api_client, logger)
         topic_service = TopicService(api_client, logger)
-        
+
         # Создаем UI-менеджер с передачей topic_service
         ui_manager = UIManager(logger, topic_service)
 
