@@ -1,4 +1,3 @@
-
 import os
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -361,6 +360,7 @@ def main_menu():
         [InlineKeyboardButton("🔍 Выбрать тему", callback_data='topic')],
         [InlineKeyboardButton("✅ Пройти тест", callback_data='test')],
         [InlineKeyboardButton("💬 Беседа о истории России", callback_data='conversation')],
+        [InlineKeyboardButton("ℹ️ Информация о проекте", callback_data='project_info')],
         [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -528,6 +528,23 @@ def button_handler(update, context):
             "Выберите действие в меню ниже:",
             reply_markup=main_menu()
         )
+        return TOPIC
+    elif query.data == 'project_info':
+        # Загружаем информацию о проекте из файла
+        try:
+            with open('static/presentation.txt', 'r', encoding='utf-8') as file:
+                presentation_text = file.read()
+        except Exception as e:
+            logger.error(f"Ошибка при чтении файла presentation.txt: {e}")
+            presentation_text = "Информация о проекте временно недоступна."
+
+        # Отправляем информацию о проекте
+        query.edit_message_text(
+            "📋 *Информация о проекте*\n\n" + presentation_text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+        )
+        logger.info(f"Пользователь {user_id} просмотрел информацию о проекте")
         return TOPIC
     elif query.data == 'conversation':
         # Обработка кнопки беседы о истории России
@@ -705,7 +722,7 @@ def get_topic_info(topic, update_message_func=None):
 
     Args:
         topic (str): Тема для изучения
-        update_message_func (callable, optional): Функция для обновления сообщения о загрузке
+        update_message_func (callable, optional): Функция для обновления сообщенияо загрузке
 
     Returns:
         list: Список сообщений для отправки
