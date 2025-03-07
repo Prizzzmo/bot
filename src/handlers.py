@@ -140,7 +140,7 @@ class CommandHandlers:
                     [InlineKeyboardButton("📥 Скачать презентацию в Word", callback_data='download_detailed_presentation')],
                     [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
                 ]
-                
+
                 # Отправляем первую часть с редактированием сообщения
                 query.edit_message_text(
                     parts[0][:4000],  # Ограничиваем длину для безопасности
@@ -202,15 +202,15 @@ class CommandHandlers:
                     "⏳ Подготавливаю подробную презентацию в формате Word...",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
-                
+
                 # Импортируем функцию для создания DOCX и создаём презентацию
                 import sys
                 sys.path.append('.')
                 from create_presentation_doc import create_presentation_docx
-                
+
                 # Создаем Word документ
                 docx_path = create_presentation_docx('detailed_presentation.md', 'История_России_подробная_презентация.docx')
-                
+
                 # Отправляем файл в формате DOCX
                 with open(docx_path, 'rb') as docx_file:
                     context.bot.send_document(
@@ -219,7 +219,7 @@ class CommandHandlers:
                         filename='История_России_подробная_презентация.docx',
                         caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word."
                     )
-                
+
                 # Также отправляем обычный текстовый файл для совместимости
                 with open('detailed_presentation.md', 'rb') as md_file:
                     context.bot.send_document(
@@ -228,7 +228,7 @@ class CommandHandlers:
                         filename='История_России_подробная_презентация.md',
                         caption="📄 Версия презентации в текстовом формате Markdown."
                     )
-                
+
                 self.logger.info(f"Пользователь {user_id} скачал подробную презентацию в формате Word и текстовом формате")
 
                 # Обновляем сообщение о успешной загрузке
@@ -250,19 +250,19 @@ class CommandHandlers:
             # Обработка кнопки интерактивной карты
             user_id = query.from_user.id
             self.logger.info(f"Пользователь {user_id} запросил историческую карту")
-            
+
             # Создаем клавиатуру для выбора категории событий на карте
             categories = self.history_map.get_categories()
             keyboard = []
-            
+
             # Добавляем кнопки для каждой категории
             for category in categories:
                 keyboard.append([InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}')])
-            
+
             # Добавляем кнопку для случайных событий и возврата в меню
             keyboard.append([InlineKeyboardButton("🎲 Случайные события", callback_data='map_random')])
             keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
-            
+
             query.edit_message_text(
                 "🗺️ *Интерактивная карта исторических событий*\n\n"
                 "Выберите категорию исторических событий для отображения на карте или "
@@ -271,23 +271,23 @@ class CommandHandlers:
                 parse_mode='Markdown'
             )
             return self.MAP
-            
+
         elif query.data.startswith('map_category_'):
             # Обработка выбора категории на карте
             category = query.data[13:]  # map_category_{category}
             user_id = query.from_user.id
             self.logger.info(f"Пользователь {user_id} выбрал категорию карты: {category}")
-            
+
             # Генерируем URL для просмотра карты с выбранной категорией
             map_url = self.history_map.generate_map_url(category=category)
-            
+
             # Создаем кнопки для просмотра карты и возврата к выбору категории
             keyboard = [
                 [InlineKeyboardButton("🌐 Открыть карту в браузере", url=map_url)],
                 [InlineKeyboardButton("⬅️ К выбору категории", callback_data='history_map')],
                 [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
             ]
-            
+
             query.edit_message_text(
                 f"📍 *Категория: {category}*\n\n"
                 f"Вы выбрали категорию исторических событий: *{category}*\n\n"
@@ -296,21 +296,21 @@ class CommandHandlers:
                 parse_mode='Markdown'
             )
             return self.MAP
-            
+
         elif query.data == 'map_random':
             # Обработка выбора случайных событий
             user_id = query.from_user.id
             self.logger.info(f"Пользователь {user_id} запросил случайные события на карте")
-            
+
             # Получаем случайные события
             random_events = self.history_map.get_random_events(5)
-            
+
             # Генерируем URL для просмотра карты со случайными событиями
             map_url = self.history_map.generate_map_url(events=random_events)
-            
+
             # Формируем список событий для отображения
             events_list = "\n".join([f"• *{event['title']}* ({event.get('date', 'Дата неизвестна')})" for event in random_events])
-            
+
             # Создаем кнопки для просмотра карты и возврата к выбору категории
             keyboard = [
                 [InlineKeyboardButton("🌐 Открыть карту в браузере", url=map_url)],
@@ -318,7 +318,7 @@ class CommandHandlers:
                 [InlineKeyboardButton("⬅️ К выбору категории", callback_data='history_map')],
                 [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
             ]
-            
+
             query.edit_message_text(
                 "🎲 *Случайные исторические события*\n\n"
                 "Для вас выбраны следующие события из истории России:\n"
@@ -328,7 +328,7 @@ class CommandHandlers:
                 parse_mode='Markdown'
             )
             return self.MAP
-            
+
         elif query.data == 'conversation':
             # Обработка кнопки беседы о истории России
             query.edit_message_text(

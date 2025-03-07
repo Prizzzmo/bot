@@ -2,6 +2,7 @@ import threading
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 
 from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
+from src.config import MAP #Added import for MAP constant
 
 class Bot:
     """Класс для управления Telegram ботом"""
@@ -11,7 +12,7 @@ class Bot:
         self.logger = logger
         self.handlers = command_handlers
         self.updater = None
-        
+
         # Инициализируем админ-панель и привязываем её к обработчику команд
         from src.admin_panel import AdminPanel
         admin_panel = AdminPanel(logger, config)
@@ -58,10 +59,10 @@ class Bot:
             # Добавляем обработчики
             dp.add_error_handler(self.handlers.error_handler)
             dp.add_handler(conv_handler)
-            
+
             # Добавляем обработчик для команды администратора
             dp.add_handler(CommandHandler('admin', self.handlers.admin_command))
-            
+
             # Добавляем обработчик для обработки callback запросов администратора
             dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'))
 
@@ -91,16 +92,16 @@ class Bot:
             # Попытка принудительного завершения updater если он был создан
             if hasattr(self, 'updater'):
                 self.updater.stop()
-                
+
     def run_log_server(self):
         """Запускает простой веб-сервер для отображения логов"""
         from flask import Flask, render_template_string, send_file, request
         import os
         from datetime import datetime
-        
+
         # Создаем приложение Flask
         app = Flask(__name__)
-        
+
         @app.route('/')
         def index():
             # Получаем список всех лог-файлов
@@ -119,10 +120,10 @@ class Bot:
                             'size': f"{size / 1024:.1f} KB",
                             'mtime': mtime_str
                         })
-            
+
             # Сортируем по времени изменения (новые сверху)
             log_files.sort(key=lambda x: x['name'], reverse=True)
-            
+
             # HTML шаблон для страницы
             template = """
             <!DOCTYPE html>
@@ -217,7 +218,7 @@ class Bot:
             </head>
             <body>
                 <h1>История России Бот - Логи</h1>
-                
+
                 {% if log_data %}
                     <a href="/" class="back-link">← Назад к списку логов</a>
                     <h2>{{ current_log }}</h2>
@@ -247,33 +248,33 @@ class Bot:
                         <div class="no-logs">Лог-файлы не найдены</div>
                     {% endif %}
                 {% endif %}
-                
+
                 <a href="javascript:location.reload()" class="refresh">Обновить</a>
             </body>
             </html>
             """
-            
+
             return render_template_string(template, log_files=log_files, log_data=None, current_log=None)
-        
+
         @app.route('/view/<path:filename>')
         def view_log(filename):
             log_path = os.path.join("logs", filename)
-            
+
             if not os.path.exists(log_path) or not filename.startswith('bot_log_') or not filename.endswith('.log'):
                 return "Файл не найден", 404
-            
+
             # Читаем содержимое лог-файла
             try:
                 with open(log_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                
+
                 # Раскрашиваем различные типы сообщений
                 content = content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
                 content = content.replace('ERROR', '<span class="error">ERROR</span>')
                 content = content.replace('INFO', '<span class="info">INFO</span>')
                 content = content.replace('WARNING', '<span class="warning">WARNING</span>')
                 content = content.replace('CRITICAL', '<span class="critical">CRITICAL</span>')
-                
+
                 # HTML шаблон с содержимым лога
                 template = """
                 <!DOCTYPE html>
@@ -344,20 +345,20 @@ class Bot:
                 </body>
                 </html>
                 """
-                
+
                 return render_template_string(template, log_data=content, current_log=filename)
             except Exception as e:
                 return f"Ошибка при чтении файла: {e}", 500
-        
+
         @app.route('/download/<path:filename>')
         def download_log(filename):
             log_path = os.path.join("logs", filename)
-            
+
             if not os.path.exists(log_path) or not filename.startswith('bot_log_') or not filename.endswith('.log'):
                 return "Файл не найден", 404
-            
+
             return send_file(log_path, as_attachment=True)
-        
+
         # Запускаем Flask-сервер на порту 8080
         try:
             self.logger.info("Запуск веб-сервера для просмотра логов на порту 8080")
@@ -369,20 +370,20 @@ class Bot:
             import socketserver
             import threading
             import os
-            
+
             # Определяем путь к директории с логами
             log_dir = "logs"
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
-                
+
             # Устанавливаем порт и handler
             PORT = 8080
             Handler = http.server.SimpleHTTPRequestHandler
-            
+
             # Настраиваем и запускаем сервер
             self.logger.info(f"Запуск веб-сервера логов на порту {PORT}")
             httpd = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
-            
+
             # Запускаем сервер в отдельном потоке
             httpd.serve_forever()
         except Exception as e:
@@ -391,10 +392,10 @@ class Bot:
 
 class BotManager:
     """Класс для управления запуском бота и его жизненным циклом"""
-    
+
     def __init__(self):
         self.logger = None
-        
+
     def run(self):
         """Запускает основную функцию для инициализации и запуска бота"""
         from main import main
