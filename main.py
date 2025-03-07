@@ -1,3 +1,4 @@
+
 import os
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -278,7 +279,7 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
             logger.info("Использую кэшированный ответ")
             return cached_response
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -360,7 +361,6 @@ def main_menu():
         [InlineKeyboardButton("🔍 Выбрать тему", callback_data='topic')],
         [InlineKeyboardButton("✅ Пройти тест", callback_data='test')],
         [InlineKeyboardButton("💬 Беседа о истории России", callback_data='conversation')],
-        [InlineKeyboardButton("📄 Скачать презентацию", callback_data='download_presentation')],
         [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -369,7 +369,6 @@ def main_menu():
 def start(update, context):
     """
     Обрабатывает команду /start, показывает приветствие и главное меню.
-    Также предлагает скачать презентацию бота.
 
     Args:
         update (telegram.Update): Объект обновления Telegram
@@ -380,11 +379,6 @@ def start(update, context):
     """
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} ({user.first_name}) запустил бота")
-
-    # Создаем директорию static, если её нет
-    if not os.path.exists('static'):
-        os.makedirs('static')
-        logger.info("Создана директория для статических файлов")
 
     # Очищаем историю чата
     clear_chat_history(update, context)
@@ -404,8 +398,6 @@ def start(update, context):
     )
     # Сохраняем ID сообщения
     save_message_id(update, context, sent_message.message_id)
-
-    # Функция презентации была удалена из приветственного сообщения
 
     # Отправляем основное меню
     sent_msg = update.message.reply_text(
@@ -686,52 +678,6 @@ def button_handler(update, context):
                 reply_markup=main_menu()
             )
         return CHOOSE_TOPIC
-    elif query.data == 'download_presentation':
-        # Обработка кнопки скачивания презентации
-        logger.info(f"Пользователь {user_id} запросил презентацию через меню")
-        query.edit_message_text("Загружаю презентацию...")
-
-        try:
-            presentation_path = 'static/presentation.txt'
-
-            # Проверяем наличие директории static
-            if not os.path.exists('static'):
-                os.makedirs('static')
-                logger.info("Создана директория для статических файлов")
-
-            # Проверяем наличие файла презентации
-            if not os.path.exists(presentation_path):
-                logger.warning(f"Файл презентации {presentation_path} не найден")
-                # Если файла нет, создаем его
-                if os.path.exists('presentation.md'):
-                    with open(presentation_path, 'w', encoding='utf-8') as f:
-                        with open('presentation.md', 'r', encoding='utf-8') as md_file:
-                            md_content = md_file.read()
-                            txt_content = md_content.replace('## ', '').replace('### ', '').replace('- ', '   - ')
-                            f.write(txt_content)
-                    logger.info(f"Файл презентации {presentation_path} создан")
-                else:
-                    logger.error("Файл presentation.md не найден")
-                    query.message.reply_text("К сожалению, файл презентации не найден. Обратитесь к администратору.")
-                    query.message.reply_text("Выберите действие:", reply_markup=main_menu())
-                    return TOPIC
-
-            # Отправляем презентацию пользователю
-            with open(presentation_path, 'rb') as document:
-                query.message.reply_document(
-                    document=document, 
-                    filename="Презентация_бота_истории_России.txt",
-                    caption="📝 *Презентация бота*\nЗдесь вы можете ознакомиться с подробным описанием функцийи возможностей бота.",
-                    parse_mode='Markdown'
-                )
-            logger.info(f"Презентация отправлена пользователю {user_id}")
-            query.message.reply_text("Выберите действие:", reply_markup=main_menu())
-        except Exception as e:
-            log_error(e, f"Ошибка при отправке презентации пользователю {user_id}")
-            query.message.reply_text("К сожалению, не удалось отправить презентацию. Пожалуйста, попробуйте позже.")
-            query.message.reply_text("Выберите действие:", reply_markup=main_menu())
-        return TOPIC
-
     elif query.data == 'end_test' or query.data == 'cancel':
         if query.data == 'end_test':
             logger.info(f"Пользователь {user_id} досрочно завершил тест")
@@ -1288,60 +1234,9 @@ def main():
         updater = Updater(TELEGRAM_TOKEN, use_context=True, workers=4)  # Увеличиваем количество рабочих потоков
         dp = updater.dispatcher
 
-        # Добавляем команду для получения презентации
-        def get_presentation(update, context):
-            """
-            Обрабатывает команду /presentation, отправляет презентацию бота.
-
-            Args:
-                update (telegram.Update): Объект обновления Telegram
-                context (telegram.ext.CallbackContext): Контекст разговора
-            """
-            user = update.message.from_user
-            logger.info(f"Пользователь {user.id} запросил презентацию")
-
-            try:
-                presentation_path = 'static/presentation.txt'
-
-                # Проверяем наличие директории static
-                if not os.path.exists('static'):
-                    os.makedirs('static')
-                    logger.info("Создана директория для статических файлов")
-
-                # Проверяем наличие файла презентации
-                if not os.path.exists(presentation_path):
-                    logger.warning(f"Файл презентации {presentation_path} не найден")
-                    # Если файла нет, создаем его из MD версии
-                    if os.path.exists('presentation.md'):
-                        with open(presentation_path, 'w', encoding='utf-8') as f:
-                            with open('presentation.md', 'r', encoding='utf-8') as md_file:
-                                md_content = md_file.read()
-                                txt_content = md_content.replace('## ', '').replace('### ', '').replace('- ', '   - ')
-                                f.write(txt_content)
-                        logger.info(f"Файл презентации {presentation_path} создан")
-                    else:
-                        logger.error("Файл presentation.md не найден")
-                        update.message.reply_text("К сожалению, файл презентации не найден. Обратитесь к администратору.")
-                        return
-
-                # Отправляем презентацию пользователю
-                with open(presentation_path, 'rb') as document:
-                    sent_doc = update.message.reply_document(
-                        document=document, 
-                        filename="Презентация_бота_истории_России.txt",
-                        caption="📝 *Презентация бота*\nЗдесь вы можете ознакомиться с подробным описанием функций и возможностей бота.",
-                        parse_mode='Markdown'
-                    )
-                    # Сохраняем ID сообщения с документом
-                    save_message_id(update, context, sent_doc.message_id)
-                logger.info(f"Презентация отправлена пользователю {user.id}")
-            except Exception as e:
-                log_error(e, f"Ошибка при отправке презентации пользователю {user.id}")
-                update.message.reply_text("К сожалению, не удалось отправить презентацию. Пожалуйста, попробуйте позже.")
-
         # Создаем ConversationHandler для управления диалогом
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', start), CommandHandler('presentation', get_presentation)],
+            entry_points=[CommandHandler('start', start)],
             states={
                 TOPIC: [
                     CallbackQueryHandler(button_handler)
