@@ -1419,11 +1419,6 @@ class CommandHandlers:
                 for i in range(len(options), 4):
                     options.append(f"{i+1}) Вариант ответа {i+1}")
             
-            # Формируем отформатированный текст вопроса
-            formatted_text = f"{main_question}\n\n"
-            for option in options:
-                formatted_text += f"{option}\n"
-            
             # Отправляем информацию о прогрессе теста
             sent_msg1 = update.message.reply_text(
                 f"🧠 Вопрос {current_question+1} из {total_questions}:\n"
@@ -1431,20 +1426,28 @@ class CommandHandlers:
             )
             self.message_manager.save_message_id(update, context, sent_msg1.message_id)
 
-            # Отправляем отформатированный текст вопроса
-            sent_msg2 = update.message.reply_text(formatted_text)
+            # Отправляем текст вопроса отдельным сообщением
+            sent_msg2 = update.message.reply_text(main_question)
             self.message_manager.save_message_id(update, context, sent_msg2.message_id)
+            
+            # Отправляем варианты ответов отдельным сообщением
+            options_text = ""
+            for option in options:
+                options_text += f"{option}\n"
+                
+            sent_msg3 = update.message.reply_text(options_text)
+            self.message_manager.save_message_id(update, context, sent_msg3.message_id)
 
             # Создаем клавиатуру с кнопкой для завершения теста
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             # Отправляем инструкцию для ответа
-            sent_msg3 = update.message.reply_text(
+            sent_msg4 = update.message.reply_text(
                 "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
                 reply_markup=reply_markup
             )
-            self.message_manager.save_message_id(update, context, sent_msg3.message_id)
+            self.message_manager.save_message_id(update, context, sent_msg4.message_id)
             
             return self.ANSWER
             
