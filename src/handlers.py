@@ -2,6 +2,7 @@
 import telegram
 import re
 import random
+import time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatAction
 from telegram.ext import ConversationHandler
 
@@ -23,6 +24,26 @@ class CommandHandlers:
         self.TEST = TEST
         self.ANSWER = ANSWER
         self.CONVERSATION = CONVERSATION
+        
+    def auto_clear_before_reply(self, update, context):
+        """
+        Автоматически отправляет команду /clear_all перед каждым ответом бота.
+        
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        try:
+            if update and update.effective_chat:
+                chat_id = update.effective_chat.id
+                # Отправляем команду /clear_all
+                context.bot.send_message(chat_id=chat_id, text="/clear_all")
+                # Короткая пауза для выполнения команды
+                time.sleep(0.5)
+                self.logger.debug(f"Автоматическая команда очистки отправлена в чат {chat_id}")
+        except Exception as e:
+            self.logger.error(f"Ошибка при автоматической очистке: {e}")
+            # Не прерываем выполнение в случае ошибки
         
     def clear_all(self, update, context):
         """
@@ -55,6 +76,9 @@ class CommandHandlers:
         user = update.message.from_user
         self.logger.info(f"Пользователь {user.id} ({user.first_name}) запустил бота")
 
+        # Отправляем команду автоочистки
+        self.auto_clear_before_reply(update, context)
+        
         # Очищаем историю чата дважды для надежности
         self.message_manager.clear_chat_history(update, context)
         self.message_manager.clear_chat_history(update, context)
@@ -101,6 +125,9 @@ class CommandHandlers:
             self.logger.warning(f"Не удалось подтвердить кнопку: {e}")
 
         user_id = query.from_user.id
+        
+        # Отправляем команду автоочистки
+        self.auto_clear_before_reply(update, context)
 
         # Очищаем историю чата полностью перед новым действием (двойной вызов)
         self.message_manager.clean_all_messages_except_active(update, context)
@@ -342,6 +369,9 @@ class CommandHandlers:
             query = update.callback_query
             query.answer()
             user_id = query.from_user.id
+            
+            # Отправляем команду автоочистки
+            self.auto_clear_before_reply(update, context)
 
             # Очищаем историю чата перед новым действием (двойной вызов)
             self.message_manager.clear_chat_history(update, context)
@@ -431,6 +461,9 @@ class CommandHandlers:
         topic = update.message.text
         user_id = update.message.from_user.id
         context.user_data['current_topic'] = topic
+        
+        # Отправляем команду автоочистки
+        self.auto_clear_before_reply(update, context)
 
         # Очищаем историю чата перед обработкой новой темы (двойной вызов)
         self.message_manager.clear_chat_history(update, context)
@@ -472,6 +505,9 @@ class CommandHandlers:
         """
         user_answer = update.message.text.strip()
         user_id = update.message.from_user.id
+        
+        # Отправляем команду автоочистки
+        self.auto_clear_before_reply(update, context)
 
         # Очищаем историю чата перед ответом на новый вопрос (двойной вызов)
         self.message_manager.clear_chat_history(update, context)
@@ -574,6 +610,9 @@ class CommandHandlers:
         """
         user_message = update.message.text
         user_id = update.message.from_user.id
+        
+        # Отправляем команду автоочистки
+        self.auto_clear_before_reply(update, context)
 
         # Очищаем историю чата перед ответом на новое сообщение (двойной вызов)
         self.message_manager.clear_chat_history(update, context)
