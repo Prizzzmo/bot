@@ -278,63 +278,114 @@ class APIClient(BaseClient):
         """
         Генерирует тестовые задания по исторической теме.
         
-        Создает структурированный тест в формате JSON с вопросами разной
-        сложности, вариантами ответов и пояснениями.
+        Создает структурированный тест с вопросами и вариантами ответов
+        в простом текстовом формате для максимальной надежности.
         
         Args:
             topic (str): Историческая тема для генерации теста
             
         Returns:
-            Dict[str, Any]: Структурированный тест с вопросами и ответами
+            Dict[str, Any]: Тест по исторической теме
         """
         prompt = f"""
-        Создай тест по следующей теме из истории России: "{topic}".
+        Создай тест по теме "{topic}" из истории России.
+        Тест должен содержать ровно 5 вопросов с 4 вариантами ответов для каждого.
         
-        Структура ответа должна быть в следующем формате JSON:
-        {{
-            "title": "Название теста",
-            "questions": [
-                {{
-                    "text": "Текст вопроса 1",
-                    "options": ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"],
-                    "correct_answer": 0,
-                    "explanation": "Объяснение правильного ответа"
-                }},
-                ...еще 4 вопроса по такой же структуре...
-            ]
-        }}
+        Формат должен быть такой:
         
-        Создай ровно 5 вопросов. Индекс правильного ответа должен быть числом от 0 до 3.
-        Вопросы должны быть разнообразными по сложности и охватывать разные аспекты темы.
+        1. Вопрос 1?
+        1) Вариант ответа 1
+        2) Вариант ответа 2
+        3) Вариант ответа 3
+        4) Вариант ответа 4
+        Правильный ответ: [номер от 1 до 4]
+        
+        2. Вопрос 2?
+        ...и так далее
+        
+        Дополнительные требования:
+        - Используй только знания о событиях, людях и фактах из истории России
+        - Убедись, что в каждом вопросе указан правильный ответ в формате "Правильный ответ: X"
+        - Не используй символы форматирования Markdown (* _ ` и т.д.)
+        - Используй только цифры 1, 2, 3, 4 для нумерации вариантов ответа
         """
         
         try:
+            # Получаем текстовый ответ API с вопросами
             result = self.call_api(
                 prompt=prompt,
-                temperature=0.7,  # Повышенная температура для разнообразия вопросов
+                temperature=0.7,  # Для разнообразия вопросов
                 max_tokens=2048,   # Достаточно для полного теста
-                use_cache=True
+                use_cache=False    # Отключаем кэширование для получения свежих вопросов
             )
             
-            # Извлекаем JSON из ответа
-            import re
-            json_str = re.search(r'\{.*\}', result.get("text", ""), re.DOTALL)
+            response_text = result.get("text", "")
             
-            if not json_str:
-                raise ValueError("Не удалось найти JSON в ответе API")
-                
-            test_data = json.loads(json_str.group(0))
+            # Проверяем наличие вопросов в ответе
+            if not response_text or len(response_text) < 100:
+                self.logger.warning(f"Слишком короткий ответ от API при генерации теста: {response_text[:50]}...")
+                raise ValueError("Получен слишком короткий ответ от API")
+            
+            # Проверяем наличие правильных ответов в тексте
+            import re
+            if not re.search(r"Правильный ответ:\s*[1-4]", response_text):
+                self.logger.warning("В ответе API нет указаний на правильные ответы")
+                # Пробуем альтернативный формат
+                if re.search(r"Ответ:\s*[1-4]", response_text):
+                    response_text = response_text.replace("Ответ:", "Правильный ответ:")
+                else:
+                    raise ValueError("В ответе не указаны правильные ответы")
+            
+            # Разбиваем текст на отдельные вопросы
+            questions = []
+            raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', response_text)
+            
+            for q in raw_questions:
+                q = q.strip()
+                if q and len(q) > 10 and ('?' in q):
+                    # Удаляем начальные цифры, если они есть
+                    q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
+                    questions.append(q)
+            
+            # Проверяем, есть ли вопросы
+            if not questions:
+                self.logger.warning(f"Не удалось разбить ответ на вопросы: {response_text[:100]}...")
+                # Используем весь текст как один вопрос
+                questions = [response_text]
+            
+            # Форматируем результат для обратной совместимости
             return {
                 "status": "success",
                 "topic": topic,
-                "test": test_data
+                "content": questions,
+                "original_questions": questions,
+                "display_questions": questions
             }
             
         except Exception as e:
-            self.logger.error(f"Ошибка при генерации теста: {e}")
+            self.logger.error(f"Ошибка при генерации теста по теме '{topic}': {e}")
+            
+            # Создаем базовый тест в аварийном режиме
+            try:
+                # Простой запрос для генерации теста
+                emergency_prompt = f"Создай 5 простых вопросов для тестирования по теме '{topic}'. Каждый вопрос должен иметь 4 варианта ответа (1-4) и указанный правильный ответ. Нумеруй вопросы."
+                emergency_response = self.model.generate_content(emergency_prompt)
+                emergency_text = emergency_response.text
+                
+                if emergency_text and len(emergency_text) > 100:
+                    return {
+                        "status": "success",
+                        "topic": topic,
+                        "content": [emergency_text],
+                        "original_questions": [emergency_text],
+                        "display_questions": [emergency_text]
+                    }
+            except Exception as e2:
+                self.logger.error(f"Не удалось создать аварийный тест: {e2}")
+            
+            # Если и аварийный вариант не сработал
             return {
                 "status": "error",
                 "topic": topic,
-                "content": "К сожалению, произошла ошибка при генерации теста. Пожалуйста, попробуйте еще раз или выберите другую тему.",
-                "error": str(e)
+                "content": f"Произошла ошибка при генерации теста: {str(e)}. Пожалуйста, попробуйте еще раз."
             }
