@@ -693,9 +693,28 @@ class CommandHandlers:
                 test_data = self.content_service.generate_test(topic)
 
                 # Проверяем структуру полученных данных
-                if isinstance(test_data, dict) and 'original_questions' in test_data and 'display_questions' in test_data:
-                    valid_questions = test_data['original_questions']
-                    display_questions = test_data['display_questions']
+                if isinstance(test_data, dict):
+                    if 'original_questions' in test_data and 'display_questions' in test_data:
+                        valid_questions = test_data['original_questions']
+                        display_questions = test_data['display_questions']
+                    elif 'status' in test_data and test_data['status'] == 'error':
+                        # Обрабатываем случай ошибки в ответе API
+                        self.logger.warning(f"Ошибка API при генерации теста: {test_data.get('content', '')}")
+                        raise ValueError(f"Не удалось сгенерировать тест: {test_data.get('content', 'Ошибка API')}")
+                    elif 'content' in test_data and isinstance(test_data['content'], list):
+                        # Обрабатываем случай, когда вопросы в поле content
+                        valid_questions = test_data['content']
+                        display_questions = test_data['content']
+                    else:
+                        # Пытаемся извлечь содержимое из других полей
+                        for field in test_data:
+                            if isinstance(test_data[field], list) and len(test_data[field]) > 0:
+                                valid_questions = test_data[field]
+                                display_questions = test_data[field]
+                                break
+                        else:
+                            self.logger.warning(f"Неожиданная структура данных теста: {test_data}")
+                            raise ValueError("Неверный формат данных теста: отсутствуют вопросы")
                 elif isinstance(test_data, list) and len(test_data) > 0:
                     # Обрабатываем случай, когда test_data это список вопросов
                     valid_questions = test_data
@@ -703,7 +722,7 @@ class CommandHandlers:
                 else:
                     # Создаем дефолтную структуру для обработки ошибок
                     self.logger.warning(f"Неожиданный формат test_data: {type(test_data)}")
-                    raise ValueError("Неверный формат данных теста")
+                    raise ValueError(f"Неверный формат данных теста: получен {type(test_data).__name__}")
 
                 context.user_data['questions'] = valid_questions
                 context.user_data['current_question'] = 0
