@@ -364,27 +364,6 @@ class CommandHandlers:
             
             context.bot.delete_message(chat_id=user_id, message_id=status_message.message_id)
             return self.MAP
-            
-            # Удаляем сообщение о генерации
-            context.bot.delete_message(
-                    chat_id=user_id,
-                    message_id=status_message.message_id
-                )
-
-                # Удаляем изображение карты после отправки
-                os.remove(map_image_path)
-
-                self.logger.info(f"Пользователь {user_id} получил изображение карты категории {category}")
-            else:
-                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
-                context.bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=status_message.message_id,
-                    text=f"❌ Не удалось сгенерировать изображение карты для категории «{category}». Попробуйте позже.",
-                    parse_mode='HTML'
-                )
-                self.logger.error(f"Не удалось сгенерировать изображение карты категории {category} для пользователя {user_id}")
-            return self.MAP
 
         elif query_data.startswith('map_img_'):
             category = query_data.replace('map_img_', '')
