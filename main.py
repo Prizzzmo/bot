@@ -1171,7 +1171,8 @@ def handle_conversation(update, context):
 # Полностью переработанная функция очистки чата
 def clear_chat_history(update, context):
     """
-    Очищает историю чата, удаляя предыдущие сообщения бота.
+    Очищает историю чата, удаляя предыдущие сообщения бота,
+    но сохраняет активное сообщение.
     Комплексно переработанная версия с улучшенной обработкой ошибок и
     оптимизацией для работы с API Telegram.
 
@@ -1188,6 +1189,13 @@ def clear_chat_history(update, context):
         # Получаем ID чата
         chat_id = update.effective_chat.id
         
+        # Получаем ID активного сообщения
+        active_message_id = None
+        if update.message:
+            active_message_id = update.message.message_id
+        elif update.callback_query and update.callback_query.message:
+            active_message_id = update.callback_query.message.message_id
+        
         # Проверка на наличие данных пользователя
         if 'previous_messages' not in context.user_data:
             context.user_data['previous_messages'] = []
@@ -1200,6 +1208,11 @@ def clear_chat_history(update, context):
 
         # Удаляем дубликаты
         message_ids = list(set(message_ids))
+        
+        # Исключаем активное сообщение из списка удаления
+        if active_message_id and active_message_id in message_ids:
+            message_ids.remove(active_message_id)
+            logger.debug(f"Активное сообщение {active_message_id} исключено из очистки")
         
         # Сортируем по убыванию (сначала новые сообщения)
         # Это важно, так как новые сообщения с большей вероятностью будут удалены успешно
@@ -1238,6 +1251,11 @@ def clear_chat_history(update, context):
             """Удаляет сообщение с повторными попытками в случае ошибок скорости"""
             nonlocal count_deleted, retry_count, failure_reasons
             
+            # Проверяем, не является ли это активным сообщением
+            if msg_id == active_message_id:
+                logger.debug(f"Пропуск удаления активного сообщения {msg_id}")
+                return False
+                
             for attempt in range(max_retries + 1):
                 try:
                     context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
@@ -1310,22 +1328,33 @@ def clear_chat_history(update, context):
                 if i + batch_size < len(message_ids):
                     time.sleep(0.5)
         
-        # Обновляем список предыдущих сообщений, оставляя только те, которые не удалось удалить
+        # Обновляем список предыдущих сообщений, оставляя только активное сообщение и те, которые не удалось удалить
         new_message_list = []
         for msg_id in context.user_data.get('previous_messages', []):
-            if msg_id not in deletion_status or not deletion_status[msg_id]:
+            # Если это активное сообщение или сообщение не удалось удалить
+            if msg_id == active_message_id or (msg_id not in deletion_status or not deletion_status[msg_id]):
                 new_message_list.append(msg_id)
         
         # Ограничиваем размер списка
         max_saved_messages = 50
         if len(new_message_list) > max_saved_messages:
-            new_message_list = new_message_list[-max_saved_messages:]
+            # Убедимся, что активное сообщение остается в списке
+            if active_message_id in new_message_list:
+                new_message_list.remove(active_message_id)
+                # Ограничиваем остальные сообщения
+                if len(new_message_list) > max_saved_messages - 1:
+                    new_message_list = new_message_list[-(max_saved_messages-1):]
+                # Возвращаем активное сообщение в список
+                new_message_list.append(active_message_id)
+            else:
+                # Если активного сообщения нет в списке, просто ограничиваем размер
+                new_message_list = new_message_list[-max_saved_messages:]
         
         context.user_data['previous_messages'] = new_message_list
         
         # Логирование результатов с подробной информацией
         if count_deleted > 0 or failure_reasons:
-            log_message = f"Очистка чата {chat_id}: удалено {count_deleted} из {len(message_ids)} сообщений"
+            log_message = f"Очистка чата {chat_id}: удалено {count_deleted} из {len(message_ids)} сообщений, активное сообщение: {active_message_id}"
             if retry_count:
                 log_message += f", повторных попыток: {retry_count}"
             if failure_reasons:
