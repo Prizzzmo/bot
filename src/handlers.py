@@ -320,6 +320,51 @@ class CommandHandlers:
                     context.bot.send_photo(
                         chat_id=user_id,
                         photo=img,
+                        caption=f"🗺️ Карта исторических событий: {category}",
+                        parse_mode='HTML'
+                    )
+            else:
+                context.bot.send_message(
+                    chat_id=user_id,
+                    text="❌ Не удалось сгенерировать карту. Пожалуйста, попробуйте позже.",
+                    parse_mode='HTML'
+                )
+            
+            context.bot.delete_message(chat_id=user_id, message_id=status_message.message_id)
+            return self.MAP
+            
+        elif query_data.startswith('map_img_'):
+            category = query_data.replace('map_img_', '')
+            
+            # Генерируем HTML-карту
+            status_message = context.bot.send_message(
+                chat_id=user_id,
+                text=f"🔄 Генерация HTML-карты для категории «{category}»...",
+                parse_mode='HTML'
+            )
+            
+            map_html_path = self.history_map.generate_map_html(category=category)
+            
+            if map_html_path and os.path.exists(map_html_path):
+                # Отправляем HTML-файл с картой
+                with open(map_html_path, 'rb') as html_file:
+                    context.bot.send_document(
+                        chat_id=user_id,
+                        document=html_file,
+                        filename=f"Карта_{category}.html",
+                        caption=f"🗺️ Интерактивная HTML-карта исторических событий: {category}\n\nОткройте файл в браузере для просмотра интерактивной карты.",
+                        parse_mode='HTML'
+                    )
+            else:
+                context.bot.send_message(
+                    chat_id=user_id,
+                    text="❌ Не удалось сгенерировать HTML-карту. Пожалуйста, попробуйте позже.",
+                    parse_mode='HTML'
+                )
+            
+            context.bot.delete_message(chat_id=user_id, message_id=status_message.message_id)
+            return self.MAPt_id=user_id,
+                        photo=img,
                         caption=f"🗺️ Карта исторических событий категории «{category}»",
                         parse_mode='HTML'
                     )
