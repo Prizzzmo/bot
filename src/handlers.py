@@ -828,22 +828,58 @@ class CommandHandlers:
                             query.edit_message_text(text, parse_mode='Markdown')
 
                         # Получаем информацию о теме
-                        messages = self.content_service.get_topic_info(topic, update_message)
+                        result = self.content_service.get_topic_info(topic, update_message)
 
-                        # Отправляем сообщения, проверяя возможность редактирования
-                        if messages and isinstance(messages, list) and len(messages) > 0:
+                        # Проверяем формат полученных данных
+                        if isinstance(result, dict):
+                            # Обрабатываем словарь (dict)
+                            if result.get("status") == "success":
+                                content = result.get("content", "")
+                                
+                                # Разбиваем длинный контент на части, если нужно
+                                if len(content) > 4000:
+                                    messages = [content[i:i+4000] for i in range(0, len(content), 4000)]
+                                else:
+                                    messages = [content]
+                                
+                                try:
+                                    # Пробуем отредактировать первое сообщение
+                                    query.edit_message_text(
+                                        f"📚 *{topic}*\n\n{messages[0]}", 
+                                        parse_mode='Markdown'
+                                    )
+                                except Exception as e:
+                                    # Если редактирование не удалось, отправляем как новое сообщение
+                                    self.logger.warning(f"Не удалось отредактировать сообщение: {e}")
+                                    query.message.reply_text(
+                                        f"📚 *{topic}*\n\n{messages[0]}", 
+                                        parse_mode='Markdown'
+                                    )
+                                
+                                # Отправляем остальные части как новые сообщения, если они есть
+                                for msg in messages[1:]:
+                                    query.message.reply_text(msg, parse_mode='Markdown')
+                            else:
+                                # Обработка ошибки
+                                error_message = result.get("content", f"Не удалось получить информацию по теме: {topic}")
+                                query.edit_message_text(
+                                    f"⚠️ {error_message}",
+                                    parse_mode='Markdown'
+                                )
+                        elif isinstance(result, list) and len(result) > 0:
+                            # Обрабатываем список (list)
                             try:
                                 # Пробуем отредактировать первое сообщение
-                                query.edit_message_text(messages[0], parse_mode='Markdown')
+                                query.edit_message_text(result[0], parse_mode='Markdown')
                             except Exception as e:
                                 # Если редактирование не удалось, отправляем как новое сообщение
                                 self.logger.warning(f"Не удалось отредактировать сообщение: {e}")
-                                query.message.reply_text(messages[0], parse_mode='Markdown')
+                                query.message.reply_text(result[0], parse_mode='Markdown')
 
                             # Отправляем остальные сообщения как новые
-                            for msg in messages[1:]:
+                            for msg in result[1:]:
                                 query.message.reply_text(msg, parse_mode='Markdown')
-                        elif isinstance(messages, list) and len(messages) == 0:
+                        elif isinstance(result, list) and len(result) == 0:
                             # Обработка пустого списка сообщений
                             self.logger.warning(f"Получен пустой список сообщений для темы: {topic}")
                             query.edit_message_text(
@@ -851,8 +887,8 @@ class CommandHandlers:
                                 parse_mode='Markdown'
                             )
                         else:
-                            # Обработка случая, когда messages не является списком или None
-                            self.logger.warning(f"Неверный формат данных для темы: {topic}. Тип: {type(messages)}")
+                            # Обработка случая, когда result имеет неожиданный формат или None
+                            self.logger.warning(f"Неверный формат данных для темы: {topic}. Тип: {type(result)}")
                             query.edit_message_text(
                                 f"Произошла ошибка при обработке данных для темы *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
                                 parse_mode='Markdown'
@@ -905,16 +941,43 @@ class CommandHandlers:
                 update.message.reply_text(text, parse_mode='Markdown')
 
             # Получаем информацию о теме
-            messages = self.content_service.get_topic_info(topic, update_message)
+            result = self.content_service.get_topic_info(topic, update_message)
 
-            # Проверяем, получены ли сообщения
-            if messages and len(messages) > 0:
-                # Отправляем все сообщения
-                for msg in messages:
+            # Проверяем формат полученных данных
+            if isinstance(result, dict):
+                # Обрабатываем словарь (dict)
+                if result.get("status") == "success":
+                    content = result.get("content", "")
+                    
+                    # Разбиваем длинный контент на части, если нужно
+                    if len(content) > 4000:
+                        messages = [content[i:i+4000] for i in range(0, len(content), 4000)]
+                    else:
+                        messages = [content]
+                    
+                    # Отправляем заголовок с первой частью
+                    update.message.reply_text(
+                        f"📚 *{topic}*\n\n{messages[0]}", 
+                        parse_mode='Markdown'
+                    )
+                    
+                    # Отправляем остальные части как новые сообщения, если они есть
+                    for msg in messages[1:]:
+                        update.message.reply_text(msg, parse_mode='Markdown')
+                else:
+                    # Обработка ошибки
+                    error_message = result.get("content", f"Не удалось получить информацию по теме: {topic}")
+                    update.message.reply_text(
+                        f"⚠️ {error_message}",
+                        parse_mode='Markdown'
+                    )
+            elif isinstance(result, list) and len(result) > 0:
+                # Обрабатываем список (list)
+                for msg in result:
                     update.message.reply_text(msg, parse_mode='Markdown')
             else:
-                # Обработка случая, когда список сообщений пуст
-                self.logger.warning(f"Получен пустой список сообщений для темы: {topic}")
+                # Обработка случая, когда список сообщений пуст или формат неизвестен
+                self.logger.warning(f"Неверный формат данных для темы: {topic}. Тип: {type(result)}")
                 update.message.reply_text(
                     f"К сожалению, не удалось получить информацию по теме *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
                     parse_mode='Markdown'
