@@ -1,4 +1,3 @@
-
 import os
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -30,7 +29,7 @@ ERROR_DESCRIPTIONS = {
 def clean_logs():
     """
     Очищает лог-файлы при запуске бота.
-    
+
     Returns:
         tuple: Кортеж (директория логов, путь к файлу лога)
     """
@@ -40,24 +39,24 @@ def clean_logs():
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
             print(f"Создана директория для логов: {log_dir}")
-            
+
         # Дата для имени файла лога
         log_date = datetime.now().strftime('%Y%m%d')
         log_file_path = f"{log_dir}/bot_log_{log_date}.log"
-        
+
         # Очищаем текущий лог бота, если он существует
         if os.path.exists(log_file_path):
             with open(log_file_path, 'w') as f:
                 f.write("")
             print(f"Лог бота очищен: {log_file_path}")
-            
+
         # Очищаем временные логи в корневой директории, если они есть
         root_log_path = f"bot_log_{log_date}.log"
         if os.path.exists(root_log_path):
             with open(root_log_path, 'w') as f:
                 f.write("")
             print(f"Временный лог очищен: {root_log_path}")
-            
+
         print("Все логи успешно очищены")
         return log_dir, log_file_path
     except Exception as e:
@@ -69,7 +68,7 @@ def clean_logs():
 def setup_logging():
     """
     Настраивает систему логирования для бота.
-    
+
     Returns:
         logging.Logger: Настроенный логгер
     """
@@ -94,11 +93,11 @@ def setup_logging():
     # Настройка корневого логгера
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    
+
     # Удаляем существующие обработчики, чтобы избежать дублирования
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-        
+
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
@@ -112,7 +111,7 @@ logger = setup_logging()
 def log_error(error, additional_info=None):
     """
     Логирует ошибку с дополнительной информацией и комментариями.
-    
+
     Args:
         error (Exception): Объект ошибки
         additional_info (str, optional): Дополнительная информация
@@ -147,7 +146,7 @@ class APICache:
         self.save_interval = save_interval  # Интервал автоматического сохранения кэша
         self.operation_count = 0  # Счетчик операций для периодического сохранения
         self.load_cache()
-        
+
     def get(self, key):
         """Получить значение из кэша по ключу с обновлением времени доступа"""
         if key in self.cache:
@@ -165,10 +164,10 @@ class APICache:
                 [(k, v['last_accessed']) for k, v in self.cache.items()],
                 key=lambda x: x[1]
             )[:int(self.max_size * 0.2)]  # Удаляем 20% старых элементов
-            
+
             for key_to_remove, _ in items_to_remove:
                 del self.cache[key_to_remove]
-        
+
         timestamp = datetime.now().timestamp()
         # Добавляем новый элемент с временной меткой и TTL
         self.cache[key] = {
@@ -177,10 +176,10 @@ class APICache:
             'created_at': timestamp,
             'ttl': ttl
         }
-        
+
         # Инкрементируем счетчик операций
         self.operation_count += 1
-        
+
         # Периодически сохраняем кэш и очищаем устаревшие записи
         if self.operation_count >= self.save_interval:
             self.cleanup_expired()
@@ -191,14 +190,14 @@ class APICache:
         """Очистка устаревших элементов кэша по TTL"""
         current_time = datetime.now().timestamp()
         keys_to_remove = []
-        
+
         for key, data in self.cache.items():
             if current_time - data['created_at'] > data['ttl']:
                 keys_to_remove.append(key)
-                
+
         for key in keys_to_remove:
             del self.cache[key]
-            
+
         if keys_to_remove:
             logger.info(f"Удалено {len(keys_to_remove)} устаревших элементов из кэша")
 
@@ -222,7 +221,7 @@ class APICache:
                                 'created_at': v.get('created_at', current_time),
                                 'ttl': v.get('ttl', 86400)
                             }
-                            
+
                     logger.info(f"Кэш загружен из {self.cache_file}, {len(self.cache)} записей")
         except Exception as e:
             logger.error(f"Ошибка при загрузке кэша: {e}")
@@ -235,7 +234,7 @@ class APICache:
             temp_file = f"{self.cache_file}.temp"
             with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(self.cache, f, ensure_ascii=False)
-            
+
             # Переименовываем временный файл для атомарной операции
             os.replace(temp_file, self.cache_file)
             logger.info(f"Кэш сохранен в {self.cache_file}, {len(self.cache)} записей")
@@ -272,7 +271,7 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
     if use_cache:
         import hashlib
         cache_key = hashlib.md5(f"{prompt}_{max_tokens}_{temp}".encode()).hexdigest()
-        
+
         # Проверяем кэш с улучшенной производительностью
         cached_response = api_cache.get(cache_key)
         if cached_response:
@@ -291,7 +290,7 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
 
     try:
         logger.info(f"Отправка запроса к Gemini API: {prompt[:50]}...")
-        
+
         # Оптимизируем запрос с таймаутом и пулингом соединений
         session = requests.Session()
         response = session.post(url, headers=headers, json=data, timeout=30)
@@ -325,7 +324,7 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
                 ttl = 3600  # 1 час для тестов
             elif "беседа" in prompt.lower() or "разговор" in prompt.lower():
                 ttl = 1800  # 30 минут для бесед
-                
+
             api_cache.set(cache_key, result, ttl=ttl)
 
         return result
@@ -353,7 +352,7 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
 def main_menu():
     """
     Создает главное меню в виде кнопок.
-    
+
     Returns:
         InlineKeyboardMarkup: Клавиатура с кнопками меню
     """
@@ -371,25 +370,25 @@ def start(update, context):
     """
     Обрабатывает команду /start, показывает приветствие и главное меню.
     Также предлагает скачать презентацию бота.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
-        
+
     Returns:
         int: Следующее состояние разговора
     """
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} ({user.first_name}) запустил бота")
-    
+
     # Создаем директорию static, если её нет
     if not os.path.exists('static'):
         os.makedirs('static')
         logger.info("Создана директория для статических файлов")
-    
+
     # Очищаем историю чата
     clear_chat_history(update, context)
-    
+
     # Отправляем приветственное сообщение и сохраняем его ID
     sent_message = update.message.reply_text(
         f"👋 Здравствуйте, {user.first_name}!\n\n"
@@ -405,9 +404,9 @@ def start(update, context):
     )
     # Сохраняем ID сообщения
     save_message_id(update, context, sent_message.message_id)
-    
+
     # Функция презентации была удалена из приветственного сообщения
-    
+
     # Отправляем основное меню
     sent_msg = update.message.reply_text(
         "Выберите действие в меню ниже, чтобы начать:",
@@ -428,18 +427,18 @@ def parse_topics(topics_text):
         list: Список отформатированных тем
     """
     filtered_topics = []
-    
+
     # Оптимизированное регулярное выражение для более эффективного извлечения тем
     pattern = r'(?:^\d+[.):]\s*|^[*•-]\s*|^[а-яА-Я\w]+[:.]\s*)(.+?)$'
-    
+
     # Используем множество для быстрой проверки дубликатов
     unique_topics_set = set()
-    
+
     for line in topics_text.split('\n'):
         line = line.strip()
         if not line or len(line) <= 1:
             continue
-            
+
         # Пытаемся извлечь тему с помощью регулярного выражения
         match = re.search(pattern, line, re.MULTILINE)
         if match:
@@ -501,7 +500,7 @@ def create_topics_keyboard(topics):
         InlineKeyboardButton("📝 Своя тема", callback_data='custom_topic'),
         InlineKeyboardButton("🔄 Больше тем", callback_data='more_topics')
     ])
-    
+
     # Добавляем кнопку возврата в меню
     keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
 
@@ -511,11 +510,11 @@ def create_topics_keyboard(topics):
 def button_handler(update, context):
     """
     Обрабатывает нажатия на кнопки меню.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
-        
+
     Returns:
         int: Следующее состояние разговора
     """
@@ -524,12 +523,12 @@ def button_handler(update, context):
         query.answer()  # Подтверждаем нажатие кнопки
     except Exception as e:
         logger.warning(f"Не удалось подтвердить кнопку: {e}")
-        
+
     user_id = query.from_user.id
-    
+
     # Очищаем историю чата перед новым действием
     clear_chat_history(update, context)
-    
+
     logger.info(f"Пользователь {user_id} нажал кнопку: {query.data}")
 
     if query.data == 'back_to_menu':
@@ -556,7 +555,7 @@ def button_handler(update, context):
             except Exception as e:
                 logger.warning(f"Не удалось обновить сообщение о загрузке тем: {e}")
                 query.message.reply_text("⏳ Загружаю список тем истории России...")
-                
+
             topics_text = ask_grok(prompt)
 
             # Парсим и сохраняем темы
@@ -579,7 +578,7 @@ def button_handler(update, context):
                     reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
-                
+
             logger.info(f"Пользователю {user_id} показаны темы для изучения")
         except Exception as e:
             log_error(e, f"Ошибка при генерации списка тем для пользователя {user_id}")
@@ -633,7 +632,7 @@ def button_handler(update, context):
                 # Удаляем строку с правильным ответом из текста вопроса
                 cleaned_q = re.sub(r"Правильный ответ:\s*\d+", "", q).strip()
                 display_questions.append(cleaned_q)
-                
+
             # Сохраняем оригинальные вопросы для проверки ответов
             context.user_data['original_questions'] = valid_questions
             # Сохраняем очищенные вопросы для отображения
@@ -691,15 +690,15 @@ def button_handler(update, context):
         # Обработка кнопки скачивания презентации
         logger.info(f"Пользователь {user_id} запросил презентацию через меню")
         query.edit_message_text("Загружаю презентацию...")
-        
+
         try:
             presentation_path = 'static/presentation.txt'
-            
+
             # Проверяем наличие директории static
             if not os.path.exists('static'):
                 os.makedirs('static')
                 logger.info("Создана директория для статических файлов")
-            
+
             # Проверяем наличие файла презентации
             if not os.path.exists(presentation_path):
                 logger.warning(f"Файл презентации {presentation_path} не найден")
@@ -716,13 +715,13 @@ def button_handler(update, context):
                     query.message.reply_text("К сожалению, файл презентации не найден. Обратитесь к администратору.")
                     query.message.reply_text("Выберите действие:", reply_markup=main_menu())
                     return TOPIC
-            
+
             # Отправляем презентацию пользователю
             with open(presentation_path, 'rb') as document:
                 query.message.reply_document(
                     document=document, 
                     filename="Презентация_бота_истории_России.txt",
-                    caption="📝 *Презентация бота*\nЗдесь вы можете ознакомиться с подробным описанием функций и возможностей бота.",
+                    caption="📝 *Презентация бота*\nЗдесь вы можете ознакомиться с подробным описанием функцийи возможностей бота.",
                     parse_mode='Markdown'
                 )
             logger.info(f"Презентация отправлена пользователю {user_id}")
@@ -732,7 +731,7 @@ def button_handler(update, context):
             query.message.reply_text("К сожалению, не удалось отправить презентацию. Пожалуйста, попробуйте позже.")
             query.message.reply_text("Выберите действие:", reply_markup=main_menu())
         return TOPIC
-    
+
     elif query.data == 'end_test' or query.data == 'cancel':
         if query.data == 'end_test':
             logger.info(f"Пользователь {user_id} досрочно завершил тест")
@@ -788,10 +787,10 @@ def get_topic_info(topic, update_message_func=None):
     def fetch_response(index, prompt):
         if update_message_func:
             update_message_func(f"📝 Загружаю главу {index+1} из {len(prompts)} по теме: *{topic}*...")
-        
+
         # Получаем ответ от API с использованием общего кэша
         response = ask_grok(prompt)
-        
+
         # Добавляем заголовок главы перед текстом
         chapter_response = f"*{chapter_titles[index]}*\n\n{response}"
         all_responses[index] = chapter_response
@@ -815,11 +814,11 @@ def get_topic_info(topic, update_message_func=None):
     # Оптимизированный алгоритм разделения на части (макс. 4000 символов) для отправки в Telegram
     messages = []
     max_length = 4000
-    
+
     # Эффективный алгоритм разделения на части с сохранением форматирования markdown
     current_part = ""
     paragraphs = combined_responses.split('\n\n')
-    
+
     for paragraph in paragraphs:
         if paragraph.startswith('*') and current_part and len(current_part) + len(paragraph) + 2 > max_length:
             # Начало новой главы, сохраняем предыдущую часть
@@ -835,7 +834,7 @@ def get_topic_info(topic, update_message_func=None):
                 current_part += '\n\n' + paragraph
             else:
                 current_part = paragraph
-    
+
     # Добавляем последнюю часть, если она не пуста
     if current_part:
         messages.append(current_part)
@@ -846,40 +845,40 @@ def get_topic_info(topic, update_message_func=None):
 def choose_topic(update, context):
     """
     Обрабатывает выбор темы пользователем из списка или ввод своей темы.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
-        
+
     Returns:
         int: Следующее состояние разговора
     """
     user_id = None
-    
+
     # Проверяем, пришел ли запрос от кнопки или от текстового сообщения
     if update.callback_query:
         query = update.callback_query
         query.answer()
         user_id = query.from_user.id
-        
+
         # Очищаем историю чата перед новым действием
         clear_chat_history(update, context)
-        
+
         logger.info(f"Пользователь {user_id} выбирает тему через кнопку: {query.data}")
-        
+
         # Если пользователь выбрал "Больше тем"
         if query.data == 'more_topics':
             return button_handler(update, context)
-        
+
         # Если пользователь выбрал "Своя тема"
         elif query.data == 'custom_topic':
             query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
             return CHOOSE_TOPIC
-        
+
         # Если пользователь хочет вернуться в меню
         elif query.data == 'back_to_menu':
             return button_handler(update, context)
-        
+
         # Если пользователь выбрал тему из списка
         elif query.data.startswith('topic_'):
             try:
@@ -912,7 +911,7 @@ def choose_topic(update, context):
                             # Если редактирование не удалось, отправляем как новое сообщение
                             logger.warning(f"Не удалось отредактировать сообщение: {e}")
                             query.message.reply_text(messages[0], parse_mode='Markdown')
-                        
+
                         # Отправляем остальные сообщения как новые
                         for msg in messages[1:]:
                             query.message.reply_text(msg, parse_mode='Markdown')
@@ -939,21 +938,21 @@ def choose_topic(update, context):
 def handle_custom_topic(update, context):
     """
     Обрабатывает ввод пользователем своей темы.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
-        
+
     Returns:
         int: Следующее состояние разговора
     """
     topic = update.message.text
     user_id = update.message.from_user.id
     context.user_data['current_topic'] = topic
-    
+
     # Очищаем историю чата перед обработкой новой темы
     clear_chat_history(update, context)
-    
+
     logger.info(f"Пользователь {user_id} ввел свою тему: {topic}")
 
     try:
@@ -981,23 +980,23 @@ def handle_custom_topic(update, context):
 def handle_answer(update, context):
     """
     Обрабатывает ответы пользователя на вопросы теста.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
-        
+
     Returns:
         int: Следующее состояние разговора
     """
     user_answer = update.message.text.strip()
     user_id = update.message.from_user.id
-    
+
     # Очищаем историю чата перед ответом на новый вопрос
     clear_chat_history(update, context)
-    
+
     questions = context.user_data.get('questions', [])
     current_question = context.user_data.get('current_question', 0)
-    
+
     if not questions:
         logger.warning(f"Пользователь {user_id} пытается ответить на вопрос, но вопросы отсутствуют")
         update.message.reply_text(
@@ -1009,7 +1008,7 @@ def handle_answer(update, context):
     # Получаем оригинальные вопросы с правильными ответами и вопросы для отображения
     original_questions = context.user_data.get('original_questions', questions)
     display_questions = context.user_data.get('display_questions', questions)
-    
+
     # Парсим правильный ответ из оригинального текста вопроса
     try:
         correct_answer_match = re.search(r"Правильный ответ:\s*(\d+)", original_questions[current_question])
@@ -1039,12 +1038,12 @@ def handle_answer(update, context):
 
     # Переходим к следующему вопросу
     context.user_data['current_question'] = current_question + 1
-    
+
     if context.user_data['current_question'] < len(display_questions):
         next_question = context.user_data['current_question'] + 1
         sent_msg1 = update.message.reply_text(f"Вопрос {next_question} из {len(display_questions)}:")
         save_message_id(update, context, sent_msg1.message_id)
-        
+
         sent_msg2 = update.message.reply_text(display_questions[context.user_data['current_question']])
         save_message_id(update, context, sent_msg2.message_id)
 
@@ -1060,7 +1059,7 @@ def handle_answer(update, context):
         score = context.user_data.get('score', 0)
         total_questions = len(questions)
         percentage = (score / total_questions) * 100
-        
+
         # Оценка усвоенного материала
         if percentage >= 90:
             assessment = "🏆 Отлично! Ты прекрасно усвоил материал."
@@ -1070,7 +1069,7 @@ def handle_answer(update, context):
             assessment = "👌 Удовлетворительно. Рекомендуется повторить материал."
         else:
             assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
-            
+
         update.message.reply_text(
             f"🎯 Тест завершен! Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n{assessment}\n\n"
             "Выбери следующее действие:",
@@ -1083,33 +1082,33 @@ def handle_answer(update, context):
 def handle_conversation(update, context):
     """
     Обрабатывает сообщения пользователя в режиме беседы с оптимизацией.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
-        
+
     Returns:
         int: Следующее состояние разговора
     """
     user_message = update.message.text
     user_id = update.message.from_user.id
-    
+
     # Очищаем историю чата перед ответом на новое сообщение
     clear_chat_history(update, context)
-    
+
     logger.info(f"Пользователь {user_id} отправил сообщение в режиме беседы: {user_message[:50]}...")
-    
+
     # Проверяем, относится ли сообщение к истории России - используем кэширование
     check_prompt = f"Проверь, относится ли следующее сообщение к истории России: \"{user_message}\". Ответь только 'да' или 'нет'."
-    
+
     # Отправляем индикатор набора текста
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
-    
+
     try:
         # Проверяем тему сообщения с малым лимитом токенов для ускорения
         is_history_related = ask_grok(check_prompt, max_tokens=50, temp=0.1).lower().strip()
         logger.info(f"Проверка темы сообщения пользователя {user_id}: {is_history_related}")
-        
+
         if 'да' in is_history_related:
             # Если сообщение относится к истории России - более детальный ответ
             prompt = f"Пользователь задал вопрос на тему истории России: \"{user_message}\"\n\n" \
@@ -1120,22 +1119,22 @@ def handle_conversation(update, context):
             prompt = f"Пользователь задал вопрос не относящийся к истории России: \"{user_message}\"\n\n" \
                     "Вежливо объясни, что ты специализируешься только на истории России, и " \
                     "предложи задать вопрос, связанный с историей России. Приведи пример возможного вопроса."
-        
+
         # Получаем ответ от API с индикатором набора
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
         response = ask_grok(prompt, max_tokens=1024)
-        
+
         # Отправляем ответ пользователю и сохраняем ID сообщения
         sent_msg = update.message.reply_text(response)
         save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Отправлен ответ пользователю {user_id}")
-        
+
         # Предлагаем продолжить беседу или вернуться в меню
         keyboard = [
             [InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back_to_menu')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         # Если сообщение не относилось к истории, добавляем дополнительное пояснение
         if 'да' not in is_history_related:
             update.message.reply_text(
@@ -1154,7 +1153,7 @@ def handle_conversation(update, context):
             f"Произошла ошибка при обработке вашего сообщения: {e}. Попробуйте еще раз или вернитесь в меню.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back_to_menu')]])
         )
-    
+
     return CONVERSATION
 
 # Оптимизированная функция для очистки истории чата
@@ -1162,7 +1161,7 @@ def clear_chat_history(update, context):
     """
     Очищает историю чата, удаляя предыдущие сообщения бота.
     Оптимизированная версия с увеличенной производительностью.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
@@ -1170,17 +1169,17 @@ def clear_chat_history(update, context):
     try:
         # Получаем ID чата
         chat_id = update.effective_chat.id
-        
+
         # Получаем список сохраненных ID сообщений
         message_ids = context.user_data.get('previous_messages', [])
-        
+
         if not message_ids:
             return
-            
+
         # Удаляем сообщения пакетами для эффективности
         count_deleted = 0
         batch_size = 5
-        
+
         for i in range(0, len(message_ids), batch_size):
             batch = message_ids[i:i+batch_size]
             for msg_id in batch:
@@ -1190,15 +1189,15 @@ def clear_chat_history(update, context):
                 except Exception:
                     # Игнорируем ошибки при удалении сообщений
                     pass
-                    
+
             # Добавляем небольшую задержку между пакетами
             if len(batch) == batch_size:
                 import time
                 time.sleep(0.1)
-        
+
         # Очищаем список предыдущих сообщений
         context.user_data['previous_messages'] = []
-        
+
         if count_deleted > 0:
             logger.debug(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений")
     except Exception as e:
@@ -1208,7 +1207,7 @@ def clear_chat_history(update, context):
 def save_message_id(update, context, message_id):
     """
     Сохраняет ID сообщения в список предыдущих сообщений.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
@@ -1216,9 +1215,9 @@ def save_message_id(update, context, message_id):
     """
     if 'previous_messages' not in context.user_data:
         context.user_data['previous_messages'] = []
-    
+
     context.user_data['previous_messages'].append(message_id)
-    
+
     # Ограничиваем список последними 50 сообщениями
     if len(context.user_data['previous_messages']) > 50:
         context.user_data['previous_messages'] = context.user_data['previous_messages'][-50:]
@@ -1227,7 +1226,7 @@ def save_message_id(update, context, message_id):
 def error_handler(update, context):
     """
     Обработчик ошибок: записывает их в журнал с комментариями и информирует пользователя.
-    
+
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
@@ -1238,7 +1237,7 @@ def error_handler(update, context):
     # Используем расширенное логирование ошибок
     user_info = f"пользователь {update.effective_user.id}" if update and update.effective_user else "неизвестный пользователь"
     additional_info = f"Ошибка для {user_info} в обновлении {update}" if update else "Ошибка без контекста обновления"
-    
+
     log_error(error, additional_info)
 
     if update and update.effective_message:
@@ -1262,7 +1261,7 @@ def main():
     try:
         logger.info("Запуск бота истории России...")
         print("Начинаю запуск бота истории России...")
-        
+
         # Проверка наличия токенов с более подробными сообщениями
         if not TELEGRAM_TOKEN:
             error_msg = "Отсутствует TELEGRAM_TOKEN! Проверьте .env файл. Токен должен быть установлен в переменной TELEGRAM_TOKEN."
@@ -1288,27 +1287,27 @@ def main():
         # Инициализируем бота и диспетчер с оптимизированными настройками
         updater = Updater(TELEGRAM_TOKEN, use_context=True, workers=4)  # Увеличиваем количество рабочих потоков
         dp = updater.dispatcher
-            
+
         # Добавляем команду для получения презентации
         def get_presentation(update, context):
             """
             Обрабатывает команду /presentation, отправляет презентацию бота.
-            
+
             Args:
                 update (telegram.Update): Объект обновления Telegram
                 context (telegram.ext.CallbackContext): Контекст разговора
             """
             user = update.message.from_user
             logger.info(f"Пользователь {user.id} запросил презентацию")
-            
+
             try:
                 presentation_path = 'static/presentation.txt'
-                
+
                 # Проверяем наличие директории static
                 if not os.path.exists('static'):
                     os.makedirs('static')
                     logger.info("Создана директория для статических файлов")
-                
+
                 # Проверяем наличие файла презентации
                 if not os.path.exists(presentation_path):
                     logger.warning(f"Файл презентации {presentation_path} не найден")
@@ -1324,7 +1323,7 @@ def main():
                         logger.error("Файл presentation.md не найден")
                         update.message.reply_text("К сожалению, файл презентации не найден. Обратитесь к администратору.")
                         return
-                
+
                 # Отправляем презентацию пользователю
                 with open(presentation_path, 'rb') as document:
                     sent_doc = update.message.reply_document(
@@ -1339,7 +1338,7 @@ def main():
             except Exception as e:
                 log_error(e, f"Ошибка при отправке презентации пользователю {user.id}")
                 update.message.reply_text("К сожалению, не удалось отправить презентацию. Пожалуйста, попробуйте позже.")
-        
+
         # Создаем ConversationHandler для управления диалогом
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', start), CommandHandler('presentation', get_presentation)],

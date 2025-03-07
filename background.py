@@ -25,7 +25,7 @@ except Exception as e:
 flask_handler = RotatingFileHandler(flask_log_path, maxBytes=10485760, backupCount=3)
 flask_handler.setFormatter(log_formatter)
 app.logger.addHandler(flask_handler)
-app.logger.setLevel(logging.INFO)
+app.logger.setLevel(logging.ERROR) # Reduced logging level to ERROR
 
 # Шаблон HTML для отображения логов
 HTML_TEMPLATE = """
@@ -165,11 +165,11 @@ HTML_TEMPLATE = """
             .chat-messages {
                 height: 400px;
             }
-            
+
             .chat-input input {
                 padding: 8px 12px;
             }
-            
+
             .chat-input button {
                 padding: 8px 15px;
             }
@@ -180,17 +180,17 @@ HTML_TEMPLATE = """
                 max-width: 100%;
                 margin: 5px auto;
             }
-            
+
             .chat-header {
                 padding: 12px;
                 font-size: 16px;
             }
-            
+
             .chat-messages {
                 height: 350px;
                 padding: 10px;
             }
-            
+
             .message {
                 max-width: 90%;
                 padding: 8px 12px;
@@ -259,7 +259,7 @@ HTML_TEMPLATE = """
             outline: none;
             transition: border-color 0.3s;
         }
-        
+
         .chat-input input:focus {
             border-color: #337ab7;
             box-shadow: 0 0 5px rgba(51, 122, 183, 0.3);
@@ -277,7 +277,7 @@ HTML_TEMPLATE = """
             width: 50%;
             max-width: 200px;
         }
-        
+
         .chat-input button:hover {
             background-color: #2e6da4;
         }
@@ -442,18 +442,18 @@ HTML_TEMPLATE = """
         function sendMessage() {
             const messageInput = document.getElementById('chat-input');
             const message = messageInput.value.trim();
-            
+
             if (!message) return; // Не отправляем пустые сообщения
-            
+
             // Показываем сообщение пользователя
             addMessage(message, 'user-message');
-            
+
             // Очищаем поле ввода
             messageInput.value = '';
-            
+
             // Показываем индикатор "бот печатает"
             document.getElementById('typing-indicator').style.display = 'block';
-            
+
             // Отправляем запрос на сервер
             fetch('/api/chat', {
                 method: 'POST',
@@ -471,10 +471,10 @@ HTML_TEMPLATE = """
             .then(data => {
                 // Скрываем индикатор "бот печатает"
                 document.getElementById('typing-indicator').style.display = 'none';
-                
+
                 // Показываем ответ бота
                 addMessage(data.response, 'bot-message');
-                
+
                 // Прокручиваем чат вниз
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -483,12 +483,12 @@ HTML_TEMPLATE = """
                 console.error('Ошибка:', error);
                 // Скрываем индикатор "бот печатает"
                 document.getElementById('typing-indicator').style.display = 'none';
-                
+
                 // Показываем сообщение об ошибке
                 addMessage('Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже.', 'bot-message');
             });
         }
-        
+
         // Функция для добавления сообщения в чат
         function addMessage(text, className) {
             const chatMessages = document.getElementById('chat-messages');
@@ -496,11 +496,11 @@ HTML_TEMPLATE = """
             messageElement.className = `message ${className}`;
             messageElement.textContent = text;
             chatMessages.appendChild(messageElement);
-            
+
             // Прокручиваем чат вниз
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
-        
+
         // Обработка нажатия Enter в поле ввода
         document.addEventListener('DOMContentLoaded', function() {
             const inputField = document.getElementById('chat-input');
@@ -570,7 +570,7 @@ def read_logs():
 @app.route('/')
 def index():
     try:
-        app.logger.info('Запрос главной страницы')
+        # app.logger.info('Запрос главной страницы') #Removed
         return HTML_TEMPLATE
     except Exception as e:
         app.logger.error(f'Ошибка при обработке запроса главной страницы: {e}')
@@ -582,34 +582,27 @@ def download_presentation():
     Маршрут для скачивания презентации бота через веб-интерфейс.
     """
     try:
-        app.logger.info('Запрос на скачивание презентации')
-        
+        # app.logger.info('Запрос на скачивание презентации') #Removed
+
         # Проверяем наличие директории static
         if not os.path.exists('static'):
             os.makedirs('static')
-            app.logger.info('Создана директория static')
-        
+
         # Путь к файлу презентации
         presentation_path = 'static/presentation.txt'
-        
+
         # Если файла нет, создаем его
         if not os.path.exists(presentation_path):
-            app.logger.info('Файл презентации не найден, создаем новый')
-            try:
-                with open('presentation.md', 'r', encoding='utf-8') as md_file:
-                    md_content = md_file.read()
-                    
-                    # Упрощаем форматирование для txt версии
-                    txt_content = md_content.replace('## ', '').replace('### ', '').replace('- ', '   - ')
-                    
-                    with open(presentation_path, 'w', encoding='utf-8') as txt_file:
-                        txt_file.write(txt_content)
-                        
-                app.logger.info('Презентация успешно создана')
-            except Exception as e:
-                app.logger.error(f'Ошибка при создании презентации: {e}')
-                return f'Ошибка при создании презентации: {e}', 500
-        
+            # logger.warning(f"Файл презентации {presentation_path} не найден") #Removed
+            # Если файла нет, создаем его
+            if os.path.exists('presentation.md'):
+                with open(presentation_path, 'w', encoding='utf-8') as f:
+                    with open('presentation.md', 'r', encoding='utf-8') as md_file:
+                        md_content = md_file.read()
+                        txt_content = md_content.replace('## ', '').replace('### ', '').replace('- ', '   - ')
+                        f.write(txt_content)
+                # logger.info(f"Файл презентации {presentation_path} создан") #Removed
+
         # Отправляем файл для скачивания
         from flask import send_file
         return send_file(
@@ -625,8 +618,7 @@ def download_presentation():
 @app.route('/logs')
 def logs():
     try:
-        app.logger.info('Запрос страницы логов')
-        # Используем тот же шаблон, JavaScript определит, что показывать
+        # app.logger.info('Запрос страницы логов') #Removed
         return HTML_TEMPLATE
     except Exception as e:
         app.logger.error(f'Ошибка при обработке запроса страницы логов: {e}')
@@ -635,7 +627,7 @@ def logs():
 @app.route('/api/logs')
 def get_logs():
     try:
-        app.logger.info('Запрос API логов')
+        # app.logger.info('Запрос API логов') #Removed
         logs = read_logs()
         return jsonify({'logs': logs})
     except Exception as e:
@@ -646,33 +638,33 @@ def get_logs():
 def chat():
     """
     Обрабатывает API запросы для чата с ботом.
-    
+
     Принимает сообщение пользователя, проверяет его на соответствие теме истории России,
     генерирует соответствующий ответ и возвращает его в формате JSON.
-    
+
     Returns:
         JSON-ответ с текстом ответа бота или сообщением об ошибке
     """
     try:
-        app.logger.info('Получен запрос чата')
+        # app.logger.info('Получен запрос чата') #Removed
         data = request.json
         user_message = data.get('message', '')
-        
+
         # Валидация входных данных
         if not user_message:
-            app.logger.warning('Получен пустой запрос чата')
+            # app.logger.warning('Получен пустой запрос чата') #Removed
             return jsonify({'error': 'Сообщение не может быть пустым'}), 400
-            
+
         # Импортируем функцию для генерации ответа
         from main import ask_grok
-        
+
         # Сначала проверяем, относится ли сообщение к истории России
         # Используем короткий запрос для эффективности
         check_prompt = f"Проверь, относится ли следующее сообщение к истории России: \"{user_message}\". Ответь только 'да' или 'нет'."
         is_history_related = ask_grok(check_prompt, max_tokens=50, temp=0.1).lower().strip()
-        
-        app.logger.info(f'Проверка темы сообщения: {is_history_related}')
-        
+
+        # app.logger.info(f'Проверка темы сообщения: {is_history_related}') #Removed
+
         # Формируем разные промпты в зависимости от темы сообщения
         if 'да' in is_history_related:
             # Если сообщение относится к истории России - отвечаем по существу
@@ -690,18 +682,18 @@ def chat():
                 "предложи задать вопрос, связанный с историей России. "
                 "Приведи пример возможного вопроса, который мог бы быть интересен пользователю."
             )
-        
-        app.logger.info(f'Обработка сообщения пользователя: {user_message[:50]}...' if len(user_message) > 50 else f'Обработка сообщения пользователя: {user_message}')
-        
+
+        # app.logger.info(f'Обработка сообщения пользователя: {user_message[:50]}...' if len(user_message) > 50 else f'Обработка сообщения пользователя: {user_message}') #Removed
+
         # Генерируем ответ
         bot_response = ask_grok(prompt, max_tokens=1024)
-        
+
         # Если сообщение не относится к истории России, добавляем предупреждение
         if 'да' not in is_history_related:
             bot_response = "⚠️ Я могу общаться только на темы, связанные с историей России. ⚠️\n\n" + bot_response
-        
-        app.logger.info('Ответ сгенерирован успешно')
-        
+
+        # app.logger.info('Ответ сгенерирован успешно') #Removed
+
         return jsonify({'response': bot_response})
     except Exception as e:
         app.logger.error(f'Ошибка при обработке запроса чата: {e}')
