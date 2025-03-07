@@ -105,6 +105,20 @@ class TopicService:
             dict: Информация по теме
         """
         try:
+            # Очищаем тему от специальных символов для безопасной обработки
+            # Импортируем функцию sanitize_markdown из ui_manager или повторно реализуем её здесь
+            def sanitize_markdown(text):
+                if not text:
+                    return ""
+                # Экранируем специальные символы Markdown
+                chars_to_escape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                for char in chars_to_escape:
+                    text = text.replace(char, '\\' + char)
+                return text
+            
+            # Очищаем пользовательский ввод
+            safe_topic = sanitize_markdown(topic)
+            
             chapters = [
                 "Истоки и предпосылки",
                 "Ключевые события",
@@ -114,7 +128,7 @@ class TopicService:
             ]
             
             # Формируем запрос на получение структурированной информации по теме
-            prompt = f"""Предоставь структурированную информацию по теме "{topic}" из истории России.
+            prompt = f"""Предоставь структурированную информацию по теме "{safe_topic}" из истории России.
             Раздели ответ на следующие главы:
             1. {chapters[0]}: предыстория, причины возникновения, контекст эпохи
             2. {chapters[1]}: хронология, основные этапы, ключевые даты
@@ -135,12 +149,21 @@ class TopicService:
                 update_callback(f"✏️ Форматирую материал по теме: *{topic}*...")
             
             # Форматируем результат
-            formatted_content = self._format_content_with_chapters(response, chapters, topic)
+            formatted_content = self._format_content_with_chapters(response, chapters, safe_topic)
             
-            return {
-                "status": "success",
-                "content": formatted_content
-            }
+            # Очищаем отформатированный контент от специальных символов Markdown
+            try:
+                sanitized_content = sanitize_markdown(formatted_content)
+                return {
+                    "status": "success",
+                    "content": sanitized_content
+                }
+            except Exception as sanitize_error:
+                self.logger.error(f"Ошибка при очистке контента: {sanitize_error}")
+                return {
+                    "status": "success",
+                    "content": formatted_content  # Возвращаем неочищенный контент в случае ошибки
+                }
             
         except Exception as e:
             self.logger.error(f"Ошибка при получении информации по теме {topic}: {e}")
