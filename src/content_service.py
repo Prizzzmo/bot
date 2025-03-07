@@ -211,3 +211,93 @@ class ContentService(IContentProvider):
 
         except Exception as e:
             self.logger.error(f"Ошибка при сохранении информации о теме '{topic}': {e}")
+            
+    def get_topic_info(self, topic: str, update_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        Получение информации по исторической теме.
+
+        Args:
+            topic (str): Историческая тема
+            update_callback (Optional[Callable]): Функция обратного вызова для обновления статуса
+
+        Returns:
+            Dict[str, Any]: Информация о теме
+        """
+        try:
+            # Сначала ищем в локальных данных
+            local_info = self._get_local_topic_info(topic)
+            if local_info:
+                self.logger.info(f"Найдена локальная информация по теме '{topic}'")
+                return local_info
+
+            # Если в локальных данных нет, запрашиваем через API
+            self.logger.info(f"Запрос информации по теме '{topic}' через API")
+            
+            if update_callback:
+                update_callback("Получение информации...")
+                
+            api_response = self.api_client.get_historical_info(topic)
+            
+            if api_response and "content" in api_response and api_response["status"] == "success":
+                # Сохраняем полученную информацию локально
+                self._save_topic_info(topic, api_response["content"])
+                return api_response
+            else:
+                self.logger.warning(f"Не удалось получить информацию по теме '{topic}' через API")
+                return {
+                    "status": "error",
+                    "topic": topic,
+                    "error": "Не удалось получить информацию по данной исторической теме"
+                }
+                
+        except Exception as e:
+            self.logger.error(f"Ошибка при получении информации по теме '{topic}': {e}")
+            return {
+                "status": "error",
+                "topic": topic,
+                "error": f"Произошла ошибка: {str(e)}"
+            }
+            
+    def generate_test(self, topic: str) -> Dict[str, Any]:
+        """
+        Генерация теста по исторической теме.
+
+        Args:
+            topic (str): Историческая тема
+
+        Returns:
+            Dict[str, Any]: Тест с вопросами и ответами
+        """
+        try:
+            self.logger.info(f"Генерация теста по теме '{topic}'")
+            
+            # Проверяем, является ли тема исторической
+            if not self.validate_topic(topic):
+                self.logger.warning(f"Попытка генерации теста для неисторической темы '{topic}'")
+                return {
+                    "status": "error",
+                    "topic": topic,
+                    "error": "Указанная тема не является исторической"
+                }
+            
+            # Получаем тест через API
+            test_response = self.api_client.generate_historical_test(topic)
+            
+            if test_response and "questions" in test_response and test_response["status"] == "success":
+                self.logger.info(f"Успешно сгенерирован тест по теме '{topic}' ({len(test_response['questions'])} вопросов)")
+                return test_response
+            else:
+                self.logger.warning(f"Не удалось сгенерировать тест по теме '{topic}'")
+                return {
+                    "status": "error",
+                    "topic": topic,
+                    "error": "Не удалось сгенерировать тест по данной теме"
+                }
+                
+        except Exception as e:
+            self.logger.error(f"Ошибка при генерации теста по теме '{topic}': {e}")
+            return {
+                "status": "error",
+                "topic": topic,
+                "error": f"Произошла ошибка: {str(e)}"
+            }
