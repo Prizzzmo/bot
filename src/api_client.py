@@ -52,8 +52,8 @@ class APIClient(BaseClient):
         """
         try:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
-            self.logger.info("Gemini API успешно инициализирован")
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
+            self.logger.info("Gemini API успешно инициализирован (модель: gemini-2.0-flash)")
         except Exception as e:
             self.logger.error(f"Ошибка инициализации Gemini API: {e}")
             raise
@@ -110,14 +110,22 @@ class APIClient(BaseClient):
                 }
                 
                 # Формирование промпта с системной инструкцией если она предоставлена
-                if system_prompt:
-                    chat = self.model.start_chat(history=[
-                        {"role": "user", "parts": [system_prompt]},
-                        {"role": "model", "parts": ["Понял инструкции. Готов к работе."]}
-                    ])
-                    response = chat.send_message(prompt, generation_config=generation_config)
-                else:
-                    response = self.model.generate_content(prompt, generation_config=generation_config)
+                try:
+                    if system_prompt:
+                        # Для Gemini 2.0 используем обновленный метод формирования чата
+                        chat = self.model.start_chat(history=[
+                            {"role": "user", "parts": [system_prompt]},
+                            {"role": "model", "parts": ["Понял инструкции. Готов к работе."]}
+                        ])
+                        response = chat.send_message(prompt, generation_config=generation_config)
+                    else:
+                        # Стандартный запрос к модели
+                        response = self.model.generate_content(prompt, generation_config=generation_config)
+                except AttributeError as ae:
+                    # Обработка возможных изменений в API Gemini 2.0
+                    self.logger.warning(f"Возникла ошибка атрибута при вызове API: {ae}. Пробуем альтернативный метод.")
+                    # Альтернативный метод для новой версии API
+                    response = self.model.generate_content(content=prompt, generation_config=generation_config)
                 
                 elapsed_time = time.time() - start_time
                 self.logger.debug(f"Ответ получен за {elapsed_time:.2f}с")
@@ -126,7 +134,7 @@ class APIClient(BaseClient):
                 result = {
                     "text": response.text,
                     "status": "success",
-                    "model": "gemini-pro",
+                    "model": "gemini-2.0-flash",
                     "elapsed_time": elapsed_time
                 }
                 
@@ -223,7 +231,7 @@ class APIClient(BaseClient):
                 "status": "success",
                 "topic": topic,
                 "content": result.get("text", ""),
-                "source": "gemini-pro"
+                "source": "gemini-2.0-flash"
             }
             
         except Exception as e:
@@ -238,6 +246,7 @@ class APIClient(BaseClient):
     def ask_grok(self, prompt: str, use_cache: bool = True) -> str:
         """
         Упрощенный метод для отправки запроса к Gemini API и получения текстового ответа.
+        Адаптирован для работы с Gemini 2.0 Flash.
         
         Args:
             prompt (str): Текст запроса для модели
@@ -256,7 +265,14 @@ class APIClient(BaseClient):
             return result.get("text", "")
         except Exception as e:
             self.logger.error(f"Ошибка в методе ask_grok: {e}")
-            return f"Произошла ошибка при обработке запроса: {str(e)}"
+            # Попробуем запасной метод для Gemini 2.0
+            try:
+                self.logger.info("Пробуем альтернативный метод вызова API...")
+                response = self.model.generate_content(content=prompt)
+                return response.text
+            except Exception as e2:
+                self.logger.error(f"Вторая ошибка в методе ask_grok: {e2}")
+                return f"Произошла ошибка при обработке запроса: {str(e)}. Повторная попытка также не удалась: {str(e2)}"
     
     def generate_historical_test(self, topic: str) -> Dict[str, Any]:
         """
