@@ -142,25 +142,41 @@ class CommandHandlers:
                 )
                 
                 # Отправляем остальные части как новые сообщения
-                for part in parts[1:]:
-                    query.message.reply_text(
-                        part[:4000],  # Ограничиваем длину для безопасности
-                        parse_mode='Markdown'
-                    )
+                for i, part in enumerate(parts[1:], 1):
+                    # Добавляем кнопку главного меню только к последней части
+                    if i == len(parts[1:]):
+                        sent_msg = query.message.reply_text(
+                            part[:4000],  # Ограничиваем длину для безопасности
+                            parse_mode='Markdown',
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                        )
+                    else:
+                        sent_msg = query.message.reply_text(
+                            part[:4000],  # Ограничиваем длину для безопасности
+                            parse_mode='Markdown'
+                        )
+                    # Сохраняем ID сообщения
+                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
                     
                 self.logger.info(f"Пользователь {user_id} просмотрел информацию о проекте")
             except telegram.error.BadRequest as e:
                 self.logger.error(f"Ошибка при отправке информации о проекте: {e}")
                 # Отправляем новое сообщение вместо редактирования
-                for part in parts:
-                    query.message.reply_text(
-                        part[:4000],  # Ограничиваем длину для безопасности
-                        parse_mode='Markdown'
-                    )
-                query.message.reply_text(
-                    "Выберите действие:",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-                )
+                for i, part in enumerate(parts):
+                    # Добавляем кнопку главного меню к последней части
+                    if i == len(parts) - 1:
+                        sent_msg = query.message.reply_text(
+                            part[:4000],  # Ограничиваем длину для безопасности
+                            parse_mode='Markdown',
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                        )
+                    else:
+                        sent_msg = query.message.reply_text(
+                            part[:4000],  # Ограничиваем длину для безопасности
+                            parse_mode='Markdown'
+                        )
+                    # Сохраняем ID сообщения
+                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
             
             return self.TOPIC
         elif query.data == 'conversation':
