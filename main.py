@@ -52,9 +52,11 @@ def main():
     
     history_map = HistoryMap(logger)
     map_server = MapServer(history_map, logger)
-    map_server.run()ой загрузкой
-    from src.history_map import HistoryMap
-    history_map = HistoryMap(logger)
+    map_server.run()
+    
+    # Уже инициализировано выше, повторная инициализация не требуется
+    # from src.history_map import HistoryMap
+    # history_map = HistoryMap(logger)
 
     # Создаем и запускаем веб-сервер
     from src.web_server import MapServer
