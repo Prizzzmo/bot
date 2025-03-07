@@ -195,7 +195,9 @@ class MessageManager:
         except Exception as e:
             self.logger.error(f"Ошибка при полной очистке чата: {e}")
             if update.message:
-                update.message.reply_text(f"❌ Ошибка при очистке чата: {e}")tion_lock:
+                update.message.reply_text(f"❌ Ошибка при очистке чата: {e}")
+        
+        with self._deletion_lock:
             try:
                 chat_id = update.effective_chat.id
                 
