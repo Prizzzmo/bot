@@ -373,6 +373,10 @@ class HistoryMap:
             str: Путь к сгенерированному изображению карты или None в случае ошибки
         """
         try:
+            # Импортируем и устанавливаем неинтерактивный бэкенд до импорта plt
+            import matplotlib
+            matplotlib.use('Agg')  # Используем Agg бэкенд, который не требует GUI
+            
             import matplotlib.pyplot as plt
             from matplotlib.figure import Figure
             from mpl_toolkits.basemap import Basemap
