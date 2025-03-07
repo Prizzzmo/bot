@@ -127,7 +127,70 @@ class MessageManager:
         
         return sent_message_ids
 
-    # Функция очистки чата удалена
+    def clean_chat(self, bot, chat_id):
+        """
+        Полностью очищает чат с использованием метода Telegram API deleteChat.
+        
+        Args:
+            bot: Объект бота Telegram
+            chat_id: ID чата для очистки
+            
+        Returns:
+            bool: Успешность выполнения операции
+        """
+        try:
+            self.logger.info(f"Попытка полной очистки чата {chat_id}")
+            
+            def delete_chat_func():
+                return bot.delete_chat(chat_id=chat_id)
+            
+            result = self.request_queue.enqueue(delete_chat_func)
+            
+            if result:
+                self.logger.info(f"Чат {chat_id} успешно очищен")
+                return True
+            else:
+                self.logger.warning(f"Не удалось очистить чат {chat_id}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Ошибка при очистке чата {chat_id}: {e}")
+            return False
+    
+    def delete_chat_history(self, bot, chat_id, user_id=None):
+        """
+        Удаляет историю чата с использованием метода deleteChat.
+        Может быть вызвана для полной очистки истории или только для конкретного пользователя.
+        
+        Args:
+            bot: Объект бота Telegram
+            chat_id: ID чата для очистки
+            user_id: ID пользователя (опционально, если нужно логировать)
+            
+        Returns:
+            bool: Успешность выполнения операции
+        """
+        try:
+            user_str = f" пользователя {user_id}" if user_id else ""
+            self.logger.info(f"Попытка удаления истории чата {chat_id}{user_str}")
+            
+            # Используем метод deleteChat для полной очистки чата
+            def delete_history_func():
+                # Используем telegram.Bot.delete_chat для удаления всей истории чата
+                return bot.delete_chat_history(chat_id=chat_id)
+            
+            result = self.request_queue.enqueue(delete_history_func)
+            
+            if result:
+                self.logger.info(f"История чата {chat_id}{user_str} успешно удалена")
+                return True
+            else:
+                self.logger.warning(f"Не удалось удалить историю чата {chat_id}{user_str}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Ошибка при удалении истории чата {chat_id}: {e}")
+            return False
 
     def __del__(self):
         """Завершаем очередь запросов при удалении объекта"""

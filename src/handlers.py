@@ -54,6 +54,10 @@ class CommandHandlers:
         user = update.message.from_user
         self.logger.info(f"Пользователь {user.id} ({user.first_name}) запустил бота")
 
+        # Очищаем историю чата при старте (опционально)
+        chat_id = update.effective_chat.id
+        self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
+
         # Отправляем приветственное сообщение и сохраняем его ID
         sent_message = update.message.reply_text(
             f"👋 Здравствуйте, {user.first_name}!\n\n"
@@ -1801,6 +1805,41 @@ class CommandHandlers:
             self.admin_panel.handle_admin_command(update, context)
         else:
             update.message.reply_text("Административная панель недоступна")
+            
+    def clear_chat_command(self, update, context):
+        """
+        Обрабатывает команду /clear для полной очистки чата.
+        
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        user = update.message.from_user
+        chat_id = update.effective_chat.id
+        
+        # Проверяем права администратора (если необходимо)
+        is_admin = False
+        if hasattr(self, 'admin_panel'):
+            is_admin = self.admin_panel.is_admin(user.id)
+        
+        # Только админы могут очищать чат (опционально)
+        if is_admin:
+            update.message.reply_text("🧹 Начинаю очистку истории чата...")
+            success = self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
+            
+            if success:
+                update.message.reply_text("✅ История чата успешно очищена!")
+            else:
+                update.message.reply_text("❌ Не удалось очистить историю чата. Попробуйте позже.")
+        else:
+            # Обычные пользователи могут очищать только свою историю
+            update.message.reply_text("🧹 Очищаю вашу историю чата...")
+            success = self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
+            
+            if success:
+                update.message.reply_text("✅ Ваша история чата успешно очищена!")
+            else:
+                update.message.reply_text("❌ Не удалось очистить историю чата. Попробуйте позже.")
 
     def admin_callback(self, update, context):
         """
