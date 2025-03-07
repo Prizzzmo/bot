@@ -1,4 +1,3 @@
-
 import os
 from dotenv import load_dotenv
 import json
@@ -18,15 +17,24 @@ ERROR_DESCRIPTIONS = {
     'TelegramError': 'Ошибка при взаимодействии с Telegram API.',
     'KeyboardInterrupt': 'Бот был остановлен вручную.',
     'ApiError': 'Ошибка при взаимодействии с внешним API.',
+    "TelegramError": "Ошибка Telegram API",
+    "Unauthorized": "Неверный токен бота",
+    "BadRequest": "Неверный запрос к Telegram API",
+    "TimedOut": "Превышено время ожидания ответа от Telegram API",
+    "NetworkError": "Проблемы с сетью",
+    "ChatMigrated": "Чат был перенесен",
+    "RetryAfter": "Превышен лимит запросов, ожидание",
+    "InvalidToken": "Неверный токен бота",
+    "Conflict": "Конфликт запросов getUpdates. Проверьте, что запущен только один экземпляр бота"
 }
 
 class Config:
     """Класс для работы с конфигурацией приложения"""
-    
+
     def __init__(self):
         self.telegram_token = os.getenv("TELEGRAM_TOKEN")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        
+
     def validate(self):
         """Проверка наличия и валидности токенов"""
         if not self.telegram_token:
