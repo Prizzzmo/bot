@@ -61,7 +61,9 @@ def main():
 
     # Создаем необходимые сервисы
     ui_manager = UIManager(logger)
-    api_client = APIClient(logger, config)
+    # Создаем кэш для API запросов
+    api_cache = APICache(logger)
+    api_client = APIClient(config.gemini_api_key, api_cache, logger)
     message_manager = MessageManager(logger)
     content_service = ContentService(api_client, logger, config)
 
