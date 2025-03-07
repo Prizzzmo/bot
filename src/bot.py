@@ -84,8 +84,9 @@ class Bot:
         try:
             # Включаем сбор обновлений для реагирования на сообщения, запускаем бота
             # Установка более длинного таймаута для обработки конфликтов
-            # Используем drop_pending_updates=True (не используем clean=True, так как они взаимоисключающие)
-            self.updater.start_polling(timeout=30, drop_pending_updates=True)
+            # Используем drop_pending_updates=True для пропуска обновлений, накопившихся во время остановки
+            # Уменьшаем timeout для более быстрого обнаружения ошибок подключения
+            self.updater.start_polling(timeout=10, drop_pending_updates=True, allowed_updates=['message', 'callback_query'])
             self.logger.info("Бот успешно запущен")
 
             # Остаемся в режиме работы до получения Ctrl+C

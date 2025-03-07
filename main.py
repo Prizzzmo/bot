@@ -8,49 +8,17 @@ from src.ui_manager import UIManager
 from src.content_service import ContentService
 from src.handlers import CommandHandlers
 from src.bot import Bot, BotManager
+import fcntl
 
-
-def check_running_instances():
-    """Checks for other running instances of the bot and terminates them."""
-    import psutil
-    import os
-    import time
-    import signal
-
-    print("Проверка других запущенных экземпляров бота...")
-    current_pid = os.getpid()
-
-    # Ищем процессы Python с main.py в командной строке
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-        try:
-            # Пропускаем текущий процесс
-            if proc.info['pid'] == current_pid:
-                continue
-
-            cmdline = proc.info.get('cmdline', [])
-            if not cmdline:
-                continue
-
-            # Проверяем, запущен ли это наш бот
-            is_bot = False
-            for cmd in cmdline:
-                if 'python' in cmd.lower() and 'main.py' in cmdline:
-                    is_bot = True
-                    break
-
-            if is_bot:
-                print(f"Найден другой экземпляр бота (PID: {proc.info['pid']}). Завершение...")
-                try:
-                    os.kill(proc.info['pid'], signal.SIGTERM)
-                    # Ждем немного, чтобы процесс успел завершиться
-                    time.sleep(1)
-                except Exception as e:
-                    print(f"Ошибка при завершении процесса: {e}")
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-
-    print("Проверка завершена, запуск нового экземпляра...")
-
+def is_bot_already_running():
+    """Проверяет, запущен ли уже бот, используя механизм блокировки файла"""
+    lockfile = "/tmp/history_bot.lock"
+    try:
+        fd = open(lockfile, 'w')
+        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fd  # Возвращаем файловый дескриптор для сохранения блокировки
+    except IOError:
+        return False  # Бот уже запущен
 
 def main():
     # Создаем экземпляр логгера
@@ -94,9 +62,24 @@ def main():
         logger.error("Не удалось настроить бота")
 
 
-if __name__ == '__main__':
-    # Проверяем и завершаем другие экземпляры бота перед запуском
-    check_running_instances()
+if __name__ == "__main__":
+    # Проверяем, запущен ли уже бот
+    lock_fd = is_bot_already_running()
+
+    if not lock_fd:
+        print("Бот уже запущен! Завершение работы.")
+        exit(1)
+
+    # Инициализируем логгер
+    logger = Logger()
+    logger.info("Запуск бота и веб-сервера логов...")
+
+    # Загружаем токен и API ключ
+    #load_dotenv()  # Загружаем переменные окружения из .env файла  - This line is commented out because it's not in the original code and the changes don't explicitly mention it.
+    config = Config()
+
+    # Инициализируем LRU-кэш для API
+    api_cache = APICache(logger)
 
     bot_manager = BotManager() # Initialize BotManager here
     bot_manager.run()
