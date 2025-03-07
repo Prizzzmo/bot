@@ -1,5 +1,13 @@
 
-"""API клиент для работы с Gemini API"""
+"""
+API клиент для работы с Google Gemini API.
+
+Обеспечивает взаимодействие с моделью искусственного интеллекта Google Gemini Pro:
+- Инициализация и настройка модели
+- Выполнение запросов к API с различными параметрами
+- Валидация исторических тем
+- Получение исторической информации и генерация тестов
+"""
 
 import json
 import time
@@ -13,7 +21,11 @@ from src.interfaces import ILogger, ICache
 class APIClient(BaseClient):
     """
     Клиент для работы с Google Gemini API.
-    Наследует базовую функциональность из BaseClient.
+    
+    Обеспечивает взаимодействие с моделью Gemini Pro для:
+    - Генерации исторического контента
+    - Проверки релевантности запросов
+    - Создания тестовых заданий
     """
     
     def __init__(self, api_key: str, cache: ICache, logger: ILogger):
@@ -22,8 +34,8 @@ class APIClient(BaseClient):
         
         Args:
             api_key (str): API ключ для Google Gemini
-            cache (ICache): Имплементация интерфейса кэширования
-            logger (ILogger): Имплементация интерфейса логирования
+            cache (ICache): Компонент для кэширования запросов
+            logger (ILogger): Компонент для логирования операций
         """
         super().__init__(api_key, cache, logger)
         self.model = None
@@ -32,7 +44,11 @@ class APIClient(BaseClient):
     def initialize_model(self) -> None:
         """
         Инициализация модели Google Gemini.
-        Устанавливает API ключ и настраивает модель.
+        
+        Настраивает модель Gemini Pro, которая обеспечивает:
+        - Продвинутое понимание запросов на естественном языке
+        - Генерацию структурированных и информативных ответов
+        - Проверку фактологической точности контента
         """
         try:
             genai.configure(api_key=self.api_key)
@@ -47,15 +63,21 @@ class APIClient(BaseClient):
         """
         Выполняет запрос к API Gemini с оптимизированными настройками.
         
+        Параметры запроса:
+        - temperature: контролирует креативность/случайность ответов
+          (низкие значения для фактов, высокие для творческих задач)
+        - max_tokens: максимальная длина ответа
+        - system_prompt: системный промпт для настройки поведения модели
+        
         Args:
-            prompt (str): Текст запроса
+            prompt (str): Основной текст запроса
             temperature (float): Параметр случайности генерации (0.0-1.0)
             max_tokens (int): Максимальное количество токенов ответа
             use_cache (bool): Использовать ли кэш для данного запроса
             system_prompt (str, optional): Системный промпт для настройки поведения модели
             
         Returns:
-            Dict[str, Any]: Результат запроса
+            Dict[str, Any]: Результат запроса с текстом ответа и метаданными
             
         Raises:
             Exception: При ошибке выполнения запроса к API
@@ -124,13 +146,16 @@ class APIClient(BaseClient):
     
     def validate_historical_topic(self, topic: str) -> bool:
         """
-        Проверяет, является ли тема исторической.
+        Проверяет, относится ли тема к истории России.
+        
+        Выполняет проверку с помощью специального запроса к модели Gemini
+        с низкой температурой для максимальной точности определения.
         
         Args:
             topic (str): Тема для проверки
             
         Returns:
-            bool: True если тема историческая, False в противном случае
+            bool: True если тема относится к истории России, False в противном случае
         """
         prompt = f"""
         Определи, относится ли следующий запрос к истории России:
@@ -143,8 +168,8 @@ class APIClient(BaseClient):
         try:
             result = self.call_api(
                 prompt=prompt,
-                temperature=0.1,
-                max_tokens=10,
+                temperature=0.1,  # Низкая температура для определенности ответа
+                max_tokens=10,     # Короткий ответ (да/нет)
                 use_cache=True
             )
             
@@ -161,13 +186,16 @@ class APIClient(BaseClient):
     
     def get_historical_info(self, topic: str) -> Dict[str, Any]:
         """
-        Получает информацию по исторической теме.
+        Получает структурированную информацию по исторической теме.
+        
+        Создает запрос к Gemini для получения подробной информации
+        об историческом периоде или событии с акцентом на фактологическую точность.
         
         Args:
             topic (str): Историческая тема
             
         Returns:
-            Dict[str, Any]: Информация по теме
+            Dict[str, Any]: Структурированная информация по теме с разделами
         """
         prompt = f"""
         Предоставь точную историческую информацию о следующей теме из истории России: "{topic}".
@@ -186,8 +214,8 @@ class APIClient(BaseClient):
         try:
             result = self.call_api(
                 prompt=prompt,
-                temperature=0.2,
-                max_tokens=2048,
+                temperature=0.2,  # Низкая температура для фактической точности
+                max_tokens=2048,   # Достаточно для подробного ответа
                 use_cache=True
             )
             
@@ -209,13 +237,16 @@ class APIClient(BaseClient):
     
     def generate_historical_test(self, topic: str) -> Dict[str, Any]:
         """
-        Генерирует тест по исторической теме.
+        Генерирует тестовые задания по исторической теме.
+        
+        Создает структурированный тест в формате JSON с вопросами разной
+        сложности, вариантами ответов и пояснениями.
         
         Args:
-            topic (str): Историческая тема
+            topic (str): Историческая тема для генерации теста
             
         Returns:
-            Dict[str, Any]: Тест по исторической теме
+            Dict[str, Any]: Структурированный тест с вопросами и ответами
         """
         prompt = f"""
         Создай тест по следующей теме из истории России: "{topic}".
@@ -241,8 +272,8 @@ class APIClient(BaseClient):
         try:
             result = self.call_api(
                 prompt=prompt,
-                temperature=0.7,  # Увеличиваем разнообразие для тестов
-                max_tokens=2048,
+                temperature=0.7,  # Повышенная температура для разнообразия вопросов
+                max_tokens=2048,   # Достаточно для полного теста
                 use_cache=True
             )
             

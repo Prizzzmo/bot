@@ -1,5 +1,13 @@
 
-"""Базовый клиент для API запросов"""
+"""
+Базовый клиент для API запросов.
+
+Предоставляет общую функциональность для работы с внешними API:
+- Унифицированное выполнение HTTP-запросов
+- Автоматическое кэширование результатов
+- Обработка ошибок и повторные попытки
+- Детальное логирование операций
+"""
 
 import json
 import time
@@ -12,7 +20,12 @@ from src.interfaces import ILogger, ICache
 class BaseClient(ABC):
     """
     Абстрактный базовый класс для реализации API клиентов.
-    Предоставляет общую функциональность для работы с внешними API.
+    
+    Обеспечивает базовую функциональность для всех API-клиентов системы:
+    - Выполнение HTTP-запросов с поддержкой различных методов (GET, POST и т.д.)
+    - Интеллектуальное кэширование запросов для оптимизации производительности
+    - Повторные попытки при сбоях соединения
+    - Подробное логирование для отладки
     """
 
     def __init__(self, api_key, cache, logger):
@@ -20,9 +33,9 @@ class BaseClient(ABC):
         Инициализация базового API клиента.
         
         Args:
-            api_key (str): API ключ для авторизации
-            cache (ICache): Имплементация интерфейса кэширования
-            logger (ILogger): Имплементация интерфейса логирования
+            api_key (str): API ключ для авторизации в сервисе
+            cache (ICache): Компонент для кэширования запросов
+            logger (ILogger): Компонент для логирования операций
         """
         self.api_key = api_key
         self.cache = cache
@@ -35,14 +48,19 @@ class BaseClient(ABC):
 
     def _make_request(self, method, endpoint, params=None, data=None, headers=None, timeout=None, use_cache=True):
         """
-        Выполняет HTTP запрос с поддержкой кэширования, повторов и логирования.
+        Выполняет HTTP запрос с поддержкой кэширования, повторных попыток и логирования.
+        
+        Метод обеспечивает:
+        - Кэширование GET-запросов для оптимизации
+        - Экспоненциальные задержки между повторными попытками
+        - Детальное логирование этапов выполнения запроса
         
         Args:
             method (str): HTTP метод ('GET', 'POST', etc.)
-            endpoint (str): API эндпоинт
-            params (dict, optional): Параметры запроса
+            endpoint (str): API эндпоинт или полный URL
+            params (dict, optional): Параметры запроса (для query string)
             data (dict, optional): Данные для отправки в теле запроса
-            headers (dict, optional): HTTP заголовки
+            headers (dict, optional): HTTP заголовки для запроса
             timeout (int, optional): Таймаут запроса в секундах
             use_cache (bool): Использовать ли кэш для данного запроса
             
@@ -50,13 +68,13 @@ class BaseClient(ABC):
             dict: Результат запроса в формате JSON
             
         Raises:
-            RequestException: При ошибке выполнения запроса
+            RequestException: При неустранимой ошибке выполнения запроса
         """
         url = f"{self.base_url}{endpoint}" if self.base_url else endpoint
         request_headers = {**self.default_headers, **(headers or {})}
         request_timeout = timeout or self.default_timeout
         
-        # Формируем ключ кэша
+        # Формируем ключ кэша и проверяем наличие в кэше
         cache_key = None
         if use_cache and method.upper() == 'GET':
             cache_key = self._generate_cache_key(url, params)
@@ -65,6 +83,7 @@ class BaseClient(ABC):
                 self.logger.debug(f"Данные получены из кэша: {url}")
                 return cached_result
         
+        # Выполняем запрос с поддержкой повторных попыток
         for attempt in range(self.retry_attempts):
             try:
                 self.logger.debug(f"Выполняется {method} запрос: {url}")
@@ -112,14 +131,14 @@ class BaseClient(ABC):
     
     def _generate_cache_key(self, url, params=None):
         """
-        Генерирует ключ кэша для запроса.
+        Генерирует уникальный ключ кэша для запроса.
         
         Args:
             url (str): URL запроса
-            params (dict, optional): Параметры запроса
+            params (dict, optional): Параметры запроса для включения в ключ
             
         Returns:
-            str: Хэш-ключ для кэширования
+            str: MD5-хэш для использования в качестве ключа кэша
         """
         import hashlib
         key_data = f"{url}:{json.dumps(params or {}, sort_keys=True)}"
@@ -128,6 +147,9 @@ class BaseClient(ABC):
     @abstractmethod
     def call_api(self, *args, **kwargs):
         """
-        Абстрактный метод для реализации конкретного API вызова
+        Абстрактный метод для реализации конкретного API вызова.
+        
+        Должен быть переопределен в дочерних классах для реализации
+        специфической логики работы с конкретным API.
         """
         pass
