@@ -8,6 +8,14 @@ from telegram.ext import CallbackContext
 from telegram import Update
 from telegram.error import BadRequest
 
+
+class MessageManager:
+    """Класс для управления сообщениями в чате"""
+
+    def __init__(self, logger):
+        self.logger = logger
+        self._deletion_lock = threading.Lock()
+
     def clear_chat(self, update: Update, context: CallbackContext):
         """
         Очищает чат с использованием метода deleteHistory
@@ -37,14 +45,6 @@ from telegram.error import BadRequest
                 chat_id=update.effective_chat.id,
                 text="Произошла ошибка при очистке чата."
             )
-
-
-class MessageManager:
-    """Класс для управления сообщениями в чате"""
-
-    def __init__(self, logger):
-        self.logger = logger
-        self._deletion_lock = threading.Lock()
 
     def save_message_id(self, update, context, message_id):
         """
