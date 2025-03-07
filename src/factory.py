@@ -87,10 +87,7 @@ class BotFactory:
         bot = Bot(
             config=config,
             logger=logger,
-            command_handlers=command_handlers,
-            state_manager=state_manager,
-            analytics_service=analytics_service,
-            web_server=web_server
+            command_handlers=command_handlers
         )
         
         logger.info("Все компоненты бота инициализированы успешно")
