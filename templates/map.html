@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -103,9 +102,9 @@
     <div class="header">
         <h1>Интерактивная карта исторических событий России</h1>
     </div>
-    
+
     <div id="map"></div>
-    
+
     <div class="filter-panel">
         <div class="category-filter">
             <label for="category-select">Фильтр по категории:</label>
@@ -117,41 +116,41 @@
             </select>
         </div>
     </div>
-    
+
     <div class="timeline" id="timeline">
         <!-- Будет заполнено с помощью JavaScript -->
     </div>
-    
+
     <script>
         // Инициализация карты с центром на России
         const map = L.map('map').setView([55.75, 37.62], 4);
-        
+
         // Добавление картографической подложки
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
-        
+
         // Загрузка данных о событиях
         const events = {{ events|tojson }};
         const markers = {};
         const categories = {{ categories|tojson }};
-        
+
         // Функция для форматирования даты
         function formatDate(dateStr) {
             if (!dateStr) return '';
-            
+
             // Проверка на формат с указанием только года
             if (/^\d{1,4}$/.test(dateStr)) {
                 return dateStr + ' г.';
             }
-            
+
             // Проверка на формат с указанием года и месяца
             if (/^\d{1,4}-\d{1,2}$/.test(dateStr)) {
                 const [year, month] = dateStr.split('-');
                 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
                 return `${monthNames[parseInt(month) - 1]} ${year} г.`;
             }
-            
+
             // Полный формат с днем, месяцем и годом
             try {
                 const [year, month, day] = dateStr.split('-');
@@ -161,7 +160,7 @@
                 return dateStr;
             }
         }
-        
+
         // Создание маркеров для каждого события
         events.forEach(event => {
             if (event.location && event.location.lat && event.location.lng) {
@@ -173,11 +172,11 @@
                             <div class="event-description">${event.description}</div>
                         </div>
                     `);
-                
+
                 markers[event.id] = marker;
             }
         });
-        
+
         // Функция для загрузки только видимых маркеров
         function updateVisibleMarkers() {
             const bounds = map.getBounds();
@@ -196,18 +195,18 @@
                 }
             });
         }
-        
+
         // Обновляем маркеры при загрузке и изменении области видимости
         map.on('moveend', updateVisibleMarkers);
         updateVisibleMarkers();
-        
+
         // Функция для фильтрации событий по категории
         function filterEventsByCategory(category) {
             // Очищаем карту
             Object.values(markers).forEach(marker => {
                 marker.removeFrom(map);
             });
-            
+
             // Добавляем только события выбранной категории или все, если категория не выбрана
             events.forEach(event => {
                 if (!category || event.category === category) {
@@ -216,16 +215,16 @@
                     }
                 }
             });
-            
+
             // Обновляем таймлайн
             updateTimeline(category);
         }
-        
+
         // Обработчик изменения выбранной категории
         document.getElementById('category-select').addEventListener('change', function() {
             const selectedCategory = this.value;
             filterEventsByCategory(selectedCategory);
-            
+
             // Обновляем URL с параметром категории
             const url = new URL(window.location);
             if (selectedCategory) {
@@ -235,24 +234,24 @@
             }
             window.history.pushState({}, '', url);
         });
-        
+
         // Функция для создания таймлайна
         function updateTimeline(category) {
             const timelineElement = document.getElementById('timeline');
             timelineElement.innerHTML = '';
-            
+
             // Фильтруем события по категории
             const filteredEvents = category 
                 ? events.filter(event => event.category === category)
                 : events;
-            
+
             // Сортируем события по дате
             filteredEvents.sort((a, b) => {
                 const dateA = a.date ? new Date(a.date.replace(/-/g, '/')) : new Date(0);
                 const dateB = b.date ? new Date(b.date.replace(/-/g, '/')) : new Date(0);
                 return dateA - dateB;
             });
-            
+
             // Добавляем события на таймлайн
             filteredEvents.forEach(event => {
                 const timelineItem = document.createElement('div');
@@ -267,26 +266,71 @@
                 timelineElement.appendChild(timelineItem);
             });
         }
-        
-        // Инициализация таймлайна со всеми событиями
+
+        // Проверяем есть ли события для отображения
+        if (events.length === 0) {
+            // Добавляем примерные события, если не загрузились
+            events = [
+                {
+                    id: 1,
+                    title: "Крещение Руси",
+                    date: "988",
+                    description: "Массовое крещение жителей Киева в водах Днепра князем Владимиром.",
+                    location: {lat: 50.45, lng: 30.52},
+                    category: "Культура и религия"
+                },
+                {
+                    id: 2,
+                    title: "Октябрьская революция",
+                    date: "1917-11-07",
+                    description: "Вооруженное восстание в Петрограде, в результате которого к власти пришли большевики.",
+                    location: {lat: 59.94, lng: 30.31},
+                    category: "Революции и перевороты"
+                }
+            ];
+
+            // Добавляем маркеры для примерных событий
+            events.forEach(event => {
+                if (event.location && event.location.lat && event.location.lng) {
+                    const marker = L.marker([event.location.lat, event.location.lng])
+                        .bindPopup(`
+                            <div class="event-info">
+                                <div class="event-title">${event.title}</div>
+                                <div class="event-date">${formatDate(event.date)}</div>
+                                <div class="event-description">${event.description}</div>
+                            </div>
+                        `)
+                        .addTo(map);
+
+                    markers[event.id] = marker;
+                }
+            });
+
+            document.getElementById('map').insertAdjacentHTML('afterbegin', 
+                `<div style="position:absolute;top:100px;left:10px;z-index:1000;background:white;padding:5px;border-radius:5px;">
+                    Отображаются примерные события
+                </div>`);
+        }
+
+        // Обновляем таймлайн со всеми событиями
         updateTimeline('');
-        
+
         // Проверка URL параметров при загрузке страницы
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
-            
+
             // Проверка параметра category
             const category = urlParams.get('category');
             if (category) {
                 document.getElementById('category-select').value = category;
                 filterEventsByCategory(category);
             }
-            
+
             // Проверка параметра events (список ID событий через запятую)
             const eventIds = urlParams.get('events');
             if (eventIds) {
                 const ids = eventIds.split(',').map(id => parseInt(id));
-                
+
                 // Центрируем карту на первом событии из списка
                 if (ids.length > 0) {
                     const firstEvent = events.find(e => e.id === ids[0]);
@@ -294,7 +338,7 @@
                         map.setView([firstEvent.location.lat, firstEvent.location.lng], 6);
                     }
                 }
-                
+
                 // Показываем только выбранные события
                 Object.values(markers).forEach(marker => marker.removeFrom(map));
                 ids.forEach(id => {

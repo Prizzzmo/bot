@@ -137,7 +137,7 @@ class HistoryMap:
         events = self.get_all_events()
         if not events:
             return []
-            
+
         # Проверяем, что events - это список объектов, а не строк
         if all(isinstance(event, dict) for event in events):
             return [event for event in events if event.get('category') == category]
@@ -199,7 +199,7 @@ class HistoryMap:
     def generate_map_url(self, category=None, events=None, timeframe=None):
         """
         Генерирует URL для описания карты (веб-сервер удален).
-        
+
         Данная функция сохранена для совместимости. В текущей версии 
         вместо URL следует использовать функцию generate_map_image.
 
@@ -213,9 +213,9 @@ class HistoryMap:
         """
         from src.web_server import get_base_url
         base_url = get_base_url()
-        
+
         message = f"Карта исторических событий теперь доступна только в виде изображений."
-        
+
         if category:
             return f"{message} Выбранная категория: {category}"
         if events:
@@ -227,25 +227,25 @@ class HistoryMap:
         if timeframe:
             start, end = timeframe
             return f"{message} Временной диапазон: {start}-{end}"
-            
+
         return message
-        
+
     def generate_map_html(self, category=None, events=None, timeframe=None):
         """
         Генерирует HTML-файл карты с отмеченными историческими событиями.
-        
+
         Args:
             category (str, optional): Категория событий
             events (list, optional): Список конкретных событий
             timeframe (tuple, optional): Временной диапазон в формате (начало, конец) - годы
-            
+
         Returns:
             str: Путь к сгенерированному HTML-файлу карты или None в случае ошибки
         """
         import time
         import json
         from jinja2 import Environment, FileSystemLoader
-        
+
         # Определяем события для отображения на карте
         try:
             if category and isinstance(category, str):
@@ -267,27 +267,31 @@ class HistoryMap:
         except Exception as e:
             self.logger.error(f"Ошибка при получении событий: {e}")
             display_events = []
-        
+
         # Создаем директорию для сохранения карт, если она не существует
         os.makedirs('generated_maps', exist_ok=True)
-        
+
         # Создаем уникальное имя файла для карты
         timestamp = int(time.time())
         map_html_path = f"generated_maps/map_{timestamp}.html"
-        
+
         try:
             # Получаем категории
             categories = self.get_categories()
-            
-            # Настраиваем окружение Jinja2
-            env = Environment(loader=FileSystemLoader('templates'))
+
+            # Настраиваем окружение Jinja2 с абсолютным путем к шаблонам
+            import os
+            templates_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
+            env = Environment(loader=FileSystemLoader(templates_dir))
             template = env.get_template('map.html')
-            
+
+            self.logger.info(f"Использую директорию шаблонов: {templates_dir}")
+
             # Заголовок
             title = "Карта исторических событий России"
             if category:
                 title += f" - {category}"
-            
+
             # Рендерим шаблон
             html_content = template.render(
                 title=title,
@@ -295,33 +299,33 @@ class HistoryMap:
                 categories=categories,
                 selected_category=category
             )
-            
+
             # Сохраняем HTML-файл
             with open(map_html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
-            
+
             self.logger.info(f"HTML-карта с событиями сгенерирована: {map_html_path}")
             return map_html_path
         except Exception as e:
             self.logger.error(f"Ошибка при генерации HTML-карты: {e}")
             return None
-            
+
     def generate_map_image(self, category=None, events=None, timeframe=None):
         """
         Генерирует изображение карты с отмеченными историческими событиями.
-        
+
         Args:
             category (str, optional): Категория событий
             events (list, optional): Список конкретных событий
             timeframe (tuple, optional): Временной диапазон в формате (начало, конец) - годы
-            
+
         Returns:
             str: Путь к сгенерированному изображению карты или None в случае ошибки
         """
         import time
         import json
         from jinja2 import Environment, FileSystemLoader
-        
+
         # Определяем события для отображения на карте
         try:
             if category and isinstance(category, str):
@@ -343,27 +347,31 @@ class HistoryMap:
         except Exception as e:
             self.logger.error(f"Ошибка при получении событий: {e}")
             display_events = []
-        
+
         # Создаем директорию для сохранения карт, если она не существует
         os.makedirs('generated_maps', exist_ok=True)
-        
+
         # Создаем уникальное имя файла для карты
         timestamp = int(time.time())
         map_html_path = f"generated_maps/map_{timestamp}.html"
-        
+
         try:
             # Получаем категории
             categories = self.get_categories()
-            
-            # Настраиваем окружение Jinja2
-            env = Environment(loader=FileSystemLoader('templates'))
+
+            # Настраиваем окружение Jinja2 с абсолютным путем к шаблонам
+            import os
+            templates_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
+            env = Environment(loader=FileSystemLoader(templates_dir))
             template = env.get_template('map.html')
-            
+
+            self.logger.info(f"Использую директорию шаблонов: {templates_dir}")
+
             # Заголовок
             title = "Карта исторических событий России"
             if category:
                 title += f" - {category}"
-            
+
             # Рендерим шаблон
             html_content = template.render(
                 title=title,
@@ -371,11 +379,11 @@ class HistoryMap:
                 categories=categories,
                 selected_category=category
             )
-            
+
             # Сохраняем HTML-файл
             with open(map_html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
-            
+
             self.logger.info(f"HTML-карта с событиями сгенерирована: {map_html_path}")
             return map_html_path
         except Exception as e:
