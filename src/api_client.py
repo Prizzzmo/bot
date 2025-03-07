@@ -235,6 +235,29 @@ class APIClient(BaseClient):
                 "error": str(e)
             }
     
+    def ask_grok(self, prompt: str, use_cache: bool = True) -> str:
+        """
+        Упрощенный метод для отправки запроса к Gemini API и получения текстового ответа.
+        
+        Args:
+            prompt (str): Текст запроса для модели
+            use_cache (bool): Использовать ли кэширование для этого запроса
+            
+        Returns:
+            str: Текстовый ответ от модели
+        """
+        try:
+            result = self.call_api(
+                prompt=prompt, 
+                temperature=0.3,
+                max_tokens=1024,
+                use_cache=use_cache
+            )
+            return result.get("text", "")
+        except Exception as e:
+            self.logger.error(f"Ошибка в методе ask_grok: {e}")
+            return f"Произошла ошибка при обработке запроса: {str(e)}"
+    
     def generate_historical_test(self, topic: str) -> Dict[str, Any]:
         """
         Генерирует тестовые задания по исторической теме.
