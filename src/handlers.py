@@ -363,11 +363,7 @@ class CommandHandlers:
                 )
             
             context.bot.delete_message(chat_id=user_id, message_id=status_message.message_id)
-            return self.MAPt_id=user_id,
-                        photo=img,
-                        caption=f"🗺️ Карта исторических событий категории «{category}»",
-                        parse_mode='HTML'
-                    )
+            return self.MAP
 
                 # Удаляем сообщение о генерации
                 context.bot.delete_message(
