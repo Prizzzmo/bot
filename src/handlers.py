@@ -1052,6 +1052,21 @@ class CommandHandlers:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
         """
+        # Словарь с описаниями распространенных ошибок
+        ERROR_DESCRIPTIONS = {
+            'BadRequest': 'Ошибка в запросе к Telegram API. Возможно, слишком длинное сообщение.',
+            'Unauthorized': 'Ошибка авторизации бота. Проверьте токен бота.',
+            'TimedOut': 'Превышено время ожидания ответа от Telegram API. Попробуйте позже.',
+            'NetworkError': 'Проблемы с сетевым подключением. Проверьте интернет.',
+            'ChatMigrated': 'Чат был перенесен на другой сервер.',
+            'TelegramError': 'Общая ошибка Telegram API.',
+            'AttributeError': 'Ошибка доступа к атрибуту объекта.',
+            'TypeError': 'Ошибка типа данных.',
+            'ValueError': 'Ошибка значения переменной.',
+            'KeyError': 'Ошибка доступа по ключу.',
+            'IndexError': 'Ошибка индекса списка.'
+        }
+        
         error = context.error
         error_type = type(error).__name__
 

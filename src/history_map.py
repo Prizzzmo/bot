@@ -117,7 +117,10 @@ class HistoryMap:
 
     def get_all_events(self):
         """Возвращает все исторические события"""
-        return self.events_data
+        events_data = self.events_data
+        if isinstance(events_data, dict) and 'events' in events_data:
+            return events_data['events']
+        return []
 
     def get_categories(self):
         """Возвращает список категорий событий"""
@@ -132,7 +135,15 @@ class HistoryMap:
     def get_events_by_category(self, category):
         """Возвращает события по указанной категории"""
         events = self.get_all_events()
-        return [event for event in events if event.get('category') == category]
+        if not events:
+            return []
+            
+        # Проверяем, что events - это список объектов, а не строк
+        if all(isinstance(event, dict) for event in events):
+            return [event for event in events if event.get('category') == category]
+        else:
+            self.logger.error(f"Неверный формат событий: получены не словари")
+            return []
 
     def get_event_by_id(self, event_id):
         """Возвращает событие по ID"""
