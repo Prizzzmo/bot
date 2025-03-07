@@ -356,28 +356,14 @@ class CommandHandlers:
                 map_path = self.history_map.generate_map_image(category=category)
 
                 if map_path and os.path.exists(map_path):
-                    # Определяем, это изображение или HTML-файл
-                    is_image = map_path.endswith(('.png', '.jpg', '.jpeg'))
-
-                    if is_image:
-                        # Отправляем как изображение
-                        with open(map_path, 'rb') as img_file:
-                            context.bot.send_photo(
-                                chat_id=user_id,
-                                photo=img_file,
-                                caption=f"🗺️ Карта исторических событий категории «{category}»",
-                                parse_mode='HTML'
-                            )
-                    else:
-                        # Отправляем как документ (HTML-файл)
-                        with open(map_path, 'rb') as html_file:
-                            context.bot.send_document(
-                                chat_id=user_id,
-                                document=html_file,
-                                filename=f"Карта_исторических_событий_{category}.html",
-                                caption=f"🗺️ Интерактивная карта исторических событий категории «{category}»\nОткройте файл в браузере для просмотра интерактивной карты.",
-                                parse_mode='HTML'
-                            )
+                    # Отправляем изображение
+                    with open(map_path, 'rb') as img_file:
+                        context.bot.send_photo(
+                            chat_id=user_id,
+                            photo=img_file,
+                            caption=f"🗺️ Карта исторических событий категории «{category}»",
+                            parse_mode='HTML'
+                        )
 
                     # Удаляем сообщение о генерации
                     context.bot.delete_message(

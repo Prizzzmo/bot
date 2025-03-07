@@ -330,8 +330,6 @@ class HistoryMap:
         """
         Генерирует изображение карты с историческими событиями.
         
-        В текущей версии использует статичное изображение или HTML-карту.
-        
         Args:
             category (str, optional): Категория событий
             events (list, optional): Список конкретных событий
@@ -341,20 +339,27 @@ class HistoryMap:
             str: Путь к сгенерированному изображению карты или None в случае ошибки
         """
         try:
-            # В первую очередь пробуем создать изображение с помощью matplotlib
+            # Создаем изображение карты с помощью matplotlib
             image_path = self._generate_matplotlib_map(category, events, timeframe)
             if image_path:
                 return image_path
-                
-            # Если не удалось создать изображение, возвращаем HTML-файл
-            self.logger.warning("Не удалось создать изображение карты, возвращаем HTML-файл")
-            return self.generate_map_html(category, events, timeframe)
+            
+            # Если не удалось создать изображение, возвращаем статичное изображение
+            self.logger.warning("Не удалось создать изображение карты, возвращаем стандартную карту")
+            
+            # Возвращаем статичное изображение, если оно есть
+            static_map_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                                        'static', 'default_map.png')
+            if os.path.exists(static_map_path):
+                return static_map_path
+            
+            return None
         except Exception as e:
             self.logger.error(f"Ошибка при генерации изображения карты: {e}")
             
             # В случае ошибки возвращаем статичное изображение, если оно есть
             static_map_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                                         'static', 'default_map.png')
+                                        'static', 'default_map.png')
             if os.path.exists(static_map_path):
                 return static_map_path
                 
