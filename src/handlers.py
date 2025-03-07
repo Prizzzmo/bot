@@ -1547,4 +1547,3 @@ class CommandHandlers:
                 error_message,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
             )
-        }
