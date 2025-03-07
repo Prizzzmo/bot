@@ -335,6 +335,8 @@ class CommandHandlers:
             
         elif query_data.startswith('map_img_'):
             category = query_data.replace('map_img_', '')
+            
+            import os  # Добавляем импорт os здесь
 
             # Отправляем сообщение о том, что генерируем карту
             status_message = context.bot.send_message(
