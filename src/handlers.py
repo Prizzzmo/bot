@@ -174,9 +174,8 @@ class CommandHandlers:
                 parts.append(current_part)
 
             try:
-                # Создаем клавиатуру с кнопками для первой части
-                keyboard_first = [
-                    [InlineKeyboardButton("📥 Скачать презентацию в Word", callback_data='download_detailed_presentation')],
+                # Создаем клавиатуру только с кнопкой возврата в меню
+                keyboard = [
                     [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
                 ]
 
@@ -184,107 +183,105 @@ class CommandHandlers:
                 query.edit_message_text(
                     parts[0][:4000],  # Ограничиваем длину для безопасности
                     parse_mode='Markdown',
-                    reply_markup=InlineKeyboardMarkup(keyboard_first)
+                    reply_markup=InlineKeyboardMarkup(keyboard)
                 )
 
                 # Отправляем остальные части как новые сообщения
                 for i, part in enumerate(parts[1:], 1):
-                    # Добавляем кнопки к последней части
-                    if i == len(parts[1:]):
-                        keyboard_last = [
-                            [InlineKeyboardButton("📥 Скачать презентацию в Word", callback_data='download_detailed_presentation')],
-                            [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
-                        ]
-                        sent_msg = query.message.reply_text(
-                            part[:4000],  # Ограничиваем длину для безопасности
-                            parse_mode='Markdown',
-                            reply_markup=InlineKeyboardMarkup(keyboard_last)
-                        )
-                    else:
-                        sent_msg = query.message.reply_text(
-                            part[:4000],  # Ограничиваем длину для безопасности
-                            parse_mode='Markdown'
-                        )
+                    sent_msg = query.message.reply_text(
+                        part[:4000],  # Ограничиваем длину для безопасности
+                        parse_mode='Markdown',
+                        reply_markup=InlineKeyboardMarkup(keyboard) if i == len(parts[1:]) else None
+                    )
                     # Сохраняем ID сообщения
                     self.message_manager.save_message_id(update, context, sent_msg.message_id)
 
-                self.logger.info(f"Пользователь {user_id} просмотрел информацию о проекте")
-            except telegram.error.BadRequest as e:
-                self.logger.error(f"Ошибка при отправке информации о проекте: {e}")
-                # Отправляем новое сообщение вместо редактирования
-                for i, part in enumerate(parts):
-                    # Добавляем кнопки к последней части
-                    if i == len(parts) - 1:
-                        keyboard = [
-                            [InlineKeyboardButton("📥 Скачать презентацию в Word", callback_data='download_detailed_presentation')],
-                            [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
-                        ]
-                        sent_msg = query.message.reply_text(
-                            part[:4000],  # Ограничиваем длину для безопасности
-                            parse_mode='Markdown',
-                            reply_markup=InlineKeyboardMarkup(keyboard)
-                        )
-                    else:
-                        sent_msg = query.message.reply_text(
-                            part[:4000],  # Ограничиваем длину для безопасности
-                            parse_mode='Markdown'
-                        )
-                    # Сохраняем ID сообщения
-                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
-
-            return self.TOPIC
-        elif query_data == 'download_detailed_presentation':
-            # Обработка кнопки скачивания подробной презентации
-            try:
-                # Показываем сообщение о подготовке файла
-                query.edit_message_text(
-                    "⏳ Подготавливаю подробную презентацию в формате Word...",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-                )
-
-                # Импортируем функцию для создания DOCX и создаём презентацию
+                # Подготавливаем презентации заранее
                 import sys
                 sys.path.append('.')
                 from create_presentation_doc import create_presentation_docx
 
-                # Создаем Word документ
-                docx_path = create_presentation_docx('detailed_presentation.md', 'История_России_подробная_презентация.docx')
+                # Создаем Word документ если он не существует
+                docx_path = 'История_России_подробная_презентация.docx'
+                if not os.path.exists(docx_path):
+                    docx_path = create_presentation_docx('detailed_presentation.md', docx_path)
 
-                # Отправляем файл в формате DOCX
+                # Отправляем отдельное сообщение со ссылками на скачивание
+                download_message = "📥 *Скачать презентацию:*\n\n"
+                
+                # Отправляем файлы напрямую как документы
                 with open(docx_path, 'rb') as docx_file:
-                    context.bot.send_document(
+                    sent_doc = context.bot.send_document(
                         chat_id=update.effective_chat.id,
                         document=docx_file,
                         filename='История_России_подробная_презентация.docx',
                         caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word."
                     )
+                    self.message_manager.save_message_id(update, context, sent_doc.message_id)
 
                 # Также отправляем обычный текстовый файл для совместимости
                 with open('detailed_presentation.md', 'rb') as md_file:
-                    context.bot.send_document(
+                    sent_md = context.bot.send_document(
                         chat_id=update.effective_chat.id,
                         document=md_file,
                         filename='История_России_подробная_презентация.md',
                         caption="📄 Версия презентации в текстовом формате Markdown."
                     )
+                    self.message_manager.save_message_id(update, context, sent_md.message_id)
 
-                self.logger.info(f"Пользователь {user_id} скачал подробную презентацию в формате Word и текстовом формате")
+                self.logger.info(f"Пользователь {user_id} просмотрел информацию о проекте и получил файлы презентации")
+            except telegram.error.BadRequest as e:
+                self.logger.error(f"Ошибка при отправке информации о проекте: {e}")
+                # Отправляем новое сообщение вместо редактирования
+                for i, part in enumerate(parts):
+                    keyboard = [
+                        [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+                    ]
+                    sent_msg = query.message.reply_text(
+                        part[:4000],  # Ограничиваем длину для безопасности
+                        parse_mode='Markdown',
+                        reply_markup=InlineKeyboardMarkup(keyboard) if i == len(parts) - 1 else None
+                    )
+                    # Сохраняем ID сообщения
+                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
 
-                # Обновляем сообщение о успешной загрузке
-                query.edit_message_text(
-                    "✅ Презентация успешно отправлена в двух форматах:\n\n"
-                    "1. DOCX (Word) - с иллюстрациями и форматированием\n"
-                    "2. Markdown - текстовый формат для удобного просмотра\n\n"
-                    "Выберите дальнейшее действие:",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-                )
-            except Exception as e:
-                self.logger.error(f"Ошибка при отправке файла презентации: {e}")
-                query.edit_message_text(
-                    f"К сожалению, произошла ошибка при создании или отправке презентации: {e}. Пожалуйста, попробуйте позже.",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-                )
+                # Пробуем отправить файлы презентации
+                try:
+                    # Создаем Word документ если он не существует
+                    docx_path = 'История_России_подробная_презентация.docx'
+                    if not os.path.exists(docx_path):
+                        from create_presentation_doc import create_presentation_docx
+                        docx_path = create_presentation_docx('detailed_presentation.md', docx_path)
+
+                    # Отправляем файлы напрямую как документы
+                    with open(docx_path, 'rb') as docx_file:
+                        sent_doc = context.bot.send_document(
+                            chat_id=update.effective_chat.id,
+                            document=docx_file,
+                            filename='История_России_подробная_презентация.docx',
+                            caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word."
+                        )
+                        self.message_manager.save_message_id(update, context, sent_doc.message_id)
+
+                    # Также отправляем обычный текстовый файл для совместимости
+                    with open('detailed_presentation.md', 'rb') as md_file:
+                        sent_md = context.bot.send_document(
+                            chat_id=update.effective_chat.id,
+                            document=md_file,
+                            filename='История_России_подробная_презентация.md',
+                            caption="📄 Версия презентации в текстовом формате Markdown."
+                        )
+                        self.message_manager.save_message_id(update, context, sent_md.message_id)
+                except Exception as file_err:
+                    self.logger.error(f"Ошибка при отправке файлов презентации: {file_err}")
+                    sent_err = query.message.reply_text(
+                        "К сожалению, произошла ошибка при отправке файлов презентации. Пожалуйста, попробуйте позже.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                    )
+                    self.message_manager.save_message_id(update, context, sent_err.message_id)
+
             return self.TOPIC
+        # Обработчик кнопки скачивания презентации удален, т.к. файлы отправляются сразу
         elif query_data == 'history_map':
             # Обработка кнопки интерактивной карты
             user_id = query.from_user.id
