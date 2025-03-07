@@ -57,7 +57,7 @@ class Bot:
                 },
                 fallbacks=[CommandHandler('start', self.handlers.start)],
                 allow_reentry=True,
-                per_message=True
+                per_message=False
             )
 
             # Добавляем обработчики
