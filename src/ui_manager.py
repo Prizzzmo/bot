@@ -1,13 +1,14 @@
-
 import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from topic_service import TopicService # Import the new TopicService
 
 class UIManager:
     """Класс для управления пользовательским интерфейсом"""
-    
-    def __init__(self, logger):
+
+    def __init__(self, logger, topic_service: TopicService): # Inject TopicService
         self.logger = logger
-    
+        self.topic_service = topic_service
+
     def main_menu(self):
         """
         Создает главное меню в виде кнопок.
@@ -24,7 +25,45 @@ class UIManager:
             [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
         ]
         return InlineKeyboardMarkup(keyboard)
-    
+
+
+    def create_topics_keyboard(self, topics):
+        """
+        Создает клавиатуру с кнопками для выбора темы.
+
+        Args:
+            topics (list): Список тем
+
+        Returns:
+            InlineKeyboardMarkup: Клавиатура с кнопками
+        """
+        keyboard = []
+
+        for i, topic in enumerate(topics, 1):
+            # Проверяем, что тема не пустая
+            if topic and len(topic.strip()) > 0:
+                # Ограничиваем длину темы в кнопке
+                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
+                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+            else:
+                # Если тема пустая, добавляем заполнитель
+                keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
+
+        # Добавляем кнопку для ввода своей темы и показать больше тем
+        keyboard.append([
+            InlineKeyboardButton("📝 Своя тема", callback_data='custom_topic'),
+            InlineKeyboardButton("🔄 Больше тем", callback_data='more_topics')
+        ])
+
+        # Добавляем кнопку возврата в меню
+        keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
+
+        return InlineKeyboardMarkup(keyboard)
+
+# src/topic_service.py
+import re
+
+class TopicService:
     def parse_topics(self, topics_text):
         """
         Парсит текст с темами и возвращает отформатированный список тем с оптимизацией.
@@ -80,36 +119,3 @@ class UIManager:
 
         # Ограничиваем до 30 тем
         return filtered_topics[:30]
-    
-    def create_topics_keyboard(self, topics):
-        """
-        Создает клавиатуру с кнопками для выбора темы.
-
-        Args:
-            topics (list): Список тем
-
-        Returns:
-            InlineKeyboardMarkup: Клавиатура с кнопками
-        """
-        keyboard = []
-
-        for i, topic in enumerate(topics, 1):
-            # Проверяем, что тема не пустая
-            if topic and len(topic.strip()) > 0:
-                # Ограничиваем длину темы в кнопке
-                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
-                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
-            else:
-                # Если тема пустая, добавляем заполнитель
-                keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
-
-        # Добавляем кнопку для ввода своей темы и показать больше тем
-        keyboard.append([
-            InlineKeyboardButton("📝 Своя тема", callback_data='custom_topic'),
-            InlineKeyboardButton("🔄 Больше тем", callback_data='more_topics')
-        ])
-
-        # Добавляем кнопку возврата в меню
-        keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
-
-        return InlineKeyboardMarkup(keyboard)

@@ -19,6 +19,12 @@ class CommandHandlers:
         # Инициализируем карту исторических событий
         from src.history_map import HistoryMap
         self.history_map = HistoryMap(logger)
+        
+        # Инициализируем сервисы
+        from src.test_service import TestService
+        from src.topic_service import TopicService
+        self.test_service = TestService(api_client, logger)
+        self.topic_service = TopicService(api_client, logger)
 
         # Импортируем константы состояний из config
         from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION, MAP
@@ -635,8 +641,7 @@ class CommandHandlers:
             )
             return self.CONVERSATION
         elif query_data == 'topic':
-            # Генерируем список тем с помощью ИИ
-            prompt = "Составь список из 30 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
+            # Генерируем список тем с помощью сервиса тем
             try:
                 try:
                     query.edit_message_text("⏳ Загружаю список тем истории России...")
@@ -644,10 +649,8 @@ class CommandHandlers:
                     self.logger.warning(f"Не удалось обновить сообщение о загрузке тем: {e}")
                     query.message.reply_text("⏳ Загружаю список тем истории России...")
 
-                topics_text = self.api_client.ask_grok(prompt)
-
-                # Парсим и сохраняем темы
-                filtered_topics = self.ui_manager.parse_topics(topics_text)
+                # Получаем список тем через сервис
+                filtered_topics = self.topic_service.generate_topics_list()
                 context.user_data['topics'] = filtered_topics
 
                 # Создаем клавиатуру с темами
@@ -689,212 +692,15 @@ class CommandHandlers:
             self.logger.info(f"Генерация теста по теме '{topic}' для пользователя {user_id}")
 
             try:
-                # Получаем тест через сервис контента
-                test_data = self.content_service.generate_test(topic)
+                # Получаем тест через сервис тестирования
+                test_data = self.test_service.generate_test(topic)
                 
-                # Сбрасываем переменные для хранения вопросов
-                valid_questions = []
-                display_questions = []
-
-                # Прежде всего проверим, получили ли мы данные в виде обычного текста
-                if isinstance(test_data, str):
-                    # Преобразуем текст в список вопросов, разделенных пустыми строками или номерами
-                    raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data)
-                    processed_questions = []
-                    display_questions = []
-                    
-                    for q in raw_questions:
-                        q = q.strip()
-                        if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
-                            # Удаляем любые начальные цифры в начале вопроса
-                            q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
-                            
-                            # Сохраняем оригинальный вопрос с правильным ответом
-                            processed_questions.append(q)
-                            
-                            # Создаем вопрос для отображения (без правильного ответа)
-                            display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
-                            display_questions.append(display_q)
-                            
-                    if processed_questions:
-                        valid_questions = processed_questions
-                    else:
-                        raise ValueError("Не удалось извлечь вопросы из текстового формата")
+                # Получаем вопросы из теста
+                valid_questions = test_data.get('original_questions', [])
+                display_questions = test_data.get('display_questions', [])
                 
-                # Проверяем структуру полученных данных если это словарь
-                elif isinstance(test_data, dict):
-                    # Случай 1: Стандартный формат с оригинальными и отображаемыми вопросами
-                    if 'original_questions' in test_data and 'display_questions' in test_data:
-                        if (isinstance(test_data['original_questions'], list) and 
-                            isinstance(test_data['display_questions'], list) and
-                            len(test_data['original_questions']) > 0):
-                            valid_questions = test_data['original_questions']
-                            
-                            # Создаем отображаемые вопросы без правильных ответов
-                            display_questions = []
-                            for q in test_data['original_questions']:
-                                # Удаляем строку с правильным ответом из отображаемого вопроса
-                                display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
-                                display_questions.append(display_q)
-                        else:
-                            raise ValueError("Пустой список вопросов или неверный формат вопросов")
-                            
-                    # Случай 2: Ошибка в ответе API
-                    elif 'status' in test_data and test_data['status'] == 'error':
-                        error_msg = test_data.get('content', 'Ошибка API')
-                        self.logger.warning(f"Ошибка API при генерации теста: {error_msg}")
-                        raise ValueError(f"Не удалось сгенерировать тест: {error_msg}")
-                        
-                    # Случай 3: Вопросы в поле content
-                    elif 'content' in test_data:
-                        # Проверяем тип content - список
-                        if isinstance(test_data['content'], list) and len(test_data['content']) > 0:
-                            valid_questions = test_data['content']
-                            
-                            # Создаем отображаемые вопросы без правильных ответов
-                            display_questions = []
-                            for q in test_data['content']:
-                                display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
-                                display_questions.append(display_q)
-                                
-                        # Проверяем тип content - строка (требует парсинга)
-                        elif isinstance(test_data['content'], str) and len(test_data['content']) > 0:
-                            # Разделяем текст на вопросы, используя пустые строки или номера вопросов как разделители
-                            raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data['content'])
-                            processed_questions = []
-                            display_processed = []
-                            
-                            for q in raw_questions:
-                                q = q.strip()
-                                if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
-                                    # Удаляем любые начальные цифры
-                                    q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
-                                    processed_questions.append(q)
-                                    
-                                    # Создаем вопрос для отображения без правильного ответа
-                                    display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
-                                    display_processed.append(display_q)
-                                    
-                            if processed_questions:
-                                valid_questions = processed_questions
-                                display_questions = display_processed
-                            else:
-                                raise ValueError("Не удалось извлечь вопросы из текстового формата в поле content")
-                        else:
-                            raise ValueError("Поле content существует, но не содержит списка вопросов или строки")
-                        
-                    # Случай 4: Поиск вопросов в любом списковом поле
-                    else:
-                        found_questions = False
-                        for field in test_data:
-                            # Проверяем, есть ли в поле список
-                            if isinstance(test_data[field], list) and len(test_data[field]) > 0:
-                                # Проверяем, что элементы списка - строки
-                                if all(isinstance(q, str) for q in test_data[field]):
-                                    valid_questions = test_data[field]
-                                    display_questions = test_data[field]
-                                    found_questions = True
-                                    break
-                            # Проверяем, есть ли в поле строка, которую можно разделить на вопросы
-                            elif isinstance(test_data[field], str) and len(test_data[field]) > 100:
-                                # Разделяем текст на вопросы
-                                raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data[field])
-                                processed_questions = []
-                                
-                                for q in raw_questions:
-                                    q = q.strip()
-                                    if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
-                                        q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
-                                        processed_questions.append(q)
-                                        
-                                if processed_questions:
-                                    valid_questions = processed_questions
-                                    display_questions = processed_questions
-                                    found_questions = True
-                                    break
-                        
-                        if not found_questions:
-                            self.logger.warning(f"Неожиданная структура данных теста: {test_data}")
-                            raise ValueError("Неверный формат данных теста: отсутствуют вопросы или неверный формат")
-                
-                # Случай 5: test_data - это список вопросов
-                elif isinstance(test_data, list) and len(test_data) > 0:
-                    # Проверяем, что элементы списка - строки
-                    if all(isinstance(q, str) for q in test_data):
-                        valid_questions = test_data
-                        display_questions = test_data
-                    else:
-                        # Попытка извлечь строки из смешанного списка
-                        string_questions = [str(q) for q in test_data if q]
-                        if string_questions:
-                            valid_questions = string_questions
-                            display_questions = string_questions
-                        else:
-                            raise ValueError("Список вопросов содержит элементы неверного типа")
-                        
-                # Случай 6: Неверный формат данных
-                else:
-                    self.logger.warning(f"Неожиданный формат test_data: {type(test_data).__name__}")
-                    raise ValueError(f"Неверный формат данных теста: получен {type(test_data).__name__}")
-
-                # Если вопросы не получены, создаем их напрямую
                 if not valid_questions:
-                    # Запрашиваем простой набор вопросов у API напрямую 
-                    prompt = f"Создай 5 простых вопросов для тестирования по теме '{topic}'. Каждый вопрос должен иметь 4 варианта ответа (1-4) и обязательно указанный правильный ответ в формате 'Правильный ответ: X'. Пронумеруй вопросы. НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.)."
-                    response = self.api_client.ask_grok(prompt, use_cache=False)
-                    
-                    # Разделяем текст на вопросы, используя либо пустые строки, либо номера
-                    raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', response)
-                    processed_questions = []
-                    
-                    for q in raw_questions:
-                        q = q.strip()
-                        if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
-                            # Удаляем начальные цифры, если они есть
-                            q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
-                            processed_questions.append(q)
-                            
-                    if processed_questions:
-                        valid_questions = processed_questions
-                        display_questions = processed_questions
-                    else:
-                        raise ValueError("Не удалось создать вопросы даже с прямым запросом к API")
-
-                # Очищаем все вопросы от символов форматирования Markdown
-                sanitized_questions = []
-                for q in valid_questions:
-                    # Экранируем специальные символы Markdown
-                    sanitized_q = q.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`')
-                    sanitized_q = sanitized_q.replace('[', '\\[').replace(']', '\\]')
-                    sanitized_q = sanitized_q.replace('(', '\\(').replace(')', '\\)')
-                    sanitized_questions.append(sanitized_q)
-                
-                valid_questions = sanitized_questions
-                display_questions = sanitized_questions
-
-                # Валидация данных: проверяем наличие правильных ответов
-                valid_test = False
-                for question in valid_questions:
-                    if re.search(r"Правильный ответ:\s*[1-4]", question):
-                        valid_test = True
-                        break
-                
-                if not valid_test:
-                    # Если правильных ответов нет, добавим их автоматически
-                    self.logger.warning("В вопросах не найдены правильные ответы, добавляем их")
-                    
-                    new_questions = []
-                    for i, q in enumerate(valid_questions):
-                        # Добавляем правильный ответ к каждому вопросу, если его нет
-                        if not re.search(r"Правильный ответ:", q):
-                            # Выбираем случайное число от 1 до 4
-                            import random
-                            correct_answer = random.randint(1, 4)
-                            q += f"\nПравильный ответ: {correct_answer}"
-                        new_questions.append(q)
-                    
-                    valid_questions = new_questions
-                    display_questions = new_questions
+                    raise ValueError("Не удалось получить вопросы для теста")
 
                 # Сохраняем данные в контексте пользователя
                 context.user_data['questions'] = valid_questions
@@ -976,17 +782,12 @@ class CommandHandlers:
                 )
             return self.ANSWER
         elif query_data == 'more_topics':
-            # Генерируем новый список тем с помощью ИИ
-            # Добавляем случайный параметр для получения разных тем
-            random_seed = random.randint(1, 1000)
-            prompt = f"Составь список из 30 новых и оригинальных тем по истории России, которые могут быть интересны для изучения. Сосредоточься на темах {random_seed}. Выбери темы, отличные от стандартных и ранее предложенных. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
+            # Генерируем новый список тем с помощью сервиса тем
             try:
                 query.edit_message_text("🔄 Генерирую новый список уникальных тем по истории России...")
-                # Отключаем кэширование для получения действительно новых тем каждый раз
-                topics = self.api_client.ask_grok(prompt, use_cache=False)
-
-                # Парсим и сохраняем темы
-                filtered_topics = self.ui_manager.parse_topics(topics)
+                
+                # Получаем новый список тем через сервис
+                filtered_topics = self.topic_service.generate_new_topics_list()
                 context.user_data['topics'] = filtered_topics
 
                 # Создаем клавиатуру с темами
@@ -1077,8 +878,8 @@ class CommandHandlers:
                         def update_message(text):
                             query.edit_message_text(text, parse_mode='Markdown')
 
-                        # Получаем информацию о теме
-                        result = self.content_service.get_topic_info(topic, update_message)
+                        # Получаем информацию о теме через сервис тем
+                        result = self.topic_service.get_topic_info(topic, update_message)
 
                         # Проверяем формат полученных данных
                         if isinstance(result, dict):
@@ -1190,8 +991,8 @@ class CommandHandlers:
             def update_message(text):
                 update.message.reply_text(text, parse_mode='Markdown')
 
-            # Получаем информацию о теме
-            result = self.content_service.get_topic_info(topic, update_message)
+            # Получаем информацию о теме через сервис тем
+            result = self.topic_service.get_topic_info(topic, update_message)
 
             # Проверяем формат полученных данных
             if isinstance(result, dict):
@@ -1283,32 +1084,9 @@ class CommandHandlers:
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
             return self.ANSWER
 
-        # Парсим правильный ответ из оригинального текста вопроса с улучшенной обработкой ошибок
+        # Используем сервис тестирования для получения правильного ответа
         try:
-            correct_answer = None
-            # Поиск с более гибким регулярным выражением
-            patterns = [
-                r"Правильный ответ:\s*(\d+)",
-                r"Правильный:\s*(\d+)",
-                r"Ответ:\s*(\d+)",
-                r"Верный ответ:\s*(\d+)"
-            ]
-            
-            for pattern in patterns:
-                correct_answer_match = re.search(pattern, original_questions[current_question])
-                if correct_answer_match:
-                    correct_answer = correct_answer_match.group(1)
-                    break
-                    
-            if not correct_answer:
-                # Попытка найти правильный ответ в конце текста
-                lines = original_questions[current_question].split('\n')
-                for line in reversed(lines):
-                    if re.search(r"\d+", line):
-                        match = re.search(r"\d+", line)
-                        if match:
-                            correct_answer = match.group(0)
-                            break
+            correct_answer = self.test_service.parse_correct_answer(original_questions[current_question])
             
             if not correct_answer:
                 raise ValueError("Формат правильного ответа не найден")
@@ -1374,62 +1152,12 @@ class CommandHandlers:
             # Получаем текст вопроса
             question_text = display_questions[current_question]
             
-            # Удаляем строки с правильным ответом из отображаемого текста
-            question_text = re.sub(r'Правильный ответ:\s*\d+', '', question_text).strip()
+            # Используем сервис тестирования для форматирования вопроса
+            formatted_question = self.test_service.format_question_text(question_text)
             
-            # Выделяем основной вопрос и варианты ответов
-            lines = question_text.split('\n')
-            cleaned_lines = [line.strip() for line in lines if line.strip()]
-            
-            # Находим вопрос (строка с вопросительным знаком или первая строка)
-            main_question = ""
-            for line in cleaned_lines:
-                if '?' in line:
-                    main_question = line
-                    break
-            
-            # Если вопрос не найден, берем первую строку
-            if not main_question and cleaned_lines:
-                main_question = cleaned_lines[0]
-                
-            # Ищем варианты ответов
-            options = []
-            
-            # Сначала ищем стандартные форматы вариантов ответов (цифра с точкой или скобкой)
-            for line in cleaned_lines:
-                # Пропускаем строку с вопросом
-                if line == main_question:
-                    continue
-                    
-                # Проверяем разные форматы: 1) текст, 1. текст, A) текст, A. текст
-                if re.match(r'^\d[\)\.]\s+', line) or re.match(r'^[A-D][\)\.]\s+', line):
-                    # Преобразуем буквенные варианты в цифровые (A → 1, B → 2, etc.)
-                    if re.match(r'^[A-D][\)\.]\s+', line):
-                        letter = line[0]
-                        number = ord(letter) - ord('A') + 1
-                        text = line[2:].strip() if len(line) > 2 else f"Вариант {number}"
-                        options.append(f"{number}) {text}")
-                    else:
-                        options.append(line)
-            
-            # Если стандартные варианты не найдены, пытаемся распознать другие форматы
-            if not options:
-                # Рассматриваем каждую строку после вопроса как потенциальный вариант ответа
-                option_index = 0
-                for i, line in enumerate(cleaned_lines):
-                    if line == main_question:
-                        option_index = i + 1
-                        break
-                
-                # Берем до 4-х строк после вопроса как варианты ответов
-                for i in range(option_index, min(option_index + 4, len(cleaned_lines))):
-                    if i < len(cleaned_lines):
-                        options.append(f"{i - option_index + 1}) {cleaned_lines[i]}")
-            
-            # Если всё еще нет вариантов или их меньше 4, добавляем заполнители
-            if len(options) < 4:
-                for i in range(len(options), 4):
-                    options.append(f"{i+1}) Вариант ответа {i+1}")
+            # Получаем основной вопрос и варианты ответов
+            main_question = formatted_question['main_question']
+            options = formatted_question['options']
             
             # Отправляем несколько сообщений для лучшего форматирования
             
@@ -1804,27 +1532,8 @@ class CommandHandlers:
         Returns:
             list: Список рекомендованных тем
         """
-        try:
-            # Формируем запрос на рекомендацию
-            prompt = f"На основе темы '{current_topic}' предложи 3 связанные темы по истории России, которые могут заинтересовать пользователя. Перечисли их в формате нумерованного списка без дополнительных пояснений."
-
-            # Получаем ответ от API
-            similar_topics_text = self.api_client.ask_grok(prompt, max_tokens=150, temp=0.4)
-
-            # Парсим темы
-            similar_topics = []
-            for line in similar_topics_text.split('\n'):
-                # Ищем строки с форматом "1. Тема" или "- Тема"
-                if (line.strip().startswith(('1.', '2.', '3.', '-'))):
-                    # Удаляем префикс и лишние пробелы
-                    topic = re.sub(r'^[\d\.\-\s]+', '', line).strip()
-                    if topic:
-                        similar_topics.append(topic)
-
-            return similar_topics[:3]  # Возвращаем максимум 3 темы
-        except Exception as e:
-            self.logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
-            return []
+        # Используем сервис тестирования для получения рекомендаций
+        return self.test_service.recommend_similar_topics(current_topic, self.api_client)
 
     def admin_command(self, update, context):
         """
