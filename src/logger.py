@@ -86,7 +86,7 @@ class Logger:
         logger.addHandler(console_handler)
 
         print(f"Логирование настроено. Сохраняются только записи о запуске и ошибках.")
-        self.logger = logger
+        self.logger = loggerf.logger = logger
         return logger
     
     def log_error(self, error, additional_info=None):

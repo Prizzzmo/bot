@@ -74,6 +74,6 @@ def main():
 if __name__ == '__main__':
     # Проверяем и завершаем другие экземпляры бота перед запуском
     check_running_instances()
-
-    bot_manager = BotManager() # Initialize BotManager here
-    bot_manager.run()
+    
+    # Напрямую вызываем main(), так как BotManager просто вызывает его
+    main()
