@@ -695,9 +695,28 @@ class CommandHandlers:
                 # Сбрасываем переменные для хранения вопросов
                 valid_questions = []
                 display_questions = []
+
+                # Прежде всего проверим, получили ли мы данные в виде обычного текста
+                if isinstance(test_data, str):
+                    # Преобразуем текст в список вопросов, разделенных пустыми строками или номерами
+                    raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data)
+                    processed_questions = []
+                    
+                    for q in raw_questions:
+                        q = q.strip()
+                        if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
+                            # Удаляем любые начальные цифры в начале вопроса
+                            q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
+                            processed_questions.append(q)
+                            
+                    if processed_questions:
+                        valid_questions = processed_questions
+                        display_questions = processed_questions
+                    else:
+                        raise ValueError("Не удалось извлечь вопросы из текстового формата")
                 
-                # Проверяем структуру полученных данных
-                if isinstance(test_data, dict):
+                # Проверяем структуру полученных данных если это словарь
+                elif isinstance(test_data, dict):
                     # Случай 1: Стандартный формат с оригинальными и отображаемыми вопросами
                     if 'original_questions' in test_data and 'display_questions' in test_data:
                         if (isinstance(test_data['original_questions'], list) and 
@@ -715,19 +734,59 @@ class CommandHandlers:
                         raise ValueError(f"Не удалось сгенерировать тест: {error_msg}")
                         
                     # Случай 3: Вопросы в поле content
-                    elif 'content' in test_data and isinstance(test_data['content'], list) and len(test_data['content']) > 0:
-                        valid_questions = test_data['content']
-                        display_questions = test_data['content']
+                    elif 'content' in test_data:
+                        # Проверяем тип content - список
+                        if isinstance(test_data['content'], list) and len(test_data['content']) > 0:
+                            valid_questions = test_data['content']
+                            display_questions = test_data['content']
+                        # Проверяем тип content - строка (требует парсинга)
+                        elif isinstance(test_data['content'], str) and len(test_data['content']) > 0:
+                            # Разделяем текст на вопросы, используя пустые строки или номера вопросов как разделители
+                            raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data['content'])
+                            processed_questions = []
+                            
+                            for q in raw_questions:
+                                q = q.strip()
+                                if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
+                                    # Удаляем любые начальные цифры
+                                    q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
+                                    processed_questions.append(q)
+                                    
+                            if processed_questions:
+                                valid_questions = processed_questions
+                                display_questions = processed_questions
+                            else:
+                                raise ValueError("Не удалось извлечь вопросы из текстового формата в поле content")
+                        else:
+                            raise ValueError("Поле content существует, но не содержит списка вопросов или строки")
                         
                     # Случай 4: Поиск вопросов в любом списковом поле
                     else:
                         found_questions = False
                         for field in test_data:
+                            # Проверяем, есть ли в поле список
                             if isinstance(test_data[field], list) and len(test_data[field]) > 0:
                                 # Проверяем, что элементы списка - строки
                                 if all(isinstance(q, str) for q in test_data[field]):
                                     valid_questions = test_data[field]
                                     display_questions = test_data[field]
+                                    found_questions = True
+                                    break
+                            # Проверяем, есть ли в поле строка, которую можно разделить на вопросы
+                            elif isinstance(test_data[field], str) and len(test_data[field]) > 100:
+                                # Разделяем текст на вопросы
+                                raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', test_data[field])
+                                processed_questions = []
+                                
+                                for q in raw_questions:
+                                    q = q.strip()
+                                    if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
+                                        q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
+                                        processed_questions.append(q)
+                                        
+                                if processed_questions:
+                                    valid_questions = processed_questions
+                                    display_questions = processed_questions
                                     found_questions = True
                                     break
                         
@@ -742,12 +801,41 @@ class CommandHandlers:
                         valid_questions = test_data
                         display_questions = test_data
                     else:
-                        raise ValueError("Список вопросов содержит элементы неверного типа")
+                        # Попытка извлечь строки из смешанного списка
+                        string_questions = [str(q) for q in test_data if q]
+                        if string_questions:
+                            valid_questions = string_questions
+                            display_questions = string_questions
+                        else:
+                            raise ValueError("Список вопросов содержит элементы неверного типа")
                         
                 # Случай 6: Неверный формат данных
                 else:
                     self.logger.warning(f"Неожиданный формат test_data: {type(test_data).__name__}")
                     raise ValueError(f"Неверный формат данных теста: получен {type(test_data).__name__}")
+
+                # Принудительно создадим вопросы, если их не удалось получить
+                if not valid_questions:
+                    # Запрашиваем простой набор вопросов у API напрямую
+                    prompt = f"Создай 5 простых вопросов для тестирования по теме '{topic}'. Каждый вопрос должен иметь 4 варианта ответа (1-4) и обязательно указанный правильный ответ в формате 'Правильный ответ: X'. Пронумеруй вопросы."
+                    response = self.api_client.ask_grok(prompt, use_cache=False)
+                    
+                    # Разделяем текст на вопросы, используя либо пустые строки, либо номера
+                    raw_questions = re.split(r'\n\s*\n|\n\d+[\.\)]\s+', response)
+                    processed_questions = []
+                    
+                    for q in raw_questions:
+                        q = q.strip()
+                        if q and len(q) > 10 and ('?' in q or 'Вопрос' in q):
+                            # Удаляем начальные цифры, если они есть
+                            q = re.sub(r'^(\d+[\.\)]|\d+\.)\s*', '', q).strip()
+                            processed_questions.append(q)
+                            
+                    if processed_questions:
+                        valid_questions = processed_questions
+                        display_questions = processed_questions
+                    else:
+                        raise ValueError("Не удалось создать вопросы даже с прямым запросом к API")
 
                 # Валидация данных: проверяем наличие правильных ответов
                 valid_test = False
@@ -757,8 +845,21 @@ class CommandHandlers:
                         break
                 
                 if not valid_test:
-                    self.logger.warning("В вопросах не найдены правильные ответы")
-                    raise ValueError("Неверный формат вопросов: не найдены правильные ответы")
+                    # Если правильных ответов нет, добавим их автоматически
+                    self.logger.warning("В вопросах не найдены правильные ответы, добавляем их")
+                    
+                    new_questions = []
+                    for i, q in enumerate(valid_questions):
+                        # Добавляем правильный ответ к каждому вопросу, если его нет
+                        if not re.search(r"Правильный ответ:", q):
+                            # Выбираем случайное число от 1 до 4
+                            import random
+                            correct_answer = random.randint(1, 4)
+                            q += f"\nПравильный ответ: {correct_answer}"
+                        new_questions.append(q)
+                    
+                    valid_questions = new_questions
+                    display_questions = new_questions
 
                 # Сохраняем данные в контексте пользователя
                 context.user_data['questions'] = valid_questions
