@@ -5,6 +5,7 @@ from typing import Dict, Any
 from src.api_client import APIClient
 from src.api_cache import APICache
 from src.logger import Logger
+from src.content_service import ContentService
 from src.ui_manager import UIManager
 from src.message_manager import MessageManager
 from src.state_manager import StateManager
@@ -16,7 +17,7 @@ from src.history_map import HistoryMap
 from src.web_server import WebServer
 from src.test_service import TestService
 from src.topic_service import TopicService
-from src.conversation_service import ConversationService ConversationService #Added import
+from src.conversation_service import ConversationService #Added import
 
 
 class BotFactory:
