@@ -1,6 +1,6 @@
 import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from topic_service import TopicService # Import the new TopicService
+from src.topic_service import TopicService # Import the new TopicService
 
 class UIManager:
     """Класс для управления пользовательским интерфейсом"""
