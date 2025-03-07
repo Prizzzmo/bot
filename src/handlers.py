@@ -547,6 +547,8 @@ class CommandHandlers:
     def handle_conversation(self, update, context):
         """
         Обрабатывает сообщения пользователя в режиме беседы с оптимизацией.
+        
+        Также обрабатывает ввод ID нового администратора, если его ожидает админ-панель.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
@@ -555,6 +557,10 @@ class CommandHandlers:
         Returns:
             int: Следующее состояние разговора
         """
+        # Проверяем, ожидаем ли мы ввод ID нового администратора
+        if hasattr(self, 'admin_panel') and 'waiting_for_admin_id' in context.user_data:
+            self.admin_panel.process_new_admin_id(update, context)
+            return self.CONVERSATION
         user_message = update.message.text
         user_id = update.message.from_user.id
 
@@ -621,6 +627,45 @@ class CommandHandlers:
             )
 
         return self.CONVERSATION
+    
+    def admin_command(self, update, context):
+        """
+        Обрабатывает команду /admin для доступа к административной панели.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        # Передаем управление в модуль админ-панели
+        if hasattr(self, 'admin_panel'):
+            self.admin_panel.handle_admin_command(update, context)
+        else:
+            update.message.reply_text("Административная панель недоступна")
+    
+    def admin_callback(self, update, context):
+        """
+        Обрабатывает нажатия на кнопки в административной панели.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        query = update.callback_query
+        
+        # Проверяем наличие и передаем обработку в админ-панель
+        if hasattr(self, 'admin_panel'):
+            # Обрабатываем все callback-запросы, начинающиеся с admin_
+            if query.data.startswith('admin_'):
+                # Проверяем, это удаление админа или нет
+                if query.data.startswith('admin_delete_'):
+                    # Извлекаем ID админа для удаления
+                    admin_id = int(query.data.split('_')[2])
+                    self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
+                else:
+                    # Обычный admin callback
+                    self.admin_panel.handle_admin_callback(update, context)
+                return True
+        return False
     
     def error_handler(self, update, context):
         """

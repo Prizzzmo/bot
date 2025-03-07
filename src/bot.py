@@ -11,6 +11,11 @@ class Bot:
         self.logger = logger
         self.handlers = command_handlers
         self.updater = None
+        
+        # Инициализируем админ-панель и привязываем её к обработчику команд
+        from src.admin_panel import AdminPanel
+        admin_panel = AdminPanel(logger, config)
+        self.handlers.admin_panel = admin_panel
 
     def setup(self):
         """Настройка бота и диспетчера"""
@@ -50,6 +55,12 @@ class Bot:
             # Добавляем обработчики
             dp.add_error_handler(self.handlers.error_handler)
             dp.add_handler(conv_handler)
+            
+            # Добавляем обработчик для команды администратора
+            dp.add_handler(CommandHandler('admin', self.handlers.admin_command))
+            
+            # Добавляем обработчик для обработки callback запросов администратора
+            dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'))
 
             return True
         except Exception as e:
