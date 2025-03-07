@@ -691,10 +691,20 @@ class CommandHandlers:
             try:
                 # Получаем тест через сервис контента
                 test_data = self.content_service.generate_test(topic)
-
-                valid_questions = test_data['original_questions']
-                display_questions = test_data['display_questions']
-
+                
+                # Проверяем структуру полученных данных
+                if isinstance(test_data, dict) and 'original_questions' in test_data and 'display_questions' in test_data:
+                    valid_questions = test_data['original_questions']
+                    display_questions = test_data['display_questions']
+                elif isinstance(test_data, list) and len(test_data) > 0:
+                    # Обрабатываем случай, когда test_data это список вопросов
+                    valid_questions = test_data
+                    display_questions = test_data
+                else:
+                    # Создаем дефолтную структуру для обработки ошибок
+                    self.logger.warning(f"Неожиданный формат test_data: {type(test_data)}")
+                    raise ValueError("Неверный формат данных теста")
+                
                 context.user_data['questions'] = valid_questions
                 context.user_data['current_question'] = 0
                 context.user_data['score'] = 0
