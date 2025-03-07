@@ -4,6 +4,40 @@ import telegram
 import threading
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from telegram.ext import CallbackContext
+from telegram import Update
+from telegram.error import BadRequest
+
+    def clear_chat(self, update: Update, context: CallbackContext):
+        """
+        Очищает чат с использованием метода deleteHistory
+        """
+        try:
+            chat_id = update.effective_chat.id
+            self.logger.info(f"Очистка чата {chat_id}")
+            
+            # Используем метод deleteHistory для очистки чата
+            context.bot.delete_chat_history(chat_id)
+            
+            # Отправляем подтверждение
+            context.bot.send_message(
+                chat_id=chat_id,
+                text="Чат успешно очищен.",
+                disable_notification=True
+            )
+        except BadRequest as e:
+            self.logger.error(f"Ошибка при очистке чата: {e}")
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Не удалось очистить чат. Возможно, у бота недостаточно прав."
+            )
+        except Exception as e:
+            self.logger.error(f"Непредвиденная ошибка при очистке чата: {e}")
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Произошла ошибка при очистке чата."
+            )
+
 
 class MessageManager:
     """Класс для управления сообщениями в чате"""
