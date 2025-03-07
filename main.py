@@ -58,10 +58,10 @@ if not TELEGRAM_TOKEN:
     logger.error("Отсутствует TELEGRAM_TOKEN в файле .env")
     exit(1)
 
-# Функция для вызова Gemini API с кэшированием
+# Функция для вызова Gemini API с моделью 2.0 Flash
 def ask_grok(prompt, max_tokens=1024, temp=0.7):
     """
-    Отправляет запрос к API Gemini и возвращает ответ.
+    Отправляет запрос к API Gemini 2.0 Flash и возвращает ответ.
 
     Args:
         prompt (str): Промпт для отправки
@@ -80,9 +80,9 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7):
             "max_output_tokens": max_tokens,
         }
 
-        # Создание модели с заданной конфигурацией
+        # Создание модели с заданной конфигурацией, используя Gemini 2.0 Flash
         model = genai.GenerativeModel(
-            model_name="gemini-pro",
+            model_name="gemini-1.5-flash",  # Используем модель 2.0 Flash для более быстрой обработки
             generation_config=generation_config
         )
 
