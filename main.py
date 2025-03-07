@@ -145,194 +145,65 @@ load_dotenv()
 # Класс для кэширования ответов API
 class APICache:
     """
-    Улучшенный класс для кэширования ответов API.
-    Поддерживает сохранение и загрузку кэша из файла,
-    имеет механизмы для защиты от повреждения файла кэша.
-    
-    © 2025 Silver Raven. Образовательный бот по истории России.
+    Простой класс для кэширования ответов API.
+    Поддерживает сохранение и загрузку кэша из файла.
     """
-    def __init__(self, max_size=200, cache_file='api_cache.json', backup_file='api_cache_backup.json'):
+    def __init__(self, max_size=100, cache_file='api_cache.json'):
         self.cache = {}
         self.max_size = max_size
         self.cache_file = cache_file
-        self.backup_file = backup_file
-        self.last_save_time = datetime.now().timestamp()
-        self.modified_since_save = False
         self.load_cache()
         
     def get(self, key):
-        """Получить значение из кэша по ключу и обновить время доступа"""
-        cache_item = self.cache.get(key)
-        if cache_item:
-            # Обновляем время последнего доступа
-            cache_item['last_accessed'] = datetime.now().timestamp()
-            # Обновляем счетчик использования
-            cache_item['access_count'] = cache_item.get('access_count', 0) + 1
-            self.modified_since_save = True
-            return cache_item['value']
-        return None
+        """Получить значение из кэша по ключу"""
+        return self.cache.get(key)
 
-    def set(self, key, value, ttl=None):
-        """
-        Добавить значение в кэш
-        
-        Args:
-            key (str): Ключ для хранения
-            value (any): Значение для кэширования
-            ttl (int, optional): Время жизни записи в секундах
-        """
+    def set(self, key, value):
+        """Добавить значение в кэш"""
         # Если кэш переполнен, удаляем наименее востребованные элементы
         if len(self.cache) >= self.max_size:
-            self._clean_cache()
+            # Сортируем по времени последнего доступа
+            items = sorted(self.cache.items(), key=lambda x: x[1].get('last_accessed', 0))
+            # Удаляем 10% старых элементов
+            for i in range(int(self.max_size * 0.1)):
+                if items:
+                    del self.cache[items[i][0]]
         
-        # Добавляем новый элемент с временной меткой и счетчиком использования
-        expiry = None
-        if ttl:
-            expiry = datetime.now().timestamp() + ttl
-            
+        # Добавляем новый элемент с временной меткой
         self.cache[key] = {
             'value': value,
-            'created': datetime.now().timestamp(),
-            'last_accessed': datetime.now().timestamp(),
-            'access_count': 1,
-            'expiry': expiry
+            'last_accessed': datetime.now().timestamp()
         }
-        
-        self.modified_since_save = True
-        
-        # Периодически сохраняем кэш, но не чаще чем раз в 30 секунд
-        current_time = datetime.now().timestamp()
-        if self.modified_since_save and (current_time - self.last_save_time > 30 or len(self.cache) % 20 == 0):
+        # Периодически сохраняем кэш
+        if len(self.cache) % 10 == 0:
             self.save_cache()
-    
-    def _clean_cache(self):
-        """Очищает кэш от устаревших и наименее используемых записей"""
-        # Удаляем просроченные записи
-        current_time = datetime.now().timestamp()
-        expired_keys = [k for k, v in self.cache.items() 
-                      if v.get('expiry') and v['expiry'] < current_time]
-        
-        for key in expired_keys:
-            del self.cache[key]
-        
-        # Если после удаления просроченных записей кэш всё ещё переполнен
-        if len(self.cache) >= self.max_size:
-            # Сложный алгоритм оценки ценности записи:
-            # - Недавно созданные имеют преимущество (weighted_recency)
-            # - Часто используемые имеют преимущество (access_count)
-            # - Недавно использованные имеют преимущество (last_accessed)
-            
-            items_with_score = []
-            for key, data in self.cache.items():
-                age = current_time - data.get('created', 0)
-                recency = current_time - data.get('last_accessed', 0)
-                count = data.get('access_count', 1)
-                
-                # Записи младше суток получают бонус
-                weighted_recency = recency * (0.7 if age < 86400 else 1.0) 
-                
-                # Формула: частота использования / недавность использования 
-                # (чем выше счет, тем ценнее запись)
-                score = count / (weighted_recency + 1)
-                items_with_score.append((key, score))
-            
-            # Сортируем по возрастанию ценности (наименее ценные в начале)
-            items_with_score.sort(key=lambda x: x[1])
-            
-            # Удаляем 15% наименее ценных записей
-            for i in range(int(self.max_size * 0.15)):
-                if i < len(items_with_score):
-                    del self.cache[items_with_score[i][0]]
 
     def load_cache(self):
-        """Загружает кэш из файла с резервным копированием"""
+        """Загружает кэш из файла, если он существует"""
         try:
             if os.path.exists(self.cache_file):
-                try:
-                    with open(self.cache_file, 'r', encoding='utf-8') as f:
-                        loaded_cache = json.load(f)
-                        self.cache = loaded_cache
-                        logger.info(f"Кэш загружен из {self.cache_file}, {len(self.cache)} записей")
-                        # Создаем резервную копию рабочего кэша
-                        with open(self.backup_file, 'w', encoding='utf-8') as backup:
-                            json.dump(self.cache, backup, ensure_ascii=False)
-                except json.JSONDecodeError:
-                    logger.warning(f"Ошибка формата JSON в файле кэша. Пробуем загрузить резервную копию.")
-                    if os.path.exists(self.backup_file):
-                        with open(self.backup_file, 'r', encoding='utf-8') as f:
-                            loaded_cache = json.load(f)
-                            self.cache = loaded_cache
-                            logger.info(f"Кэш загружен из резервной копии {self.backup_file}, {len(self.cache)} записей")
-                    else:
-                        logger.warning("Резервная копия кэша не найдена. Создаем новый кэш.")
-                        self.cache = {}
-            else:
-                logger.info(f"Файл кэша {self.cache_file} не найден. Создаем новый кэш.")
-                self.cache = {}
-                
-            # Фильтруем просроченные записи при загрузке
-            current_time = datetime.now().timestamp()
-            expired_keys = [k for k, v in self.cache.items() 
-                          if isinstance(v, dict) and v.get('expiry') and v['expiry'] < current_time]
-            
-            for key in expired_keys:
-                del self.cache[key]
-                
-            if expired_keys:
-                logger.info(f"Удалено {len(expired_keys)} просроченных записей из кэша")
-                
+                with open(self.cache_file, 'r', encoding='utf-8') as f:
+                    loaded_cache = json.load(f)
+                    self.cache = {k: {'value': v['value'], 'last_accessed': v['last_accessed']} 
+                                 for k, v in loaded_cache.items()}
+                    logger.info(f"Кэш загружен из {self.cache_file}, {len(self.cache)} записей")
         except Exception as e:
             logger.error(f"Ошибка при загрузке кэша: {e}")
             self.cache = {}
 
     def save_cache(self):
-        """Сохраняет кэш в файл с резервным копированием"""
-        if not self.modified_since_save:
-            return
-            
+        """Сохраняет кэш в файл"""
         try:
-            # Создаем временный файл
-            temp_file = f"{self.cache_file}.tmp"
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(self.cache, f, ensure_ascii=False)
-            
-            # Если временный файл успешно создан, заменяем основной файл
-            if os.path.exists(temp_file):
-                # В Windows нельзя просто переименовать файл, если целевой уже существует
-                if os.path.exists(self.cache_file):
-                    os.remove(self.cache_file)
-                os.rename(temp_file, self.cache_file)
-                
-                # Обновляем резервную копию каждые 5 сохранений
-                if os.path.exists(self.cache_file) and random.random() < 0.2:
-                    with open(self.backup_file, 'w', encoding='utf-8') as backup:
-                        with open(self.cache_file, 'r', encoding='utf-8') as source:
-                            backup.write(source.read())
-                
-                self.last_save_time = datetime.now().timestamp()
-                self.modified_since_save = False
-                logger.info(f"Кэш сохранен в {self.cache_file}, {len(self.cache)} записей")
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump(self.cache, f, ensure_ascii=False, indent=2)
+            logger.info(f"Кэш сохранен в {self.cache_file}, {len(self.cache)} записей")
         except Exception as e:
             logger.error(f"Ошибка при сохранении кэша: {e}")
 
     def clear(self):
         """Очистить кэш"""
         self.cache.clear()
-        self.modified_since_save = True
         self.save_cache()
-        
-    def remove_expired(self):
-        """Удаляет все истекшие записи из кэша"""
-        current_time = datetime.now().timestamp()
-        expired_keys = [k for k, v in self.cache.items() 
-                      if isinstance(v, dict) and v.get('expiry') and v['expiry'] < current_time]
-        
-        if expired_keys:
-            for key in expired_keys:
-                del self.cache[key]
-            logger.info(f"Удалено {len(expired_keys)} просроченных записей из кэша")
-            self.modified_since_save = True
-            self.save_cache()
 
 # Создаем глобальный экземпляр кэша
 api_cache = APICache()
@@ -342,39 +213,31 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Используем Google Gemini API
 
 # Функция для запросов к Google Gemini API
-def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True, retry_count=2, safety_filter=None, ttl=None):
+def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
     """
     Отправляет запрос к Google Gemini API и возвращает ответ.
-    Включает расширенную обработку ошибок и настройку фильтров безопасности.
 
     Args:
         prompt (str): Текст запроса
         max_tokens (int): Максимальное количество токенов в ответе
         temp (float): Температура генерации (0.0-1.0)
         use_cache (bool): Использовать ли кэширование
-        retry_count (int): Количество повторных попыток при ошибках
-        safety_filter (str, optional): Уровень фильтра безопасности ('BLOCK_NONE', 'BLOCK_SOME', 'BLOCK_MOST')
-        ttl (int, optional): Время жизни кэша для этого запроса (в секундах)
 
     Returns:
         str: Ответ от API или сообщение об ошибке
-        
-    © 2025 Silver Raven. Образовательный бот по истории России.
     """
     # Создаем уникальный ключ для кэша на основе параметров запроса
-    cache_key = f"{prompt}_{max_tokens}_{temp}_{safety_filter}"
+    cache_key = f"{prompt}_{max_tokens}_{temp}"
 
     # Проверяем кэш, если использование кэша включено
     if use_cache:
         cached_response = api_cache.get(cache_key)
         if cached_response:
             logger.info("Использую кэшированный ответ")
-            return cached_response
+            return cached_response['value']
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
-    
-    # Базовая конфигурация запроса
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -382,131 +245,56 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True, retry_count=2, s
             "maxOutputTokens": max_tokens
         }
     }
-    
-    # Добавление настроек фильтра безопасности, если указаны
-    if safety_filter:
-        data["safetySettings"] = [
-            {
-                "category": "HARM_CATEGORY_DANGEROUS",
-                "threshold": safety_filter
-            },
-            {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": safety_filter
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": safety_filter
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": safety_filter
-            }
-        ]
 
-    # Функция для выполнения запроса с повторными попытками
-    def make_request(current_retry=0):
-        try:
-            logger.info(f"Отправка запроса к Gemini API: {prompt[:50]}...")
-            
-            # Добавляем таймаут для HTTP-запроса
-            response = requests.post(url, headers=headers, json=data, timeout=20)
-            response.raise_for_status()
+    try:
+        logger.info(f"Отправка запроса к Gemini API: {prompt[:50]}...")
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
 
-            response_json = response.json()
+        response_json = response.json()
 
-            # Проверка наличия всех необходимых ключей в ответе
-            if "candidates" not in response_json or not response_json["candidates"]:
-                # Проверяем наличие информации о блокировке
-                if "promptFeedback" in response_json and response_json["promptFeedback"].get("blockReason"):
-                    block_reason = response_json["promptFeedback"]["blockReason"]
-                    logger.warning(f"Запрос заблокирован по причине: {block_reason}")
-                    return f"Запрос заблокирован фильтрами безопасности: {block_reason}. Пожалуйста, перефразируйте запрос."
-                    
-                logger.warning(f"Ответ не содержит 'candidates': {response_json}")
-                return "API вернул ответ без содержимого. Возможно, запрос был заблокирован фильтрами безопасности."
+        # Проверка наличия всех необходимых ключей в ответе
+        if "candidates" not in response_json or not response_json["candidates"]:
+            logger.warning(f"Ответ не содержит 'candidates': {response_json}")
+            return "API вернул ответ без содержимого. Возможно, запрос был заблокирован фильтрами безопасности."
 
-            candidate = response_json["candidates"][0]
-            if "content" not in candidate:
-                logger.warning(f"Ответ не содержит 'content': {candidate}")
-                return "API вернул неверный формат ответа."
+        candidate = response_json["candidates"][0]
+        if "content" not in candidate:
+            logger.warning(f"Ответ не содержит 'content': {candidate}")
+            return "API вернул неверный формат ответа."
 
-            content = candidate["content"]
-            if "parts" not in content or not content["parts"]:
-                logger.warning(f"Ответ не содержит 'parts': {content}")
-                return "API вернул пустой ответ."
+        content = candidate["content"]
+        if "parts" not in content or not content["parts"]:
+            logger.warning(f"Ответ не содержит 'parts': {content}")
+            return "API вернул пустой ответ."
 
-            result = content["parts"][0]["text"]
-            logger.info(f"Получен ответ от API: {result[:50]}...")
+        result = content["parts"][0]["text"]
+        logger.info(f"Получен ответ от API: {result[:50]}...")
 
-            # Сохраняем результат в кэш
-            if use_cache:
-                api_cache.set(cache_key, result, ttl)
+        # Сохраняем результат в кэш
+        if use_cache:
+            api_cache.set(cache_key, result)
 
-            return result
-            
-        except requests.exceptions.RequestException as e:
-            error_type = type(e).__name__
-            error_msg = str(e)
-            
-            # Логирование с подробностями об ошибке
-            logger.error(f"{error_type}: {error_msg}")
+        return result
 
-            # Проверяем, можно ли повторить запрос
-            if current_retry < retry_count:
-                retry_delay = (current_retry + 1) * 2  # Растущая задержка
-                logger.info(f"Повторная попытка ({current_retry+1}/{retry_count}) через {retry_delay} секунд...")
-                import time
-                time.sleep(retry_delay)
-                return make_request(current_retry + 1)
-                
-            # Более детальное логирование HTTP-ошибок
-            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, 'response'):
-                status_code = e.response.status_code
-                logger.error(f"Статус код: {status_code}")
-                
-                try:
-                    error_content = e.response.json()
-                    logger.error(f"Детали ошибки: {error_content}")
-                    
-                    # Проверка специфических ошибок API
-                    if 'error' in error_content:
-                        api_error = error_content['error']
-                        if 'status' in api_error and api_error['status'] == 'RESOURCE_EXHAUSTED':
-                            return "Превышены лимиты запросов к API. Пожалуйста, попробуйте позже."
-                        elif 'message' in api_error:
-                            return f"Ошибка API: {api_error['message']}"
-                except:
-                    logger.error(f"Ответ сервера (текст): {e.response.text}")
-                
-                # Возвращаем сообщение в зависимости от статус-кода
-                if status_code == 400:
-                    return "Неверный запрос к API. Проверьте параметры и формат запроса."
-                elif status_code == 401 or status_code == 403:
-                    return "Ошибка авторизации API. Проверьте ключ API и разрешения."
-                elif status_code == 404:
-                    return "Запрашиваемый ресурс API не найден. Проверьте URL и параметры."
-                elif status_code == 429:
-                    return "Превышены лимиты запросов к API. Пожалуйста, попробуйте позже."
-                elif 500 <= status_code < 600:
-                    return "Внутренняя ошибка сервера API. Пожалуйста, попробуйте позже."
-                else:
-                    return f"Ошибка HTTP ({status_code}) при запросе к Google Gemini: {error_msg}"
+    except requests.exceptions.RequestException as e:
+        error_type = type(e).__name__
+        error_msg = str(e)
+        logger.error(f"{error_type}: {error_msg}")
 
-            # Сообщения для других типов ошибок
-            error_messages = {
-                "ConnectionError": "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету.",
-                "Timeout": "Превышено время ожидания ответа от API Google Gemini.",
-                "JSONDecodeError": "Ошибка при обработке ответа от API Google Gemini.",
-                "HTTPError": f"Ошибка HTTP при запросе к Google Gemini: {error_msg}",
-                "SSLError": "Ошибка SSL при подключении к API. Проверьте настройки сети.",
-                "ProxyError": "Ошибка прокси-сервера при подключении к API."
-            }
+        if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, 'response'):
+            logger.error(f"Статус код: {e.response.status_code}")
+            logger.error(f"Ответ сервера: {e.response.text}")
+            return f"Ошибка HTTP при запросе к Google Gemini ({e.response.status_code}): {error_msg}"
 
-            return error_messages.get(error_type, f"Ошибка при запросе к Google Gemini: {error_msg}")
+        error_messages = {
+            "ConnectionError": "Ошибка соединения с API Google Gemini. Проверьте подключение к интернету.",
+            "Timeout": "Превышено время ожидания ответа от API Google Gemini.",
+            "JSONDecodeError": "Ошибка при обработке ответа от API Google Gemini.",
+            "HTTPError": f"Ошибка HTTP при запросе к Google Gemini: {error_msg}"
+        }
 
-    # Выполняем запрос с возможностью повторных попыток
-    return make_request()
+        return error_messages.get(error_type, f"Неизвестная ошибка при запросе к Google Gemini: {error_msg}")
 
 # Функция для создания главного меню
 def main_menu():
@@ -515,15 +303,12 @@ def main_menu():
     
     Returns:
         InlineKeyboardMarkup: Клавиатура с кнопками меню
-        
-    © 2025 Silver Raven. Образовательный бот по истории России.
     """
     keyboard = [
         [InlineKeyboardButton("🔍 Выбрать тему", callback_data='topic')],
         [InlineKeyboardButton("✅ Пройти тест", callback_data='test')],
         [InlineKeyboardButton("💬 Беседа о истории России", callback_data='conversation')],
         [InlineKeyboardButton("📄 Скачать презентацию", callback_data='download_presentation')],
-        [InlineKeyboardButton("ℹ️ О боте", callback_data='about')],
         [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -564,8 +349,7 @@ def start(update, context):
         "исторических личностях, международных отношениях и историческом значении.\n\n"
         "❗ *Данный бот создан в качестве учебного пособия.*\n\n"
         "📋 Вам отправлена подробная презентация бота, содержащая информацию о функциональности, "
-        "принципах работы с ИИ Gemini и мерах безопасности.\n\n"
-        "© 2025 Silver Raven. Образовательный бот по истории России.",
+        "принципах работы с ИИ Gemini и мерах безопасности.",
         parse_mode='Markdown'
     )
     # Сохраняем ID сообщения
@@ -621,100 +405,44 @@ def parse_topics(topics_text):
     """
     filtered_topics = []
     
-    # Усовершенствованное регулярное выражение для более точного извлечения тем
-    # Паттерн ищет строки, которые начинаются с цифры, маркера списка или содержат разделители
-    pattern = r'(?:^\d+[.):]\s*|^[*•\-–—]\s*|^[а-яА-ЯA-Za-z]+[:.]\s*)(.+?)$'
+    # Используем регулярное выражение для более эффективного извлечения тем
+    # Паттерн ищет строки, которые начинаются с цифры или содержат разделители (точка, двоеточие)
+    pattern = r'(?:^\d+[.):]\s*|^[*•-]\s*|^[а-яА-Я\w]+[:.]\s*)(.+?)$'
     
-    # Предварительная очистка текста
-    lines = [line.strip() for line in topics_text.split('\n') if line.strip()]
-    
-    for line in lines:
-        if len(line) <= 1:
+    for line in topics_text.split('\n'):
+        line = line.strip()
+        if not line or len(line) <= 1:
             continue
             
         # Пытаемся извлечь тему с помощью регулярного выражения
         match = re.search(pattern, line, re.MULTILINE)
         if match:
             topic_text = match.group(1).strip()
-            if topic_text and len(topic_text) > 3:  # Проверка минимальной длины
-                # Удаляем кавычки в начале и конце, если они есть
-                topic_text = topic_text.strip('"\'«»')
+            if topic_text:
                 filtered_topics.append(topic_text)
-        # Если регулярное выражение не сработало, используем улучшенные эвристические методы
-        elif any(sep in line for sep in ['. ', ': ', ' - ', ' – ']):
-            # Ищем первый подходящий разделитель
-            for sep in ['. ', ': ', ' - ', ' – ']:
-                if sep in line:
-                    parts = line.split(sep, 1)
-                    if len(parts) > 1 and parts[0].strip().isdigit():
-                        topic_text = parts[1].strip()
-                        if topic_text and len(topic_text) > 3:
-                            topic_text = topic_text.strip('"\'«»')
-                            filtered_topics.append(topic_text)
-                            break
+        # Если регулярное выражение не сработало, используем старый метод
+        elif '.' in line or ':' in line:
+            parts = line.split('.', 1) if '.' in line else line.split(':', 1)
+            if len(parts) > 1:
+                topic_text = parts[1].strip()
+                if topic_text:
+                    filtered_topics.append(topic_text)
         elif line[0].isdigit():
-            # Улучшенный алгоритм поиска начала темы после цифр
-            i = 0
-            # Пропускаем цифры и разделители в начале
-            while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):,-–—'):
+            # Ищем первый не цифровой и не разделительный символ
+            i = 1
+            while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
                 i += 1
             if i < len(line):
                 topic_text = line[i:].strip()
-                if topic_text and len(topic_text) > 3:
-                    topic_text = topic_text.strip('"\'«»')
+                if topic_text:
                     filtered_topics.append(topic_text)
-        # Добавляем строки, которые выглядят как темы (не содержат запрещенных символов)
-        elif (not any(char in line for char in ['?', '!', '=', '@', '#', '%', '&', '*', '(', ')', '[', ']', '{', '}']) 
-              and len(line) > 5 and len(line) < 100):
-            topic_text = line.strip('"\'«»')
-            filtered_topics.append(topic_text)
+        else:
+            filtered_topics.append(line)
 
-    # Очистка тем от общих проблем
-    cleaned_topics = []
-    for topic in filtered_topics:
-        # Удаление множественных пробелов
-        topic = re.sub(r'\s+', ' ', topic)
-        
-        # Проверка на окончание предложения и обрезка, если это необходимо
-        if '.' in topic[:-1]:  # Точка не в конце строки
-            topic = topic.split('.')[0] + '.'
-            
-        # Обрезка слишком длинных тем
-        if len(topic) > 70:
-            words = topic.split()
-            shortened = ' '.join(words[:8])  # Берем первые 8 слов
-            if not shortened.endswith('.'):
-                shortened += '...'
-            topic = shortened
-            
-        # Удаление вводных слов в начале темы
-        starters = ['тема:', 'topic:', 'вопрос:', 'период:', 'эпоха:']
-        for starter in starters:
-            if topic.lower().startswith(starter):
-                topic = topic[len(starter):].strip()
-        
-        # Убедимся, что первая буква заглавная
-        if topic and topic[0].isalpha():
-            topic = topic[0].upper() + topic[1:]
-            
-        cleaned_topics.append(topic)
-
-    # Удаляем дубликаты и похожие темы, сохраняя порядок
+    # Удаляем дубликаты, сохраняя порядок
     unique_topics = []
-    for topic in cleaned_topics:
-        # Проверка на похожие темы (если одна тема полностью содержится в другой)
-        is_duplicate = False
-        for existing in unique_topics:
-            # Игнорируем регистр при сравнении
-            if topic.lower() in existing.lower() or existing.lower() in topic.lower():
-                # Выбираем более короткую тему, если она не слишком короткая
-                if len(topic) < len(existing) and len(topic) > 10:
-                    unique_topics.remove(existing)
-                    unique_topics.append(topic)
-                is_duplicate = True
-                break
-                
-        if not is_duplicate and topic not in unique_topics:
+    for topic in filtered_topics:
+        if topic not in unique_topics:
             unique_topics.append(topic)
 
     # Ограничиваем до 30 тем
@@ -962,31 +690,6 @@ def button_handler(update, context):
             query.message.reply_text("Выберите действие:", reply_markup=main_menu())
         return TOPIC
     
-    elif query.data == 'about':
-        # Обработка кнопки "О боте"
-        logger.info(f"Пользователь {user_id} запросил информацию о боте")
-        query.edit_message_text(
-            "ℹ️ *О боте 'История России'*\n\n"
-            "🤖 Образовательный бот по истории России.\n\n"
-            "🔍 С помощью этого бота вы можете:\n"
-            "   • Изучать различные темы по истории России\n"
-            "   • Проходить тесты для проверки знаний\n"
-            "   • Обсуждать интересующие вопросы на исторические темы\n\n"
-            "📚 Используйте меню для выбора нужной функции.\n\n"
-            "🛡️ Безопасность: Бот специализируется только на истории России, "
-            "хранит минимум данных пользователя и очищает историю сообщений.\n\n"
-            "⚙️ Технологическая платформа:\n"
-            "   • Telegram Bot API для взаимодействия с пользователями\n"
-            "   • Google Gemini API для генерации ответов и тестов\n"
-            "   • Flask для веб-интерфейса мониторинга\n\n"
-            "*© 2025 Silver Raven. Образовательный бот по истории России.*\n"
-            "Все права защищены.\n\n"
-            "Версия: 1.2.0",
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
-        )
-        return TOPIC
-        
     elif query.data == 'end_test' or query.data == 'cancel':
         if query.data == 'end_test':
             logger.info(f"Пользователь {user_id} досрочно завершил тест")
@@ -1077,11 +780,8 @@ def get_topic_info(topic, update_message_func=None):
         if update_message_func:
             update_message_func(f"📝 Загружаю главу {i} из {len(prompts)} по теме: *{topic}*...")
         
-        # Получаем ответ от API с настройкой температуры для более точных фактов
-        response = ask_grok(prompt, temp=0.3)
-        
-        # Удаляем лишние пробелы и переносы строк
-        response = response.strip()
+        # Получаем ответ от API
+        response = ask_grok(prompt)
         
         # Добавляем заголовок главы перед текстом
         chapter_response = f"*{chapter_titles[i-1]}*\n\n{response}"
@@ -1089,9 +789,6 @@ def get_topic_info(topic, update_message_func=None):
 
     # Объединяем ответы с разделителями
     combined_responses = "\n\n" + "\n\n".join(all_responses)
-    
-    # Добавляем копирайт в конце материала
-    combined_responses += "\n\n---\n\n*© 2025 Silver Raven. Образовательный бот по истории России.*"
 
     # Разделяем длинный текст на части для отправки в Telegram (макс. 4000 символов)
     messages = []
@@ -1125,23 +822,7 @@ def get_topic_info(topic, update_message_func=None):
     if current_part:
         parts.append(current_part)
     
-    # Проверяем, что копирайт есть только в последней части
-    # Если копирайт оказался в середине - перемещаем его в конец
-    copyright_text = "*© 2025 Silver Raven. Образовательный бот по истории России.*"
-    for i in range(len(parts) - 1):
-        if copyright_text in parts[i]:
-            parts[i] = parts[i].replace(copyright_text, "").strip()
-            if not parts[-1].endswith(copyright_text):
-                parts[-1] = parts[-1] + "\n\n---\n\n" + copyright_text
-    
-    # Если копирайт отсутствует в последней части, добавляем его
-    if not parts[-1].endswith(copyright_text):
-        if "---" not in parts[-1][-10:]:
-            parts[-1] = parts[-1] + "\n\n---\n\n" + copyright_text
-        else:
-            parts[-1] = parts[-1] + "\n\n" + copyright_text
-    
-    # Форматируем части для отправки
+    # Форматируем части для отправки, добавляя необходимое форматирование markdown
     for part in parts:
         messages.append(part)
 
@@ -1309,37 +990,13 @@ def handle_answer(update, context):
     original_questions = context.user_data.get('original_questions', questions)
     display_questions = context.user_data.get('display_questions', questions)
     
-    # Валидация пользовательского ввода
-    valid_answers = ['1', '2', '3', '4']
-    if user_answer not in valid_answers:
-        sent_msg = update.message.reply_text(
-            "⚠️ Пожалуйста, введите только цифру (1, 2, 3 или 4)."
-        )
-        save_message_id(update, context, sent_msg.message_id)
-        
-        # Создаем клавиатуру с кнопкой для завершения теста
-        keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        sent_msg = update.message.reply_text(
-            "Введите ответ еще раз:",
-            reply_markup=reply_markup
-        )
-        save_message_id(update, context, sent_msg.message_id)
-        return ANSWER
-    
     # Парсим правильный ответ из оригинального текста вопроса
     try:
         correct_answer_match = re.search(r"Правильный ответ:\s*(\d+)", original_questions[current_question])
         if correct_answer_match:
             correct_answer = correct_answer_match.group(1)
         else:
-            # Попытка найти ответ в альтернативных форматах
-            alt_match = re.search(r"Правильный ответ[:-]\s*([1-4])", original_questions[current_question], re.IGNORECASE)
-            if alt_match:
-                correct_answer = alt_match.group(1)
-            else:
-                raise ValueError("Формат правильного ответа не найден")
+            raise ValueError("Формат правильного ответа не найден")
     except (IndexError, ValueError) as e:
         logger.error(f"Ошибка при обработке ответа пользователя {user_id}: {e}")
         update.message.reply_text(
@@ -1348,18 +1005,6 @@ def handle_answer(update, context):
         )
         return TOPIC
 
-    # Отслеживаем ответы пользователя для статистики
-    if 'user_answers' not in context.user_data:
-        context.user_data['user_answers'] = []
-    
-    # Добавляем текущий ответ в статистику
-    context.user_data['user_answers'].append({
-        'question_num': current_question + 1,
-        'user_answer': user_answer,
-        'correct_answer': correct_answer,
-        'is_correct': user_answer == correct_answer
-    })
-    
     # Проверяем ответ пользователя
     if user_answer == correct_answer:
         context.user_data['score'] = context.user_data.get('score', 0) + 1
@@ -1367,7 +1012,7 @@ def handle_answer(update, context):
         save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Пользователь {user_id} ответил верно на вопрос {current_question+1}")
     else:
-        # Не показываем правильный ответ во время теста
+        # Не показываем правильный ответ
         sent_msg = update.message.reply_text("❌ Неправильно!")
         save_message_id(update, context, sent_msg.message_id)
         logger.info(f"Пользователь {user_id} ответил неверно на вопрос {current_question+1}")
@@ -1396,56 +1041,22 @@ def handle_answer(update, context):
         total_questions = len(questions)
         percentage = (score / total_questions) * 100
         
-        # Оценка усвоенного материала с развернутым комментарием
+        # Оценка усвоенного материала
         if percentage >= 90:
-            assessment = "🏆 Отлично! Ты прекрасно усвоил материал. Твои знания по данной теме очень глубокие."
-            next_steps = "Можешь попробовать изучить другие темы или углубить знания по смежным историческим периодам."
+            assessment = "🏆 Отлично! Ты прекрасно усвоил материал."
         elif percentage >= 70:
             assessment = "👍 Хорошо! Ты неплохо усвоил материал, но есть над чем поработать."
-            next_steps = "Рекомендую повторить некоторые аспекты темы и затем снова пройти тест для закрепления."
         elif percentage >= 50:
-            assessment = "👌 Удовлетворительно. Ты понимаешь основы темы, но многие детали упущены."
-            next_steps = "Стоит внимательнее изучить материал, особенно обратить внимание на даты и ключевые события."
+            assessment = "👌 Удовлетворительно. Рекомендуется повторить материал."
         else:
-            assessment = "📚 Неудовлетворительно. Тема усвоена недостаточно хорошо."
-            next_steps = "Рекомендую заново изучить все главы по данной теме и затем повторить тестирование."
-        
-        # Формируем краткую статистику по ответам
-        user_answers = context.user_data.get('user_answers', [])
-        incorrect_count = sum(1 for answer in user_answers if not answer['is_correct'])
-        
-        # Добавляем информацию о правильных ответах на вопросы, в которых пользователь ошибся
-        incorrect_info = ""
-        if incorrect_count > 0:
-            incorrect_info = "\n\n*Информация о правильных ответах:*\n"
-            for answer in user_answers:
-                if not answer['is_correct']:
-                    q_num = answer['question_num']
-                    correct = answer['correct_answer']
-                    incorrect_info += f"• Вопрос {q_num}: правильный ответ - {correct}\n"
+            assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
             
-        # Отправляем результаты теста
         update.message.reply_text(
-            f"🎯 *Тест завершен!*\n\nТы ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n"
-            f"{assessment}\n\n{next_steps}{incorrect_info}\n\n"
+            f"🎯 Тест завершен! Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n{assessment}\n\n"
             "Выбери следующее действие:",
-            reply_markup=main_menu(),
-            parse_mode='Markdown'
+            reply_markup=main_menu()
         )
         logger.info(f"Пользователь {user_id} завершил тест с результатом {score}/{total_questions} ({percentage:.1f}%)")
-        
-        # Очищаем информацию о текущем тесте
-        # Но сохраняем выбранную тему
-        current_topic = context.user_data.get('current_topic')
-        context.user_data.pop('questions', None)
-        context.user_data.pop('current_question', None)
-        context.user_data.pop('score', None)
-        context.user_data.pop('user_answers', None)
-        context.user_data.pop('original_questions', None)
-        context.user_data.pop('display_questions', None)
-        if current_topic:
-            context.user_data['current_topic'] = current_topic
-            
         return TOPIC
 
 # Функция для обработки сообщений в режиме беседы
@@ -1550,112 +1161,39 @@ def clear_chat_history(update, context):
         if not current_message_id:
             logger.warning(f"Не удалось определить текущее сообщение для чата {chat_id}")
             return
-        
-        # Получаем все сохраненные ID сообщений для удаления
-        message_ids_to_delete = context.user_data.get('previous_messages', [])
-        
-        # Если нет сохраненных ID, пытаемся использовать сканирование сообщений
-        if not message_ids_to_delete:
-            # Определяем диапазон сообщений для удаления, обычно 500 последних сообщений будет достаточно
-            # Используем более широкий диапазон для гарантированной очистки
-            max_range = 500
-            first_message_id = max(1, current_message_id - max_range)
             
-            # Создаем список ID сообщений для удаления
-            message_ids_to_delete = list(range(first_message_id, current_message_id))
-        else:
-            # Расширяем существующий список до текущего сообщения
-            last_id = max(message_ids_to_delete) if message_ids_to_delete else 0
-            if last_id < current_message_id - 1:
-                message_ids_to_delete.extend(range(last_id + 1, current_message_id))
+        # Пробуем найти первое сообщение в чате (начало диалога)
+        first_message_id = context.user_data.get('first_message_id', current_message_id - 100)
         
-        # Добавляем более старые сообщения для обеспечения полной очистки
-        # Используем несколько диапазонов для повышения вероятности захвата всех сообщений
-        extra_ranges = [
-            range(current_message_id - 500, current_message_id - 400),
-            range(current_message_id - 400, current_message_id - 300),
-            range(current_message_id - 300, current_message_id - 200),
-            range(current_message_id - 200, current_message_id - 100)
-        ]
+        # Удаляем все сообщения в диапазоне от первого до текущего
+        # Используем более надежный подход с удалением и отслеживанием ошибок
+        count_deleted = 0
+        count_errors = 0
         
-        for extra_range in extra_ranges:
-            message_ids_to_delete.extend(extra_range)
-        
-        # Удаляем дубликаты и сортируем ID сообщений в обратном порядке
-        message_ids_to_delete = sorted(list(set(message_ids_to_delete)), reverse=True)
-        
-        # Группируем удаление для большей эффективности
-        # Используем меньшие пакеты (по 20 сообщений) для снижения вероятности ошибок
-        batches = [message_ids_to_delete[i:i+20] for i in range(0, len(message_ids_to_delete), 20)]
-        
-        # Удаляем сообщения пакетами
-        total_deleted = 0
-        total_errors = 0
-        
-        import time
-        
-        for batch in batches:
-            deleted_in_batch = 0
-            errors_in_batch = 0
-            
-            for msg_id in batch:
-                if msg_id >= current_message_id:
-                    continue  # Пропускаем текущее и будущие сообщения
-                
-                try:
-                    context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-                    deleted_in_batch += 1
-                    total_deleted += 1
-                    
-                    # Короткая пауза после каждого 3-го удаления, чтобы избежать ограничений API
-                    if deleted_in_batch % 3 == 0:
-                        time.sleep(0.1)  # Увеличенная пауза
-                        
-                except Exception as e:
-                    errors_in_batch += 1
-                    total_errors += 1
-                    
-                    # Лог для отладки, но не перегружаем журнал
-                    if errors_in_batch <= 5:  # Увеличиваем количество логируемых ошибок
-                        error_type = type(e).__name__
-                        if "MessageToDeleteNotFound" in error_type or "MessageCantBeDeleted" in error_type:
-                            logger.debug(f"Сообщение {msg_id} уже удалено или не может быть удалено")
-                        else:
-                            logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
-            
-            # Пауза между пакетами для снижения нагрузки на API
-            if deleted_in_batch > 0:
-                time.sleep(0.7)  # Увеличиваем паузу между пакетами
+        # Очищаем все сообщения в диапазоне (используем обратный порядок для более эффективного удаления)
+        for msg_id in range(current_message_id - 1, first_message_id - 1, -1):
+            try:
+                context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                count_deleted += 1
+                # Добавляем небольшую задержку для избежания ограничений API
+                if count_deleted % 10 == 0:
+                    import time
+                    time.sleep(0.1)
+            except Exception as e:
+                count_errors += 1
+                # Лог для отладки, но не перегружаем журнал
+                if count_errors <= 5:
+                    logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
         
         # Сохраняем текущее ID сообщения как отправную точку для следующей очистки
         context.user_data['first_message_id'] = current_message_id
         
-        # Сбрасываем список предыдущих сообщений
+        # Очищаем список предыдущих сообщений
         context.user_data['previous_messages'] = []
         
-        logger.info(f"История чата очищена для пользователя {chat_id}: удалено {total_deleted} сообщений, {total_errors} ошибок")
-        
-        # Если удалено мало сообщений, пробуем альтернативный метод очистки
-        if total_deleted < 5 and not context.user_data.get('clean_retry', False):
-            logger.warning(f"Недостаточно сообщений удалено ({total_deleted}), пробуем альтернативный метод")
-            context.user_data['clean_retry'] = True
-            # Отправляем сервисное сообщение, которое удалим вместе с последующими
-            service_msg = context.bot.send_message(chat_id=chat_id, text="🧹 Выполняется очистка чата...")
-            save_message_id(update, context, service_msg.message_id)
-            # Ожидаем немного и повторяем очистку
-            time.sleep(1)
-            clear_chat_history(update, context)
-            # Удаляем сервисное сообщение
-            try:
-                context.bot.delete_message(chat_id=chat_id, message_id=service_msg.message_id)
-            except:
-                pass
-            context.user_data['clean_retry'] = False
-            
+        logger.info(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений, {count_errors} ошибок")
     except Exception as e:
         logger.error(f"Ошибка при очистке истории чата: {e}")
-        # Восстанавливаем состояние для следующей попытки
-        context.user_data['clean_retry'] = False
 
 # Функция для сохранения ID сообщения
 def save_message_id(update, context, message_id):

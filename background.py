@@ -165,11 +165,11 @@ HTML_TEMPLATE = """
             .chat-messages {
                 height: 400px;
             }
-
+            
             .chat-input input {
                 padding: 8px 12px;
             }
-
+            
             .chat-input button {
                 padding: 8px 15px;
             }
@@ -180,17 +180,17 @@ HTML_TEMPLATE = """
                 max-width: 100%;
                 margin: 5px auto;
             }
-
+            
             .chat-header {
                 padding: 12px;
                 font-size: 16px;
             }
-
+            
             .chat-messages {
                 height: 350px;
                 padding: 10px;
             }
-
+            
             .message {
                 max-width: 90%;
                 padding: 8px 12px;
@@ -259,7 +259,7 @@ HTML_TEMPLATE = """
             outline: none;
             transition: border-color 0.3s;
         }
-
+        
         .chat-input input:focus {
             border-color: #337ab7;
             box-shadow: 0 0 5px rgba(51, 122, 183, 0.3);
@@ -277,7 +277,7 @@ HTML_TEMPLATE = """
             width: 50%;
             max-width: 200px;
         }
-
+        
         .chat-input button:hover {
             background-color: #2e6da4;
         }
@@ -346,10 +346,7 @@ HTML_TEMPLATE = """
         </div>
 
     </div>
-    <footer style="text-align: center; margin-top: 20px; font-size: 14px;">
-        © 2025 Silver Raven. Образовательный бот по истории России. Все права защищены.<br>
-        <span style="font-size: 12px; color: #666;">Версия 1.2.0 • Используется Google Gemini API</span>
-    </footer>
+
     <script>
         // Функция для обновления логов
         function refreshLogs() {
@@ -445,18 +442,18 @@ HTML_TEMPLATE = """
         function sendMessage() {
             const messageInput = document.getElementById('chat-input');
             const message = messageInput.value.trim();
-
+            
             if (!message) return; // Не отправляем пустые сообщения
-
+            
             // Показываем сообщение пользователя
             addMessage(message, 'user-message');
-
+            
             // Очищаем поле ввода
             messageInput.value = '';
-
+            
             // Показываем индикатор "бот печатает"
             document.getElementById('typing-indicator').style.display = 'block';
-
+            
             // Отправляем запрос на сервер
             fetch('/api/chat', {
                 method: 'POST',
@@ -474,10 +471,10 @@ HTML_TEMPLATE = """
             .then(data => {
                 // Скрываем индикатор "бот печатает"
                 document.getElementById('typing-indicator').style.display = 'none';
-
+                
                 // Показываем ответ бота
                 addMessage(data.response, 'bot-message');
-
+                
                 // Прокручиваем чат вниз
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -486,12 +483,12 @@ HTML_TEMPLATE = """
                 console.error('Ошибка:', error);
                 // Скрываем индикатор "бот печатает"
                 document.getElementById('typing-indicator').style.display = 'none';
-
+                
                 // Показываем сообщение об ошибке
                 addMessage('Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже.', 'bot-message');
             });
         }
-
+        
         // Функция для добавления сообщения в чат
         function addMessage(text, className) {
             const chatMessages = document.getElementById('chat-messages');
@@ -499,11 +496,11 @@ HTML_TEMPLATE = """
             messageElement.className = `message ${className}`;
             messageElement.textContent = text;
             chatMessages.appendChild(messageElement);
-
+            
             // Прокручиваем чат вниз
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
-
+        
         // Обработка нажатия Enter в поле ввода
         document.addEventListener('DOMContentLoaded', function() {
             const inputField = document.getElementById('chat-input');
@@ -586,33 +583,33 @@ def download_presentation():
     """
     try:
         app.logger.info('Запрос на скачивание презентации')
-
+        
         # Проверяем наличие директории static
         if not os.path.exists('static'):
             os.makedirs('static')
             app.logger.info('Создана директория static')
-
+        
         # Путь к файлу презентации
         presentation_path = 'static/presentation.txt'
-
+        
         # Если файла нет, создаем его
         if not os.path.exists(presentation_path):
             app.logger.info('Файл презентации не найден, создаем новый')
             try:
                 with open('presentation.md', 'r', encoding='utf-8') as md_file:
                     md_content = md_file.read()
-
+                    
                     # Упрощаем форматирование для txt версии
                     txt_content = md_content.replace('## ', '').replace('### ', '').replace('- ', '   - ')
-
+                    
                     with open(presentation_path, 'w', encoding='utf-8') as txt_file:
                         txt_file.write(txt_content)
-
+                        
                 app.logger.info('Презентация успешно создана')
             except Exception as e:
                 app.logger.error(f'Ошибка при создании презентации: {e}')
                 return f'Ошибка при создании презентации: {e}', 500
-
+        
         # Отправляем файл для скачивания
         from flask import send_file
         return send_file(
@@ -649,10 +646,10 @@ def get_logs():
 def chat():
     """
     Обрабатывает API запросы для чата с ботом.
-
+    
     Принимает сообщение пользователя, проверяет его на соответствие теме истории России,
     генерирует соответствующий ответ и возвращает его в формате JSON.
-
+    
     Returns:
         JSON-ответ с текстом ответа бота или сообщением об ошибке
     """
@@ -660,22 +657,22 @@ def chat():
         app.logger.info('Получен запрос чата')
         data = request.json
         user_message = data.get('message', '')
-
+        
         # Валидация входных данных
         if not user_message:
             app.logger.warning('Получен пустой запрос чата')
             return jsonify({'error': 'Сообщение не может быть пустым'}), 400
-
+            
         # Импортируем функцию для генерации ответа
         from main import ask_grok
-
+        
         # Сначала проверяем, относится ли сообщение к истории России
         # Используем короткий запрос для эффективности
         check_prompt = f"Проверь, относится ли следующее сообщение к истории России: \"{user_message}\". Ответь только 'да' или 'нет'."
         is_history_related = ask_grok(check_prompt, max_tokens=50, temp=0.1).lower().strip()
-
+        
         app.logger.info(f'Проверка темы сообщения: {is_history_related}')
-
+        
         # Формируем разные промпты в зависимости от темы сообщения
         if 'да' in is_history_related:
             # Если сообщение относится к истории России - отвечаем по существу
@@ -693,18 +690,18 @@ def chat():
                 "предложи задать вопрос, связанный с историей России. "
                 "Приведи пример возможного вопроса, который мог бы быть интересен пользователю."
             )
-
+        
         app.logger.info(f'Обработка сообщения пользователя: {user_message[:50]}...' if len(user_message) > 50 else f'Обработка сообщения пользователя: {user_message}')
-
+        
         # Генерируем ответ
         bot_response = ask_grok(prompt, max_tokens=1024)
-
+        
         # Если сообщение не относится к истории России, добавляем предупреждение
         if 'да' not in is_history_related:
             bot_response = "⚠️ Я могу общаться только на темы, связанные с историей России. ⚠️\n\n" + bot_response
-
+        
         app.logger.info('Ответ сгенерирован успешно')
-
+        
         return jsonify({'response': bot_response})
     except Exception as e:
         app.logger.error(f'Ошибка при обработке запроса чата: {e}')
