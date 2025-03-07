@@ -287,7 +287,7 @@ class CommandHandlers:
 
             # Добавляем клавиатуру для получения карты
             keyboard = [
-                [InlineKeyboardButton("🖼️ Получить карту", callback_data=f'map_img_{category}')],
+                [InlineKeyboardButton("🗺️ Получить карту", callback_data=f'map_img_{category}')],
                 [InlineKeyboardButton("🔙 Назад к категориям", callback_data='history_map')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -304,16 +304,16 @@ class CommandHandlers:
 
         elif query_data.startswith('map_url_'):
             category = query_data.replace('map_url_', '')
-            
+
             # Генерируем и отправляем изображение карты вместо URL
             status_message = context.bot.send_message(
                 chat_id=user_id,
                 text=f"🔄 Генерация изображения карты для категории «{category}»...",
                 parse_mode='HTML'
             )
-            
+
             map_image_path = self.history_map.generate_map_image(category=category)
-            
+
             if map_image_path and os.path.exists(map_image_path):
                 # Отправляем изображение карты
                 with open(map_image_path, 'rb') as img:
@@ -323,16 +323,16 @@ class CommandHandlers:
                         caption=f"🗺️ Карта исторических событий категории «{category}»",
                         parse_mode='HTML'
                     )
-                    
+
                 # Удаляем сообщение о генерации
                 context.bot.delete_message(
                     chat_id=user_id,
                     message_id=status_message.message_id
                 )
-                
+
                 # Удаляем изображение карты после отправки
                 os.remove(map_image_path)
-                
+
                 self.logger.info(f"Пользователь {user_id} получил изображение карты категории {category}")
             else:
                 # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
@@ -351,20 +351,20 @@ class CommandHandlers:
             # Отправляем сообщение о том, что генерируем карту
             status_message = context.bot.send_message(
                 chat_id=user_id,
-                text=f"🔄 Генерация изображения карты для категории «{category}»...",
+                text=f"🔄 Генерация HTML-карты для категории «{category}»...",
                 parse_mode='HTML'
             )
 
-            # Генерируем изображение карты выбранной категории
-            map_image_path = self.history_map.generate_map_image(category=category)
+            map_html_path = self.history_map.generate_map_html(category=category)
 
-            if map_image_path and os.path.exists(map_image_path):
-                # Отправляем изображение карты
-                with open(map_image_path, 'rb') as img:
-                    context.bot.send_photo(
+            if map_html_path and os.path.exists(map_html_path):
+                # Отправляем HTML-файл карты как документ
+                with open(map_html_path, 'rb') as file:
+                    context.bot.send_document(
                         chat_id=user_id,
-                        photo=img,
-                        caption=f"🗺️ Карта исторических событий категории «{category}»",
+                        document=file,
+                        filename=f"Карта_исторических_событий_{category}.html",
+                        caption=f"🗺️ Интерактивная карта исторических событий категории «{category}»\nОткройте файл в браузере для просмотра интерактивной карты.",
                         parse_mode='HTML'
                     )
 
@@ -374,35 +374,35 @@ class CommandHandlers:
                     message_id=status_message.message_id
                 )
 
-                # Удаляем изображение карты после отправки
-                os.remove(map_image_path)
+                # Удаляем HTML-файл карты после отправки
+                os.remove(map_html_path)
 
-                self.logger.info(f"Пользователь {user_id} получил изображение карты категории {category}")
+                self.logger.info(f"Пользователь {user_id} получил HTML-карту категории {category}")
             else:
                 # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
                 context.bot.edit_message_text(
                     chat_id=user_id,
                     message_id=status_message.message_id,
-                    text=f"❌ Не удалось сгенерировать изображение карты для категории «{category}». Попробуйте позже или воспользуйтесь ссылкой на карту.",
+                    text=f"❌ Не удалось сгенерировать HTML-карту для категории «{category}». Попробуйте позже или воспользуйтесь ссылкой на карту.",
                     parse_mode='HTML'
                 )
-                self.logger.error(f"Не удалось сгенерировать изображение карты категории {category} для пользователя {user_id}")
+                self.logger.error(f"Не удалось сгенерировать HTML-карту категории {category} для пользователя {user_id}")
             return self.MAP
 
         elif query_data == 'map_random':
             # Получаем случайные события
             random_events = self.history_map.get_random_events(5)
-            
+
             # Отправляем сообщение о генерации
             status_message = context.bot.send_message(
                 chat_id=user_id,
                 text="🔄 Генерация изображения карты со случайными событиями...",
                 parse_mode='HTML'
             )
-            
+
             # Генерируем изображение карты
             map_image_path = self.history_map.generate_map_image(events=random_events)
-            
+
             if map_image_path and os.path.exists(map_image_path):
                 # Отправляем изображение карты
                 with open(map_image_path, 'rb') as img:
@@ -412,16 +412,16 @@ class CommandHandlers:
                         caption="🗺️ Карта со случайными историческими событиями России",
                         parse_mode='HTML'
                     )
-                
+
                 # Удаляем сообщение о генерации
                 context.bot.delete_message(
                     chat_id=user_id,
                     message_id=status_message.message_id
                 )
-                
+
                 # Удаляем изображение карты после отправки
                 os.remove(map_image_path)
-                
+
                 self.logger.info(f"Пользователь {user_id} получил изображение карты со случайными событиями")
             else:
                 # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
@@ -432,7 +432,7 @@ class CommandHandlers:
                     parse_mode='HTML'
                 )
                 self.logger.error(f"Не удалось сгенерировать изображение карты для пользователя {user_id}")
-            
+
             return self.MAP
 
         elif query_data == 'map_image':
@@ -1066,7 +1066,7 @@ class CommandHandlers:
             'KeyError': 'Ошибка доступа по ключу.',
             'IndexError': 'Ошибка индекса списка.'
         }
-        
+
         error = context.error
         error_type = type(error).__name__
 

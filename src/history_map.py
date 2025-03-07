@@ -232,7 +232,7 @@ class HistoryMap:
         
     def generate_map_image(self, category=None, events=None, timeframe=None):
         """
-        Генерирует изображение карты с отмеченными историческими событиями.
+        Генерирует HTML-файл карты с отмеченными историческими событиями.
         
         Args:
             category (str, optional): Категория событий
@@ -240,10 +240,11 @@ class HistoryMap:
             timeframe (tuple, optional): Временной диапазон в формате (начало, конец) - годы
             
         Returns:
-            str: Путь к сгенерированному изображению карты или текстовое представление
+            str: Путь к сгенерированному HTML-файлу карты или None в случае ошибки
         """
         import time
-        from PIL import Image, ImageDraw, ImageFont
+        import json
+        from jinja2 import Environment, FileSystemLoader
         
         # Определяем события для отображения на карте
         try:
@@ -272,72 +273,35 @@ class HistoryMap:
         
         # Создаем уникальное имя файла для карты
         timestamp = int(time.time())
-        map_image_path = f"generated_maps/map_{timestamp}.png"
+        map_html_path = f"generated_maps/map_{timestamp}.html"
         
         try:
-            # Создаем простое изображение с текстовой информацией о событиях
-            width, height = 1200, 800
-            image = Image.new('RGB', (width, height), color=(255, 255, 255))
-            draw = ImageDraw.Draw(image)
+            # Получаем категории
+            categories = self.get_categories()
+            
+            # Настраиваем окружение Jinja2
+            env = Environment(loader=FileSystemLoader('templates'))
+            template = env.get_template('map.html')
             
             # Заголовок
             title = "Карта исторических событий России"
             if category:
                 title += f" - {category}"
             
-            # Рисуем заголовок
-            draw.rectangle([(0, 0), (width, 60)], fill=(50, 50, 100))
-            draw.text((width//2, 30), title, fill=(255, 255, 255), anchor="mm")
+            # Рендерим шаблон
+            html_content = template.render(
+                title=title,
+                events=display_events,
+                categories=categories,
+                selected_category=category
+            )
             
-            # Отображаем список событий
-            y_pos = 100
-            for i, event in enumerate(display_events[:15]):  # Ограничиваем до 15 событий
-                if isinstance(event, dict) and 'title' in event:
-                    title = event.get('title', 'Неизвестное событие')
-                    date = event.get('date', 'Неизвестная дата')
-                    description = event.get('description', '')
-                    location = event.get('location', {})
-                    
-                    # Ограничиваем длину описания
-                    if len(description) > 100:
-                        description = description[:97] + "..."
-                    
-                    event_text = f"{i+1}. {title} ({date})"
-                    draw.text((50, y_pos), event_text, fill=(0, 0, 0))
-                    
-                    loc_text = ""
-                    if location:
-                        lat = location.get('lat', '')
-                        lng = location.get('lng', '')
-                        if lat and lng:
-                            loc_text = f"Координаты: {lat}, {lng}"
-                    
-                    if description:
-                        draw.text((70, y_pos + 25), description, fill=(100, 100, 100))
-                        if loc_text:
-                            draw.text((70, y_pos + 45), loc_text, fill=(100, 100, 100))
-                    elif loc_text:
-                        draw.text((70, y_pos + 25), loc_text, fill=(100, 100, 100))
-                    
-                    y_pos += 70  # Увеличиваем отступ
-                    
-                    # Добавляем разделитель
-                    draw.line([(50, y_pos - 15), (width - 50, y_pos - 15)], fill=(200, 200, 200), width=1)
+            # Сохраняем HTML-файл
+            with open(map_html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
             
-            # Если нет событий
-            if not display_events:
-                draw.text((width//2, height//2), "События не найдены", fill=(100, 100, 100), anchor="mm")
-            
-            # Информация внизу карты
-            footer_text = "Исторический бот - текстовое представление карты"
-            draw.rectangle([(0, height-40), (width, height)], fill=(50, 50, 100))
-            draw.text((width//2, height-20), footer_text, fill=(255, 255, 255), anchor="mm")
-            
-            # Сохраняем изображение
-            image.save(map_image_path)
-            
-            self.logger.info(f"Карта с событиями сгенерирована: {map_image_path}")
-            return map_image_path
+            self.logger.info(f"HTML-карта с событиями сгенерирована: {map_html_path}")
+            return map_html_path
         except Exception as e:
-            self.logger.error(f"Ошибка при генерации изображения карты: {e}")
+            self.logger.error(f"Ошибка при генерации HTML-карты: {e}")
             return None
