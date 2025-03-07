@@ -19,7 +19,7 @@ class CommandHandlers:
         # Инициализируем карту исторических событий
         from src.history_map import HistoryMap
         self.history_map = HistoryMap(logger)
-        
+
         # Инициализируем сервисы
         from src.test_service import TestService
         from src.topic_service import TopicService
@@ -694,11 +694,11 @@ class CommandHandlers:
             try:
                 # Получаем тест через сервис тестирования
                 test_data = self.test_service.generate_test(topic)
-                
+
                 # Получаем вопросы из теста
                 valid_questions = test_data.get('original_questions', [])
                 display_questions = test_data.get('display_questions', [])
-                
+
                 if not valid_questions:
                     raise ValueError("Не удалось получить вопросы для теста")
 
@@ -721,12 +721,12 @@ class CommandHandlers:
                 query.edit_message_text(
                     f"📝 Тест по теме: {topic}\n\nНачинаем тест из {len(valid_questions)} вопросов! Вот первый вопрос:"
                 )
-                
+
                 # Проверяем существование первого вопроса
                 if len(display_questions) > 0:
                     # Форматируем текст первого вопроса для лучшего отображения
                     question_text = display_questions[0]
-                    
+
                     # Проверяем, есть ли в тексте вопроса варианты ответов в формате "1) ..."
                     if re.search(r'\d\)\s+', question_text) or re.search(r'\d\.\s+', question_text):
                         # Текст уже содержит форматированные варианты ответов
@@ -736,7 +736,7 @@ class CommandHandlers:
                         # Разделяем текст на основной вопрос и варианты ответов
                         parts = question_text.split("\n")
                         main_question = parts[0]
-                        
+
                         # Ищем строки с вариантами ответов, обычно они начинаются с цифр
                         options = []
                         for line in parts[1:]:
@@ -749,7 +749,7 @@ class CommandHandlers:
                                 letter = line[0]
                                 number = ord(letter) - ord('A') + 1
                                 options.append(f"{number}) {line[2:].strip()}")
-                        
+
                         if options:
                             # Если нашли варианты ответов, форматируем текст вопроса
                             formatted_text = f"{main_question}\n\n"
@@ -758,13 +758,13 @@ class CommandHandlers:
                         else:
                             # Если не нашли варианты ответов, используем исходный текст
                             formatted_text = question_text
-                    
+
                     # Отправляем инфо о начале теста
                     query.message.reply_text(f"🧠 Вопрос 1 из {len(display_questions)}:")
-                    
+
                     # Отправляем отформатированный текст вопроса
                     query.message.reply_text(formatted_text)
-                    
+
                     # Отправляем инструкцию для ответа
                     query.message.reply_text(
                         "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
@@ -773,7 +773,7 @@ class CommandHandlers:
                     self.logger.info(f"Тест по теме '{topic}' успешно сгенерирован для пользователя {user_id}")
                 else:
                     raise ValueError("Не удалось получить вопросы для теста")
-                    
+
             except Exception as e:
                 self.logger.log_error(e, f"Ошибка при генерации вопросов для пользователя {user_id}")
                 query.edit_message_text(
@@ -785,7 +785,7 @@ class CommandHandlers:
             # Генерируем новый список тем с помощью сервиса тем
             try:
                 query.edit_message_text("🔄 Генерирую новый список уникальных тем по истории России...")
-                
+
                 # Получаем новый список тем через сервис
                 filtered_topics = self.topic_service.generate_new_topics_list()
                 context.user_data['topics'] = filtered_topics
@@ -893,19 +893,15 @@ class CommandHandlers:
                                 else:
                                     messages = [content]
 
-                                try:
-                                    # Пробуем отредактировать первое сообщение
-                                    query.edit_message_text(
-                                        f"📚 *{topic}*\n\n{messages[0]}", 
-                                        parse_mode='Markdown'
-                                    )
-                                except Exception as e:
-                                    # Если редактирование не удалось, отправляем как новое сообщение
-                                    self.logger.warning(f"Не удалось отредактировать сообщение: {e}")
-                                    query.message.reply_text(
-                                        f"📚 *{topic}*\n\n{messages[0]}", 
-                                        parse_mode='Markdown'
-                                    )
+                                # Очищаем тему и сообщение от спецсимволов Markdown перед отправкой
+                                safe_topic = self._sanitize_markdown(topic)
+                                safe_message = self._sanitize_markdown(messages[0])
+
+                                # Пробуем отредактировать первое сообщение
+                                query.edit_message_text(
+                                    f"📚 *{safe_topic}*\n\n{safe_message}", 
+                                    parse_mode='Markdown'
+                                )
 
                                 # Отправляем остальные части как новые сообщения, если они есть
                                 for msg in messages[1:]:
@@ -1087,15 +1083,15 @@ class CommandHandlers:
         # Используем сервис тестирования для получения правильного ответа
         try:
             correct_answer = self.test_service.parse_correct_answer(original_questions[current_question])
-            
+
             if not correct_answer:
                 raise ValueError("Формат правильного ответа не найден")
-                
+
             # Проверка валидности правильного ответа
             if int(correct_answer) < 1 or int(correct_answer) > 4:
                 self.logger.warning(f"Некорректный правильный ответ {correct_answer} в вопросе {current_question+1}")
                 correct_answer = "1"  # Установка значения по умолчанию
-                
+
         except (IndexError, ValueError) as e:
             self.logger.error(f"Ошибка при обработке ответа пользователя {user_id} на вопрос {current_question+1}: {e}")
             update.message.reply_text(
@@ -1104,7 +1100,7 @@ class CommandHandlers:
             )
             # Переходим к следующему вопросу без учета этого
             context.user_data['current_question'] = current_question + 1
-            
+
             # Если остались вопросы, показываем следующий
             if context.user_data['current_question'] < len(display_questions):
                 return self._show_next_question(update, context, display_questions)
@@ -1148,46 +1144,46 @@ class CommandHandlers:
         try:
             current_question = context.user_data.get('current_question', 0)
             total_questions = len(display_questions)
-            
+
             # Получаем текст вопроса
             question_text = display_questions[current_question]
-            
+
             # Используем сервис тестирования для форматирования вопроса
             formatted_question = self.test_service.format_question_text(question_text)
-            
+
             # Получаем основной вопрос и варианты ответов
             main_question = formatted_question['main_question']
             options = formatted_question['options']
-            
+
             # Отправляем несколько сообщений для лучшего форматирования
-            
+
             # 1. Сообщение с информацией о прогрессе теста
             progress_text = (f"🧠 Вопрос {current_question+1} из {total_questions}\n"
                             f"(правильно отвечено: {context.user_data.get('score', 0)} из {current_question})")
             sent_msg1 = update.message.reply_text(progress_text)
             self.message_manager.save_message_id(update, context, sent_msg1.message_id)
-            
+
             # 2. Сообщение с текстом вопроса
             sent_msg2 = update.message.reply_text(main_question)
             self.message_manager.save_message_id(update, context, sent_msg2.message_id)
-            
+
             # 3. Отдельное сообщение с вариантами ответов
             options_text = "\n".join(options)
             sent_msg3 = update.message.reply_text(options_text)
             self.message_manager.save_message_id(update, context, sent_msg3.message_id)
-            
+
             # 4. Сообщение с инструкцией и кнопкой для завершения
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             sent_msg4 = update.message.reply_text(
                 "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
                 reply_markup=reply_markup
             )
             self.message_manager.save_message_id(update, context, sent_msg4.message_id)
-            
+
             return self.ANSWER
-            
+
         except Exception as e:
             self.logger.error(f"Ошибка при отображении следующего вопроса: {e}")
             update.message.reply_text(
@@ -1212,13 +1208,13 @@ class CommandHandlers:
             user_id = update.message.from_user.id
             score = context.user_data.get('score', 0)
             total_questions = len(questions)
-            
+
             # Защита от деления на ноль
             if total_questions > 0:
                 percentage = (score / total_questions) * 100
             else:
                 percentage = 0
-                
+
             topic = context.user_data.get('current_topic', 'выбранной теме')
 
             # Оценка усвоенного материала с дополнительными категориями для 20 вопросов
@@ -1268,18 +1264,18 @@ class CommandHandlers:
                 parse_mode='Markdown',
                 reply_markup=self.ui_manager.main_menu()
             )
-            
+
             self.logger.info(f"Пользователь {user_id} завершил тест с результатом {score}/{total_questions} ({percentage:.1f}%)")
-            
+
             # Очищаем данные теста
             context.user_data.pop('questions', None)
             context.user_data.pop('current_question', None)
             context.user_data.pop('score', None)
             context.user_data.pop('original_questions', None)
             context.user_data.pop('display_questions', None)
-            
+
             return self.TOPIC
-            
+
         except Exception as e:
             self.logger.error(f"Ошибка при отображении результатов теста: {e}")
             update.message.reply_text(
