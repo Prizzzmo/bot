@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.geos
     pkgs.geckodriver
     pkgs.qhull
     pkgs.pkg-config
