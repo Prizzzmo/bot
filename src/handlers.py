@@ -440,13 +440,20 @@ class CommandHandlers:
             if len(categories) > 10:
                 # Показываем следующие категории
                 remaining_categories = categories[10:]
-                category_buttons = []
-                for i, category in enumerate(remaining_categories):
-                    category_buttons.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
-                    # Создаем ряды по 2 кнопки
-                    if i % 2 == 1 or i == len(remaining_categories)-1:
-                        keyboard.append(category_buttons)
-                        category_buttons = []
+                
+                # Формируем ряды кнопок (по 2 в ряду)
+                for i in range(0, len(remaining_categories), 2):
+                    row = []
+                    # Добавляем первую кнопку
+                    category = remaining_categories[i]
+                    row.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
+                    
+                    # Добавляем вторую кнопку, если она есть
+                    if i + 1 < len(remaining_categories):
+                        category = remaining_categories[i + 1]
+                        row.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
+                    
+                    keyboard.append(row)
             else:
                 # Если дополнительных категорий нет, показываем сообщение
                 keyboard.append([InlineKeyboardButton("⚠️ Дополнительных категорий нет", callback_data='history_map')])
