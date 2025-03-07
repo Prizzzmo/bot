@@ -467,34 +467,34 @@ class CommandHandlers:
             # Показываем дополнительные категории
             categories = self.history_map.get_categories()
             keyboard = []
-            
+
             # Проверяем есть ли дополнительные категории
             if len(categories) > 10:
                 # Показываем следующие категории
                 remaining_categories = categories[10:]
-                
+
                 # Формируем ряды кнопок (по 2 в ряду)
                 for i in range(0, len(remaining_categories), 2):
                     row = []
                     # Добавляем первую кнопку
                     category = remaining_categories[i]
                     row.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
-                    
+
                     # Добавляем вторую кнопку, если она есть
                     if i + 1 < len(remaining_categories):
                         category = remaining_categories[i + 1]
                         row.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
-                    
+
                     keyboard.append(row)
             else:
                 # Если дополнительных категорий нет, показываем сообщение
                 keyboard.append([InlineKeyboardButton("⚠️ Дополнительных категорий нет", callback_data='history_map')])
-            
+
             # Добавляем навигационные кнопки
             keyboard.append([InlineKeyboardButton("◀️ Назад к основным категориям", callback_data='history_map')])
             keyboard.append([InlineKeyboardButton("🔍 Поиск по теме", callback_data='map_search_topic')])
             keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
-            
+
             try:
                 query.edit_message_text(
                     "🗺️ *Дополнительные категории исторических событий*\n\n"
@@ -512,7 +512,7 @@ class CommandHandlers:
                     parse_mode='Markdown'
                 )
             return self.MAP
-            
+
         elif query_data == 'map_search_topic':
             # Предлагаем пользователю ввести тему для генерации карты с более подробными инструкциями
             query.edit_message_text(
@@ -528,11 +528,11 @@ class CommandHandlers:
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад к категориям", callback_data='history_map')]]),
                 parse_mode='Markdown'
             )
-            
+
             # Устанавливаем флаг ожидания ввода пользовательской темы
             context.user_data['waiting_for_map_topic'] = True
             return self.MAP
-            
+
         elif query_data == 'map_random':
             # Получаем больше случайных событий для повышения детализации
             random_events = self.history_map.get_random_events(8)
@@ -691,7 +691,7 @@ class CommandHandlers:
             try:
                 # Получаем тест через сервис контента
                 test_data = self.content_service.generate_test(topic)
-                
+
                 # Проверяем структуру полученных данных
                 if isinstance(test_data, dict) and 'original_questions' in test_data and 'display_questions' in test_data:
                     valid_questions = test_data['original_questions']
@@ -704,7 +704,7 @@ class CommandHandlers:
                     # Создаем дефолтную структуру для обработки ошибок
                     self.logger.warning(f"Неожиданный формат test_data: {type(test_data)}")
                     raise ValueError("Неверный формат данных теста")
-                
+
                 context.user_data['questions'] = valid_questions
                 context.user_data['current_question'] = 0
                 context.user_data['score'] = 0
@@ -845,13 +845,13 @@ class CommandHandlers:
                             # Обрабатываем словарь (dict)
                             if result.get("status") == "success":
                                 content = result.get("content", "")
-                                
+
                                 # Разбиваем длинный контент на части, если нужно
                                 if len(content) > 4000:
                                     messages = [content[i:i+4000] for i in range(0, len(content), 4000)]
                                 else:
                                     messages = [content]
-                                
+
                                 try:
                                     # Пробуем отредактировать первое сообщение
                                     query.edit_message_text(
@@ -865,7 +865,7 @@ class CommandHandlers:
                                         f"📚 *{topic}*\n\n{messages[0]}", 
                                         parse_mode='Markdown'
                                     )
-                                
+
                                 # Отправляем остальные части как новые сообщения, если они есть
                                 for msg in messages[1:]:
                                     query.message.reply_text(msg, parse_mode='Markdown')
@@ -958,19 +958,19 @@ class CommandHandlers:
                 # Обрабатываем словарь (dict)
                 if result.get("status") == "success":
                     content = result.get("content", "")
-                    
+
                     # Разбиваем длинный контент на части, если нужно
                     if len(content) > 4000:
                         messages = [content[i:i+4000] for i in range(0, len(content), 4000)]
                     else:
                         messages = [content]
-                    
+
                     # Отправляем заголовок с первой частью
                     update.message.reply_text(
                         f"📚 *{topic}*\n\n{messages[0]}", 
                         parse_mode='Markdown'
                     )
-                    
+
                     # Отправляем остальные части как новые сообщения, если они есть
                     for msg in messages[1:]:
                         update.message.reply_text(msg, parse_mode='Markdown')
@@ -1135,23 +1135,23 @@ class CommandHandlers:
         """
         # Обработка специальных состояний (карта, админ) с оптимизацией
         user_data = context.user_data
-        
+
         # Проверяем, ожидаем ли мы ввод пользовательской темы для карты
         if user_data.get('waiting_for_map_topic', False):
             user_topic = update.message.text
             user_id = update.message.from_user.id
-            
+
             # Немедленно сбрасываем флаг ожидания для предотвращения повторного вызова
             user_data['waiting_for_map_topic'] = False
-            
+
             self.logger.debug(f"Пользователь {user_id} запросил карту по теме: {user_topic}")
-            
+
             # Отправляем сообщение о генерации
             status_message = update.message.reply_text(
                 f"🔄 Генерация карты по теме «{user_topic}»...",
                 parse_mode='HTML'
             )
-            
+
             try:
                 # Запускаем генерацию карты с таймаутом для предотвращения зависаний
                 import concurrent.futures
@@ -1163,7 +1163,7 @@ class CommandHandlers:
                     except concurrent.futures.TimeoutError:
                         map_image_path = None
                         self.logger.error(f"Превышено время ожидания при генерации карты по теме {user_topic}")
-                
+
                 if map_image_path and os.path.exists(map_image_path):
                     # Отправляем изображение карты
                     with open(map_image_path, 'rb') as img:
@@ -1172,13 +1172,13 @@ class CommandHandlers:
                             caption=f"🗺️ Карта по теме «{user_topic}»",
                             parse_mode='HTML'
                         )
-                    
+
                     # Удаляем изображение карты после отправки
                     try:
                         os.remove(map_image_path)
                     except Exception:
                         pass
-                    
+
                     # Предлагаем вернуться к выбору категорий - упрощаем клавиатуру
                     keyboard = [
                         [InlineKeyboardButton("🔍 Другая тема", callback_data='map_search_topic'),
@@ -1205,7 +1205,7 @@ class CommandHandlers:
                     f"❌ Произошла ошибка при генерации карты. Попробуйте другую тему.",
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
-            
+
             # В любом случае удаляем сообщение о генерации
             try:
                 context.bot.delete_message(
@@ -1214,9 +1214,9 @@ class CommandHandlers:
                 )
             except:
                 pass
-                
+
             return self.MAP
-        
+
         # Проверяем, ожидаем ли мы ввод ID нового администратора
         if hasattr(self, 'admin_panel') and user_data.get('waiting_for_admin_id', False):
             self.admin_panel.process_new_admin_id(update, context)
@@ -1260,7 +1260,328 @@ class CommandHandlers:
 
             # Оптимизация отправки сообщений - объединяем сообщение и кнопки
             keyboard = [[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]]
-            
+
+            # Отправляем единое сообщение с ответом и кнопкой вместо двух сообщений
+            sent_msg = update.message.reply_text(
+                response + "\n\n" + "Вы можете задать еще вопрос или вернуться в меню:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке беседы: {str(e)}")
+            # Упрощенное сообщение об ошибке
+            error_msg = update.message.reply_text(
+                "Произошла ошибка. Попробуйте позже или вернитесь в меню.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]])
+            )
+            self.message_manager.save_message_id(update, context, error_msg.message_id)
+
+        return self.CONVERSATION
+
+    def recommend_similar_topics(self, current_topic, context):
+        """
+        Рекомендует пользователю похожие темы на основе текущей темы.
+
+        Args:
+            current_topic (str): Текущая тема пользователя
+            context: Контекст разговора
+
+        Returns:
+            list: Список рекомендованных тем
+        """
+        try:
+            # Формируем запрос на рекомендацию
+            prompt = f"На основе темы '{current_topic}' предложи 3 связанные темы по истории России, которые могут заинтересовать пользователя. Перечисли их в формате нумерованного списка без дополнительных пояснений."
+
+            # Получаем ответ от API
+            similar_topics_text = self.api_client.ask_grok(prompt, max_tokens=150, temp=0.4)
+
+            # Парсим темы
+            similar_topics = []
+            for line in similar_topics_text.split('\n'):
+                # Ищем строки с форматом "1. Тема" или "- Тема"
+                if (line.strip().startswith(('1.', '2.', '3.', '-'))):
+                    # Удаляем префикс и лишние пробелы
+                    topic = re.sub(r'^[\d\.\-\s]+', '', line).strip()
+                    if topic:
+                        similar_topics.append(topic)
+
+            return similar_topics[:3]  # Возвращаем максимум 3 темы
+        except Exception as e:
+            self.logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
+            return []
+
+    def admin_command(self, update, context):
+        """
+        Обрабатывает команду /admin для доступа к административной панели.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        # Передаем управление в модуль админ-панели
+        if hasattr(self, 'admin_panel'):
+            self.admin_panel.handle_admin_command(update, context)
+        else:
+            update.message.reply_text("Административная панель недоступна")
+
+    def admin_callback(self, update, context):
+        """
+        Обрабатывает нажатия на кнопки в административной панели.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        query = update.callback_query
+
+        # Проверяем наличие и передаем обработку в админ-панель
+        if hasattr(self, 'admin_panel'):
+            # Обрабатываем все callback-запросы, начинающиеся с admin_
+            if query.data.startswith('admin_'):
+                # Проверяем, это удаление админа или нет
+                if query.data.startswith('admin_delete_'):
+                    # Извлекаем ID админа для удаления
+                    admin_id = int(query.data.split('_')[2])
+                    self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
+                else:
+                    # Обычный admin callback
+                    self.admin_panel.handle_admin_callback(update, context)
+                return True
+        return False
+
+    def error_handler(self, update, context):
+        """
+        Обработчик ошибок: записывает их в журнал с комментариями и информирует пользователя.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        # Словарь с описаниями распространенных ошибок
+        self.ERROR_DESCRIPTIONS = {
+            'BadRequest': 'Ошибка в запросе к Telegram API. Возможно, слишком длинное сообщение.',
+            'Unauthorized': 'Ошибка авторизации бота. Проверьте токен бота.',
+            'TimedOut': 'Превышено время ожидания ответа от Telegram API. Попробуйте позже.',
+            'NetworkError': 'Проблемы с сетевым подключением. Проверьте интернет.',
+            'ChatMigrated': 'Чат был перенесен на другой сервер.',
+            'TelegramError': 'Общая ошибка Telegram API.',
+            'AttributeError': 'Ошибка доступа к атрибуту объекта.',
+            'TypeError': 'Ошибка типа данных.',
+            'ValueError': 'Ошибка значения переменной.',
+            'KeyError': 'Ошибка доступа по ключу.',
+            'IndexError': 'Ошибка индекса списка.'
+        }
+
+        error = context.error
+        error_type = type(error).__name__
+
+        # Используем расширенное логирование ошибок
+        user_info = f"пользователь {update.effective_user.id}" if update and update.effective_user else "неизвестный пользователь"
+        additional_info = f"Ошибка для {user_info} в обновлении {update}" if update else "Ошибка без контекста обновления"
+
+        self.logger.log_error(error, additional_info)
+
+        if update and update.effective_message:
+            # Формируем информативное сообщение для пользователя
+            error_message = f"❌ Произошла ошибка: {error}"
+
+            # Добавляем пользователю пояснение для известных типов ошибок
+            if error_type in self.ERROR_DESCRIPTIONS:
+                error_message += f"\n{self.ERROR_DESCRIPTIONS[error_type]}"
+
+            update.effective_message.reply_text(
+                error_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+            )
+
+    def _sanitize_markdown(self, text):
+        """
+        Sanitizes text to prevent Markdown parsing errors.
+
+        Args:
+            text (str): The text to sanitize
+
+        Returns:
+            str: Sanitized text
+        """
+        if not text:
+            return ""
+
+        # Replace problematic characters that could break Markdown parsing
+        replacements = {
+            '*': '\\*',
+            '_': '\\_',
+            '`': '\\`',
+            '[': '\\[',
+            ']': '\\]',
+            '(': '\\(',
+            ')': '\\)',
+            '#': '\\#',
+            '>': '\\>',
+            '+': '\\+',
+            '-': '\\-',
+            '=': '\\=',
+            '|': '\\|',
+            '{': '\\{',
+            '}': '\\}',
+            '.': '\\.',
+            '!': '\\!'
+        }
+
+        for char, replacement in replacements.items():
+            text = text.replace(char, replacement)
+
+        return text
+
+    def __del__(self):
+        """Завершаем таймер при удалении объекта"""
+        if hasattr(self, 'cleanup_timer'):
+            self.cleanup_timer.cancel()
+
+    def handle_conversation(self, update, context):
+        """
+        Обрабатывает сообщения пользователя в режиме беседы с оптимизацией производительности.
+
+        Также обрабатывает ввод ID нового администратора или темы для карты,
+        если соответствующие флаги установлены.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+
+        Returns:
+            int: Следующее состояние разговора
+        """
+        # Обработка специальных состояний (карта, админ) с оптимизацией
+        user_data = context.user_data
+
+        # Проверяем, ожидаем ли мы ввод пользовательской темы для карты
+        if user_data.get('waiting_for_map_topic', False):
+            user_topic = update.message.text
+            user_id = update.message.from_user.id
+
+            # Немедленно сбрасываем флаг ожидания для предотвращения повторного вызова
+            user_data['waiting_for_map_topic'] = False
+
+            self.logger.debug(f"Пользователь {user_id} запросил карту по теме: {user_topic}")
+
+            # Отправляем сообщение о генерации
+            status_message = update.message.reply_text(
+                f"🔄 Генерация карты по теме «{user_topic}»...",
+                parse_mode='HTML'
+            )
+
+            try:
+                # Запускаем генерацию карты с таймаутом для предотвращения зависаний
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    # Запускаем задачу с таймаутом 30 секунд
+                    future = executor.submit(self.history_map.generate_map_by_topic, user_topic)
+                    try:
+                        map_image_path = future.result(timeout=30)
+                    except concurrent.futures.TimeoutError:
+                        map_image_path = None
+                        self.logger.error(f"Превышено время ожидания при генерации карты по теме {user_topic}")
+
+                if map_image_path and os.path.exists(map_image_path):
+                    # Отправляем изображение карты
+                    with open(map_image_path, 'rb') as img:
+                        update.message.reply_photo(
+                            photo=img,
+                            caption=f"🗺️ Карта по теме «{user_topic}»",
+                            parse_mode='HTML'
+                        )
+
+                    # Удаляем изображение карты после отправки
+                    try:
+                        os.remove(map_image_path)
+                    except Exception:
+                        pass
+
+                    # Предлагаем вернуться к выбору категорий - упрощаем клавиатуру
+                    keyboard = [
+                        [InlineKeyboardButton("🔍 Другая тема", callback_data='map_search_topic'),
+                         InlineKeyboardButton("🔙 К категориям", callback_data='history_map')],
+                        [InlineKeyboardButton("📋 Главное меню", callback_data='back_to_menu')]
+                    ]
+                else:
+                    # Если не удалось сгенерировать карту
+                    keyboard = [
+                        [InlineKeyboardButton("🔍 Другая тема", callback_data='map_search_topic'),
+                         InlineKeyboardButton("🔙 К категориям", callback_data='history_map')]
+                    ]
+                    update.message.reply_text(
+                        f"❌ Не удалось найти достаточно событий по теме «{user_topic}».",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+            except Exception as e:
+                self.logger.error(f"Ошибка при генерации карты: {str(e)}")
+                keyboard = [
+                    [InlineKeyboardButton("🔍 Другая тема", callback_data='map_search_topic'),
+                     InlineKeyboardButton("🔙 К категориям", callback_data='history_map')]
+                ]
+                update.message.reply_text(
+                    f"❌ Произошла ошибка при генерации карты. Попробуйте другую тему.",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+
+            # В любом случае удаляем сообщение о генерации
+            try:
+                context.bot.delete_message(
+                    chat_id=update.effective_chat.id,
+                    message_id=status_message.message_id
+                )
+            except:
+                pass
+
+            return self.MAP
+
+        # Проверяем, ожидаем ли мы ввод ID нового администратора
+        if hasattr(self, 'admin_panel') and user_data.get('waiting_for_admin_id', False):
+            self.admin_panel.process_new_admin_id(update, context)
+            return self.CONVERSATION
+
+        # Основная логика обработки обычных сообщений
+        user_message = update.message.text
+        user_id = update.message.from_user.id
+
+        # Отправляем индикатор набора текста сразу
+        context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+
+        try:
+            # Оптимизированная проверка исторической тематики с использованием хэш-таблицы (set)
+            # вместо итерации по списку - намного быстрее при большом количестве ключевых слов
+            history_keywords = {
+                'россия', 'история', 'царь', 'император', 'ссср', 'война', 'революция',
+                'русь', 'совет', 'петр', 'екатерина', 'сталин', 'ленин', 'князь',
+                'династия', 'кремль', 'москва', 'киев', 'новгород', 'рюрик', 'романов'
+            }
+
+            # Оптимизируем за счет разбиения на слова и проверки отдельных слов
+            # Это работает быстрее при длинных сообщениях
+            words = set(user_message.lower().split())
+            is_history_related = bool(words.intersection(history_keywords))
+
+            # Быстрая проверка на вопрос или команду рассказать
+            if not is_history_related and len(user_message) < 100:
+                is_history_related = '?' in user_message or 'расскажи' in user_message.lower()
+
+            # Оптимизированный вызов API с кэшированием и упрощенным запросом
+            if is_history_related:
+                # Сокращенный промпт для экономии токенов и ускорения ответа
+                prompt = f"""Краткий ответ на исторический вопрос о России: "{self._sanitize_markdown(user_message)}". Максимум 200 слов."""
+
+                # Используем меньшее значение температуры и токенов для ускорения ответа и экономии
+                response = self.api_client.ask_grok(prompt, max_tokens=600, temp=0.1)
+            else:
+                # Используем заранее подготовленный ответ вместо генерации
+                response = "Я отвечаю на вопросы по истории России. Пожалуйста, задайте исторический вопрос."
+
+            # Оптимизация отправки сообщений - объединяем сообщение и кнопки
+            keyboard = [[InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')]]
+
             # Отправляем единое сообщение с ответом и кнопкой вместо двух сообщений
             sent_msg = update.message.reply_text(
                 response + "\n\n" + "Вы можете задать еще вопрос или вернуться в меню:",
