@@ -396,38 +396,86 @@ class HistoryMap:
             if category:
                 title += f" - {category}"
                 
-            # Создаем фигуру
-            fig = plt.figure(figsize=(12, 8))
+            # Создаем фигуру с большим размером для лучшей детализации
+            fig = plt.figure(figsize=(15, 10))
             
             # Настраиваем проекцию карты России
             m = Basemap(projection='merc', 
                       llcrnrlat=41.0, llcrnrlon=19.0,
                       urcrnrlat=82.0, urcrnrlon=180.0,
-                      resolution='l')
+                      resolution='i')  # Повышенное разрешение карты
             
             # Добавляем контуры стран
-            m.drawcountries(linewidth=0.5)
-            m.drawcoastlines(linewidth=0.5)
+            m.drawcountries(linewidth=0.8)
+            m.drawcoastlines(linewidth=0.8)
+            
+            # Добавляем реки и административные границы для большей детализации
+            m.drawrivers(linewidth=0.3, color='blue')
             
             # Заполняем сушу и воду
             m.fillcontinents(color='#EEEEEE', lake_color='#CCCCFF')
             m.drawmapboundary(fill_color='#CCCCFF')
             
-            # Добавляем события на карту
-            for event in display_events:
+            # Добавляем координатную сетку
+            m.drawparallels(range(40, 85, 10), labels=[1,0,0,0], fontsize=8)
+            m.drawmeridians(range(20, 190, 20), labels=[0,0,0,1], fontsize=8)
+            
+            # Случайные цвета для разных категорий
+            import numpy as np
+            colors = ['ro', 'bo', 'go', 'mo', 'co', 'yo', 'ko']
+            categories_seen = {}
+            
+            # Создаем словарь для сносок
+            footnotes = []
+            
+            # Добавляем события на карту с нумерацией
+            for i, event in enumerate(display_events, 1):
                 lat = event.get('location', {}).get('lat', 0)
                 lon = event.get('location', {}).get('lng', 0)
                 title = event.get('title', 'Неизвестное событие')
+                desc = event.get('description', '')
+                event_category = event.get('category', 'Прочее')
+                date = event.get('date', '')
+                
+                # Определяем цвет для категории
+                if event_category not in categories_seen:
+                    categories_seen[event_category] = colors[len(categories_seen) % len(colors)]
+                color = categories_seen[event_category]
                 
                 x, y = m(lon, lat)
-                plt.plot(x, y, 'ro', markersize=5)
-                plt.text(x, y, title, fontsize=8, ha='right', va='bottom')
+                # Рисуем точку с номером
+                plt.plot(x, y, color[0], markersize=7)
+                plt.text(x, y+50000, str(i), fontsize=9, ha='center', va='center',
+                        bbox=dict(facecolor='white', alpha=0.7, boxstyle='round'))
+                
+                # Добавляем в сноску
+                footnote = f"{i}. {title} ({date}): {desc}"
+                footnotes.append(footnote)
             
             # Добавляем заголовок
-            plt.title(title)
+            plt.title(title, fontsize=14)
             
-            # Сохраняем изображение
-            plt.savefig(map_image_path, dpi=150, bbox_inches='tight')
+            # Добавляем легенду категорий
+            legend_elements = []
+            import matplotlib.lines as mlines
+            for cat, col in categories_seen.items():
+                legend_elements.append(mlines.Line2D([0], [0], marker='o', color=col[0], 
+                                                   markersize=7, label=cat, linestyle='None'))
+            if legend_elements:
+                plt.legend(handles=legend_elements, loc='lower left', fontsize=8)
+            
+            # Добавляем сноски внизу карты
+            bottom_text = '\n'.join(footnotes)
+            
+            # Регулируем размер шрифта в зависимости от количества сносок
+            footnote_fontsize = 10 if len(footnotes) < 5 else (8 if len(footnotes) < 10 else 6)
+            
+            # Добавляем текстовое поле с примечаниями
+            plt.figtext(0.5, 0.01, bottom_text, wrap=True, horizontalalignment='center', 
+                      fontsize=footnote_fontsize, bbox=dict(facecolor='white', alpha=0.8))
+            
+            # Сохраняем изображение с высоким разрешением
+            plt.savefig(map_image_path, dpi=200, bbox_inches='tight')
             plt.close()
             
             self.logger.info(f"Изображение карты сгенерировано: {map_image_path}")
@@ -436,6 +484,67 @@ class HistoryMap:
             self.logger.error(f"Не удалось сгенерировать изображение с помощью matplotlib: {e}")
             return None
             
+    def generate_map_by_topic(self, topic):
+        """
+        Генерирует карту на основе пользовательского запроса/темы.
+        
+        Args:
+            topic (str): Тема или запрос пользователя
+            
+        Returns:
+            str: Путь к сгенерированному изображению карты или None в случае ошибки
+        """
+        try:
+            self.logger.info(f"Генерация карты по пользовательскому запросу: {topic}")
+            
+            # Получаем все события
+            all_events = self.get_all_events()
+            if not all_events:
+                self.logger.warning("Нет доступных событий для фильтрации")
+                return None
+                
+            # Преобразуем тему в нижний регистр для поиска
+            topic_lower = topic.lower()
+            
+            # Ключевые слова для поиска соответствий
+            keywords = topic_lower.split()
+            
+            # Фильтруем события по ключевым словам
+            relevant_events = []
+            for event in all_events:
+                event_title = event.get('title', '').lower()
+                event_desc = event.get('description', '').lower()
+                event_category = event.get('category', '').lower()
+                
+                # Проверяем соответствие ключевым словам
+                if any(keyword in event_title or keyword in event_desc or keyword in event_category 
+                      for keyword in keywords):
+                    # Повышаем приоритет события, если оно соответствует нескольким ключевым словам
+                    matches = sum(1 for keyword in keywords if keyword in event_title or 
+                                 keyword in event_desc or keyword in event_category)
+                    event['relevance'] = matches
+                    relevant_events.append(event)
+            
+            # Сортируем события по релевантности 
+            relevant_events.sort(key=lambda x: x.get('relevance', 0), reverse=True)
+            
+            # Если нет релевантных событий, используем случайные события
+            if not relevant_events:
+                self.logger.warning(f"Не найдено событий для темы: {topic}. Используем случайные события.")
+                relevant_events = self.get_random_events(5)
+            
+            # Генерируем изображение карты с найденными событиями
+            map_image_path = self.generate_map_image(events=relevant_events)
+            if map_image_path:
+                self.logger.info(f"Сгенерирована карта по теме '{topic}' с {len(relevant_events)} событиями")
+                return map_image_path
+            else:
+                self.logger.error(f"Не удалось сгенерировать карту по теме: {topic}")
+                return None
+        except Exception as e:
+            self.logger.error(f"Ошибка при генерации карты по теме {topic}: {e}")
+            return None
+    
     def clean_old_maps(self, max_age_hours=24):
         """
         Очищает старые файлы карт, созданные более указанного времени назад.

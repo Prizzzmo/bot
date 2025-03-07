@@ -262,17 +262,25 @@ class CommandHandlers:
             categories = self.history_map.get_categories()
             keyboard = []
 
-            # Добавляем кнопки для каждой категории
-            for category in categories:
-                keyboard.append([InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}')])
+            # Добавляем кнопки для каждой категории (максимум 10 на странице)
+            category_buttons = []
+            for i, category in enumerate(categories[:10]):
+                category_buttons.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
+                # Создаем ряды по 2 кнопки
+                if i % 2 == 1 or i == len(categories[:10])-1:
+                    keyboard.append(category_buttons)
+                    category_buttons = []
 
-            # Добавляем кнопку для случайных событий и возврата в меню
+            # Добавляем кнопки навигации и функций
+            keyboard.append([InlineKeyboardButton("📋 Больше категорий ▶️", callback_data='map_more_categories')])
+            keyboard.append([InlineKeyboardButton("🔍 Поиск по теме", callback_data='map_search_topic')])
             keyboard.append([InlineKeyboardButton("🎲 Случайные события", callback_data='map_random')])
             keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
 
             query.edit_message_text(
                 "🗺️ *Интерактивная карта исторических событий*\n\n"
-                "Выберите категорию исторических событий для отображения на карте или "
+                "Выберите категорию исторических событий для отображения на карте, "
+                "воспользуйтесь поиском по конкретной теме или "
                 "посмотрите случайные события из разных периодов истории России.",
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='Markdown'
@@ -423,14 +431,57 @@ class CommandHandlers:
 
             return self.MAP
 
+        elif query_data == 'map_more_categories':
+            # Показываем дополнительные категории
+            categories = self.history_map.get_categories()
+            keyboard = []
+            
+            # Показываем следующие 10 категорий или оставшиеся
+            remaining_categories = categories[10:] if len(categories) > 10 else []
+            category_buttons = []
+            for i, category in enumerate(remaining_categories):
+                category_buttons.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
+                # Создаем ряды по 2 кнопки
+                if i % 2 == 1 or i == len(remaining_categories)-1:
+                    keyboard.append(category_buttons)
+                    category_buttons = []
+            
+            # Добавляем навигационные кнопки
+            keyboard.append([InlineKeyboardButton("◀️ Назад к основным категориям", callback_data='history_map')])
+            keyboard.append([InlineKeyboardButton("🔍 Поиск по теме", callback_data='map_search_topic')])
+            keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
+            
+            query.edit_message_text(
+                "🗺️ *Дополнительные категории исторических событий*\n\n"
+                "Выберите одну из дополнительных категорий для отображения на карте.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            return self.MAP
+            
+        elif query_data == 'map_search_topic':
+            # Предлагаем пользователю ввести тему для генерации карты
+            query.edit_message_text(
+                "🔍 *Поиск исторических событий по теме*\n\n"
+                "Введите интересующую вас тему или ключевое слово для поиска исторических событий "
+                "(например, «Петр I», «Крымская война», «основание городов» и т.д.).\n\n"
+                "Бот найдет соответствующие события и отобразит их на карте.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад к категориям", callback_data='history_map')]]),
+                parse_mode='Markdown'
+            )
+            
+            # Устанавливаем флаг ожидания ввода пользовательской темы
+            context.user_data['waiting_for_map_topic'] = True
+            return self.MAP
+            
         elif query_data == 'map_random':
-            # Получаем случайные события
-            random_events = self.history_map.get_random_events(5)
+            # Получаем больше случайных событий для повышения детализации
+            random_events = self.history_map.get_random_events(8)
 
             # Отправляем сообщение о генерации
             status_message = context.bot.send_message(
                 chat_id=user_id,
-                text="🔄 Генерация изображения карты со случайными событиями...",
+                text="🔄 Генерация детализированной карты со случайными событиями...",
                 parse_mode='HTML'
             )
 
@@ -443,7 +494,8 @@ class CommandHandlers:
                     context.bot.send_photo(
                         chat_id=user_id,
                         photo=img,
-                        caption="🗺️ Карта со случайными историческими событиями России",
+                        caption="🗺️ Детализированная карта случайных исторических событий России\n"
+                               "Номера на карте соответствуют подписям внизу изображения.",
                         parse_mode='HTML'
                     )
 
@@ -454,9 +506,12 @@ class CommandHandlers:
                 )
 
                 # Удаляем изображение карты после отправки
-                os.remove(map_image_path)
+                try:
+                    os.remove(map_image_path)
+                except Exception as e:
+                    self.logger.error(f"Не удалось удалить файл карты {map_image_path}: {e}")
 
-                self.logger.info(f"Пользователь {user_id} получил изображение карты со случайными событиями")
+                self.logger.info(f"Пользователь {user_id} получил детализированную карту со случайными событиями")
             else:
                 # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
                 context.bot.edit_message_text(
@@ -913,7 +968,8 @@ class CommandHandlers:
         """
         Обрабатывает сообщения пользователя в режиме беседы с улучшенной оптимизацией.
 
-        Также обрабатывает ввод ID нового администратора, если его ожидает админ-панель.
+        Также обрабатывает ввод ID нового администратора или темы для карты,
+        если соответствующие флаги установлены.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
@@ -922,6 +978,77 @@ class CommandHandlers:
         Returns:
             int: Следующее состояние разговора
         """
+        # Проверяем, ожидаем ли мы ввод пользовательской темы для карты
+        if 'waiting_for_map_topic' in context.user_data and context.user_data['waiting_for_map_topic']:
+            user_topic = update.message.text
+            user_id = update.message.from_user.id
+            
+            # Сбрасываем флаг ожидания
+            context.user_data['waiting_for_map_topic'] = False
+            
+            self.logger.info(f"Пользователь {user_id} запросил карту по теме: {user_topic}")
+            
+            # Отправляем сообщение о генерации
+            status_message = update.message.reply_text(
+                f"🔄 Генерация детализированной карты по теме «{user_topic}»...",
+                parse_mode='HTML'
+            )
+            
+            # Генерируем карту по пользовательской теме
+            map_image_path = self.history_map.generate_map_by_topic(user_topic)
+            
+            if map_image_path and os.path.exists(map_image_path):
+                # Отправляем изображение карты
+                with open(map_image_path, 'rb') as img:
+                    update.message.reply_photo(
+                        photo=img,
+                        caption=f"🗺️ Карта исторических событий по теме «{user_topic}»\n"
+                               f"Номера на карте соответствуют подписям внизу изображения.",
+                        parse_mode='HTML'
+                    )
+                
+                # Удаляем сообщение о генерации
+                try:
+                    context.bot.delete_message(
+                        chat_id=user_id,
+                        message_id=status_message.message_id
+                    )
+                except Exception as e:
+                    self.logger.error(f"Не удалось удалить сообщение о генерации: {e}")
+                
+                # Удаляем изображение карты после отправки
+                try:
+                    os.remove(map_image_path)
+                except Exception as e:
+                    self.logger.error(f"Не удалось удалить файл карты {map_image_path}: {e}")
+                
+                # Предлагаем вернуться к выбору категорий
+                keyboard = [
+                    [InlineKeyboardButton("🔍 Поискать другую тему", callback_data='map_search_topic')],
+                    [InlineKeyboardButton("🔙 Вернуться к категориям", callback_data='history_map')],
+                    [InlineKeyboardButton("📋 В главное меню", callback_data='back_to_menu')]
+                ]
+                
+                update.message.reply_text(
+                    "Выберите дальнейшее действие:",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                
+                self.logger.info(f"Пользователь {user_id} получил карту по теме: {user_topic}")
+            else:
+                # Если не удалось сгенерировать карту
+                update.message.reply_text(
+                    f"❌ К сожалению, не удалось найти достаточно событий по теме «{user_topic}» "
+                    f"или возникла ошибка при генерации карты. Попробуйте другую тему или выберите категорию.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔍 Попробовать другую тему", callback_data='map_search_topic')],
+                        [InlineKeyboardButton("🔙 Вернуться к категориям", callback_data='history_map')]
+                    ])
+                )
+                self.logger.error(f"Не удалось сгенерировать карту по теме {user_topic} для пользователя {user_id}")
+            
+            return self.MAP
+        
         # Проверяем, ожидаем ли мы ввод ID нового администратора
         if hasattr(self, 'admin_panel') and 'waiting_for_admin_id' in context.user_data:
             self.admin_panel.process_new_admin_id(update, context)
