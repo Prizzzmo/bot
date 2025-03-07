@@ -1,6 +1,8 @@
 
 import threading
 import time
+import os
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src.telegram_queue import TelegramRequestQueue
 
 class MessageManager:
@@ -129,8 +131,7 @@ class MessageManager:
 
     def clean_chat(self, bot, chat_id, user_id=None):
         """
-        Новая оптимизированная функция для удаления сообщений в чате с использованием 
-        нативных методов Telegram API.
+        Полностью переработанная функция для удаления сообщений чата.
         
         Args:
             bot: Объект бота Telegram
@@ -141,140 +142,153 @@ class MessageManager:
             bool: Успешность выполнения операции
         """
         try:
-            # Логирование
-            user_str = f" пользователя {user_id}" if user_id else ""
-            self.logger.info(f"Начата очистка чата {chat_id}{user_str}")
+            # Логирование начала операции
+            self.logger.info(f"Начата очистка чата {chat_id} (пользователь {user_id})")
             
-            # Отправка уведомления о начале очистки
-            status_message = bot.send_message(
-                chat_id=chat_id,
-                text="🧹 Начинаю очистку чата..."
-            )
-            
-            # Получаем сохраненные ID сообщений пользователя
-            message_ids = []
-            if user_id and hasattr(bot, '_dispatcher') and hasattr(bot._dispatcher, 'user_data'):
-                user_data = bot._dispatcher.user_data.get(user_id, {})
-                message_ids = user_data.get('message_ids', [])
-            
-            # Обновляем статус с количеством найденных сообщений
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=status_message.message_id,
-                text=f"🧹 Очистка чата в процессе...\nНайдено {len(message_ids)} сообщений для удаления."
-            )
-            
-            # Если нет сохраненных сообщений, пробуем получить историю чата через API
-            if not message_ids and hasattr(bot, '_bot'):
-                try:
-                    # Получаем историю чата (ограничиваем до 100 последних сообщений)
-                    history = bot._bot.get_chat_history(chat_id=chat_id, limit=100)
-                    if history:
-                        # Получаем ID сообщений из истории
-                        message_ids = [msg.message_id for msg in history]
-                        self.logger.info(f"Получено {len(message_ids)} сообщений из истории чата")
-                except Exception as e:
-                    self.logger.warning(f"Не удалось получить историю чата: {e}")
-            
-            # Если все равно нет сообщений, сообщаем пользователю
-            if not message_ids:
-                bot.edit_message_text(
+            # Отправляем начальное сообщение
+            status_message = None
+            try:
+                status_message = bot.send_message(
                     chat_id=chat_id,
-                    message_id=status_message.message_id,
-                    text="⚠️ Не найдено сообщений для удаления."
+                    text="🧹 Начинаю очистку чата..."
                 )
+            except Exception as e:
+                self.logger.error(f"Ошибка при отправке начального сообщения: {e}")
+            
+            # Собираем ID сообщений для удаления
+            message_ids = []
+            
+            # 1. Сначала проверяем сохраненные ID в контексте пользователя
+            if user_id and hasattr(bot, 'dispatcher'):
+                user_data = bot.dispatcher.user_data.get(user_id, {})
+                saved_ids = user_data.get('message_ids', [])
+                if saved_ids:
+                    message_ids.extend(saved_ids)
+                    self.logger.info(f"Получено {len(saved_ids)} сохраненных ID сообщений пользователя")
+            
+            # Обновляем статус
+            if status_message:
+                try:
+                    bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=status_message.message_id,
+                        text=f"🧹 Подготовка к очистке...\nНайдено {len(message_ids)} сообщений."
+                    )
+                except Exception as e:
+                    self.logger.error(f"Ошибка при обновлении статуса: {e}")
+            
+            # Если нет сохраненных сообщений, пробуем другие методы
+            if not message_ids:
+                # Получаем последние сообщения напрямую через API
+                self.logger.info("Попытка получить последние сообщения через API...")
+                try:
+                    # Метод 1: Через телеграм метод getUpdates (для ботов с webhooks может не работать)
+                    updates = []
+                    try:
+                        if hasattr(bot, 'get_updates'):
+                            updates = bot.get_updates(offset=-1, limit=100, timeout=1)
+                    except Exception as e:
+                        self.logger.warning(f"Не удалось получить обновления через get_updates: {e}")
+                    
+                    for update in updates:
+                        if update.message and update.message.chat_id == chat_id:
+                            message_ids.append(update.message.message_id)
+                    
+                    self.logger.info(f"Получено {len(message_ids)} сообщений из обновлений")
+                except Exception as e:
+                    self.logger.warning(f"Ошибка при попытке получить обновления: {e}")
+            
+            # Если нет сообщений для удаления, информируем пользователя
+            if not message_ids:
+                if status_message:
+                    try:
+                        bot.edit_message_text(
+                            chat_id=chat_id,
+                            message_id=status_message.message_id,
+                            text="⚠️ Не найдено сообщений для удаления."
+                        )
+                    except:
+                        pass
                 
-                # Создаем кнопки для дальнейших действий
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                # Отправляем уведомление с кнопками
                 keyboard = [
-                    [InlineKeyboardButton("🔙 Вернуться в меню", callback_data="back_to_menu")]
+                    [InlineKeyboardButton("🔄 Попробовать еще раз", callback_data="clear_chat_retry")],
+                    [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 bot.send_message(
                     chat_id=chat_id,
-                    text="Возможно, сообщения уже были удалены или бот не имеет доступа к истории чата.",
+                    text="Не удалось найти сообщения для удаления.\n\nВы можете попробовать еще раз или вернуться в главное меню.",
                     reply_markup=reply_markup
                 )
                 return False
-                
-            # Группируем сообщения по 100 (максимум для метода delete_messages)
+            
+            # Группируем сообщения по 100 (максимальный размер для метода deleteMessages)
             message_chunks = [message_ids[i:i+100] for i in range(0, len(message_ids), 100)]
             total_deleted = 0
             
             # Удаляем сообщения пакетами
             for i, chunk in enumerate(message_chunks):
                 try:
-                    # Обновляем статус прогресса
+                    # Обновляем статус
                     progress = int((i / len(message_chunks)) * 100)
-                    bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=status_message.message_id,
-                        text=f"🧹 Очистка чата... {progress}%\nУдалено {total_deleted} из {len(message_ids)} сообщений."
-                    )
+                    if status_message:
+                        try:
+                            bot.edit_message_text(
+                                chat_id=chat_id,
+                                message_id=status_message.message_id,
+                                text=f"🧹 Очистка чата... {progress}%\nУдалено {total_deleted} из {len(message_ids)} сообщений."
+                            )
+                        except:
+                            pass
                     
-                    # Используем нативный метод API для пакетного удаления
-                    def delete_batch():
-                        if hasattr(bot, '_bot'):
-                            return bot._bot.delete_messages(chat_id=chat_id, message_ids=chunk)
-                        else:
-                            # Резервный метод, если нет прямого доступа к API
-                            success_count = 0
-                            for msg_id in chunk:
-                                if bot.delete_message(chat_id=chat_id, message_id=msg_id):
-                                    success_count += 1
-                            return success_count > 0
-                            
-                    result = self.request_queue.enqueue(delete_batch)
-                    
-                    if result:
-                        total_deleted += len(chunk)
-                        self.logger.info(f"Успешно удалено {len(chunk)} сообщений (пакет {i+1}/{len(message_chunks)})")
-                    
-                    # Небольшая пауза между пакетами для предотвращения блокировки API
-                    time.sleep(0.3)
-                    
-                except Exception as e:
-                    self.logger.warning(f"Ошибка при удалении пакета сообщений: {e}")
-                    
-                    # Если пакетное удаление не удалось, пробуем удалять по одному
+                    # Попытка удаления пакета сообщений
                     for msg_id in chunk:
                         try:
+                            # Пробуем стандартный метод delete_message
                             def delete_single():
-                                return bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                                try:
+                                    return bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                                except Exception as e:
+                                    self.logger.debug(f"Ошибка при удалении сообщения {msg_id}: {e}")
+                                    return False
                             
-                            if self.request_queue.enqueue(delete_single):
+                            result = self.request_queue.enqueue(delete_single)
+                            
+                            if result:
                                 total_deleted += 1
-                        except Exception:
-                            pass
+                                # Делаем небольшую паузу после успешного удаления
+                                time.sleep(0.05)
+                        except Exception as e:
+                            self.logger.debug(f"Ошибка при удалении сообщения {msg_id}: {e}")
+                except Exception as e:
+                    self.logger.warning(f"Ошибка при обработке пакета сообщений: {e}")
             
             # Очищаем сохраненные ID сообщений пользователя
-            if user_id and hasattr(bot, '_dispatcher') and hasattr(bot._dispatcher, 'user_data'):
-                user_data = bot._dispatcher.user_data.get(user_id, {})
+            if user_id and hasattr(bot, 'dispatcher'):
+                user_data = bot.dispatcher.user_data.get(user_id, {})
                 if 'message_ids' in user_data:
                     user_data['message_ids'] = []
-            
-            # Проверяем результат и отправляем итоговое сообщение
-            success = total_deleted > 0
+                    self.logger.info(f"Очищены сохраненные ID сообщений пользователя {user_id}")
             
             # Удаляем статусное сообщение
-            try:
-                bot.delete_message(chat_id=chat_id, message_id=status_message.message_id)
-            except:
-                pass
+            if status_message:
+                try:
+                    bot.delete_message(chat_id=chat_id, message_id=status_message.message_id)
+                except:
+                    pass
             
-            # Создаем кнопки для дальнейших действий
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            # Отправляем итоговое сообщение
             keyboard = [
                 [InlineKeyboardButton("🔄 Повторить очистку", callback_data="clear_chat_retry")],
                 [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            # Отправляем итоговое сообщение
-            result_text = f"✅ Очистка чата завершена!\nУдалено {total_deleted} из {len(message_ids)} сообщений."
+            result_text = f"✅ Очистка завершена!\nУдалено {total_deleted} из {len(message_ids)} сообщений."
             if total_deleted < len(message_ids):
-                result_text += "\n\nНекоторые сообщения не удалось удалить - возможно, они слишком старые или у бота нет прав."
+                result_text += "\n\nНекоторые сообщения не удалось удалить (возможно, они слишком старые или удалены ранее)."
             
             bot.send_message(
                 chat_id=chat_id,
@@ -283,14 +297,13 @@ class MessageManager:
             )
             
             self.logger.info(f"Очистка чата {chat_id} завершена. Удалено {total_deleted} из {len(message_ids)} сообщений.")
-            return success
+            return total_deleted > 0
             
         except Exception as e:
             self.logger.error(f"Критическая ошибка при очистке чата {chat_id}: {e}")
             
             # Отправляем сообщение об ошибке
             try:
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 keyboard = [
                     [InlineKeyboardButton("🔄 Повторить", callback_data="clear_chat_retry")],
                     [InlineKeyboardButton("🔙 В меню", callback_data="back_to_menu")]
@@ -299,15 +312,15 @@ class MessageManager:
                 
                 bot.send_message(
                     chat_id=chat_id,
-                    text=f"❌ Произошла ошибка при очистке чата:\n{str(e)[:100]}\n\nВы можете попробовать еще раз.",
+                    text=f"❌ Ошибка при очистке чата:\n{str(e)[:100]}\n\nВы можете попробовать еще раз.",
                     reply_markup=reply_markup
                 )
             except:
                 pass
-                
+            
             return False
     
-    # Алиас для совместимости со старым кодом
+    # Алиас для обратной совместимости
     delete_chat_history = clean_chat
 
     def __del__(self):
