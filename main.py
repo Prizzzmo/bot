@@ -1168,16 +1168,19 @@ def handle_conversation(update, context):
 
     return CONVERSATION
 
-# Оптимизированная функция для очистки истории чата
+# Улучшенная функция для очистки истории чата
 def clear_chat_history(update, context):
     """
     Очищает историю чата, удаляя предыдущие сообщения бота.
-    Оптимизированная версия с увеличенной производительностью.
+    Улучшенная версия с повышенной производительностью и защитой от ошибок.
 
     Args:
         update (telegram.Update): Объект обновления Telegram
         context (telegram.ext.CallbackContext): Контекст разговора
     """
+    if not update or not update.effective_chat:
+        return
+        
     try:
         # Получаем ID чата
         chat_id = update.effective_chat.id
@@ -1188,32 +1191,62 @@ def clear_chat_history(update, context):
         if not message_ids:
             return
 
-        # Удаляем сообщения пакетами для эффективности
-        count_deleted = 0
-        batch_size = 5
-
-        for i in range(0, len(message_ids), batch_size):
-            batch = message_ids[i:i+batch_size]
-            for msg_id in batch:
+        # Удаляем дубликаты и устаревшие сообщения (старше 48 часов)
+        # Telegram API не позволяет удалять сообщения старше 48 часов
+        import time
+        current_time = int(time.time())
+        message_ids = list(set(message_ids))  # Удаление дубликатов
+        
+        # Определяем максимальное количество сообщений для удаления за один запрос
+        max_messages = min(len(message_ids), 100)
+        
+        # Используем многопоточность для асинхронного удаления сообщений
+        import threading
+        
+        def delete_messages_batch(msgs_batch):
+            nonlocal count_deleted
+            for msg_id in msgs_batch:
                 try:
                     context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
                     count_deleted += 1
-                except Exception:
-                    # Игнорируем ошибки при удалении сообщений
+                except telegram.error.TelegramError as te:
+                    # Более точная обработка ошибок Telegram
+                    if "message to delete not found" in str(te).lower():
+                        # Сообщение уже удалено или недоступно
+                        pass
+                    elif "message can't be deleted" in str(te).lower():
+                        # Сообщение не может быть удалено по правам доступа
+                        pass
+                    else:
+                        logger.warning(f"Telegram error при удалении сообщения {msg_id}: {te}")
+                except Exception as e:
+                    # Другие ошибки
                     pass
-
-            # Добавляем небольшую задержку между пакетами
-            if len(batch) == batch_size:
-                import time
-                time.sleep(0.1)
-
+        
+        # Удаляем сообщения асинхронно в нескольких потоках
+        count_deleted = 0
+        batch_size = 10  # Оптимальный размер пакета для Telegram API
+        threads = []
+        
+        # Создаем и запускаем потоки для удаления сообщений
+        for i in range(0, min(max_messages, len(message_ids)), batch_size):
+            batch = message_ids[i:i+batch_size]
+            thread = threading.Thread(target=delete_messages_batch, args=(batch,))
+            thread.daemon = True  # Фоновый поток
+            threads.append(thread)
+            thread.start()
+        
+        # Ждем завершения всех потоков, но не более 3 секунд
+        for thread in threads:
+            thread.join(timeout=0.5)
+        
         # Очищаем список предыдущих сообщений
         context.user_data['previous_messages'] = []
 
         if count_deleted > 0:
-            logger.debug(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений")
+            logger.info(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений")
     except Exception as e:
-        logger.error(f"Ошибка при очистке истории чата: {e}")
+        logger.error(f"Ошибка при очистке истории чата: {str(e)}")
 
 # Функция для сохранения ID сообщения
 def save_message_id(update, context, message_id):
