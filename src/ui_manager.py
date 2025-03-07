@@ -42,9 +42,17 @@ class UIManager:
         for i, topic in enumerate(topics, 1):
             # Проверяем, что тема не пустая
             if topic and len(topic.strip()) > 0:
+                # Удаляем существующую нумерацию, если она есть
+                if re.match(r'^\d+[\.\)\:]\s+', topic):
+                    # Тема уже содержит номер, используем ее как есть
+                    display_topic = topic
+                else:
+                    # Добавляем номер к теме
+                    display_topic = f"{i}. {topic}"
+                
                 # Ограничиваем длину темы в кнопке
-                display_topic = topic[:30] + '...' if len(topic) > 30 else topic
-                keyboard.append([InlineKeyboardButton(f"{i}. {display_topic}", callback_data=f'topic_{i}')])
+                display_topic = display_topic[:30] + '...' if len(display_topic) > 30 else display_topic
+                keyboard.append([InlineKeyboardButton(display_topic, callback_data=f'topic_{i}')])
             else:
                 # Если тема пустая, добавляем заполнитель
                 keyboard.append([InlineKeyboardButton(f"{i}. [Тема не определена]", callback_data=f'topic_{i}')])
