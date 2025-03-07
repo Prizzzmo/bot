@@ -35,6 +35,10 @@ class CommandHandlers:
         self.CONVERSATION = CONVERSATION
         self.MAP = MAP
 
+        # Кэш для предотвращения повторных нажатий кнопок
+        self.callback_cache = {}
+        self.callback_cache_ttl = 2  # Время жизни записи в кэше (секунды)
+
     def start(self, update, context):
         """
         Обрабатывает команду /start, показывает приветствие и главное меню.
@@ -80,6 +84,7 @@ class CommandHandlers:
     def button_handler(self, update, context):
         """
         Обрабатывает нажатия на кнопки меню с оптимизацией.
+        Включает механизм защиты от дублирования запросов.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
@@ -91,17 +96,42 @@ class CommandHandlers:
         query = update.callback_query
         try:
             query.answer()  # Подтверждаем нажатие кнопки
+        except telegram.error.BadRequest as e:
+            if "query is too old" in str(e).lower():
+                # Запрос устарел, это нормально для старых кнопок
+                self.logger.info(f"Старый запрос кнопки, пропуск подтверждения: {e}")
+            else:
+                self.logger.warning(f"Не удалось подтвердить кнопку: {e}")
         except Exception as e:
             self.logger.warning(f"Не удалось подтвердить кнопку: {e}")
 
         user_id = query.from_user.id
+        query_data = query.data
+
+        # Проверка на дублирование запросов с защитой от повторных нажатий
+        import time
+        current_time = time.time()
+        cache_key = (user_id, query_data)
+
+        if cache_key in self.callback_cache:
+            last_time = self.callback_cache[cache_key]
+            # Если с момента последнего нажатия прошло меньше TTL секунд
+            if current_time - last_time < self.callback_cache_ttl:
+                self.logger.info(f"Игнорирование повторного нажатия кнопки {query_data} пользователем {user_id}")
+                return None  # Игнорируем повторное нажатие
+
+        # Обновляем время последнего нажатия
+        self.callback_cache[cache_key] = current_time
+
+        # Очистка устаревших записей из кэша (каждые 100 запросов)
+        if len(self.callback_cache) > 100:
+            # Удаляем записи старше TTL
+            old_keys = [k for k, v in self.callback_cache.items() if current_time - v > self.callback_cache_ttl]
+            for k in old_keys:
+                del self.callback_cache[k]
 
         # Очищаем историю чата только один раз для экономии ресурсов
         self.message_manager.clean_all_messages_except_active(update, context)
-
-        # Проверяем, нужно ли обрабатывать активные сообщения
-        # Кэшируем результат data для предотвращения повторного доступа
-        query_data = query.data
 
         self.logger.info(f"Пользователь {user_id} нажал кнопку: {query_data}")
 
@@ -869,20 +899,39 @@ class CommandHandlers:
                                     parse_mode='Markdown',
                                     disable_web_page_preview=True
                                 )
-                                
+
                                 # Сохраняем ID сообщений для будущей очистки чата
                                 sent_message_ids = []
-                                
-                                # Отправляем остальные главы как отдельные сообщения
+
+                                # Отправляем остальные главы как отдельные сообщения с задержкой
+                                import time
                                 for i, msg in enumerate(messages[1:], 1):
-                                    sent_msg = query.message.reply_text(
-                                        msg, 
-                                        parse_mode='Markdown',
-                                        disable_web_page_preview=True
-                                    )
-                                    # Сохраняем ID сообщения
-                                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
-                                    
+                                    try:
+                                        # Добавляем небольшую задержку между сообщениями для предотвращения лимитов API
+                                        if i > 1 and i % 3 == 0:  # Делаем паузу после каждого 3-го сообщения
+                                            time.sleep(0.5)
+
+                                        sent_msg = query.message.reply_text(
+                                            msg, 
+                                            parse_mode='Markdown',
+                                            disable_web_page_preview=True
+                                        )
+                                        # Сохраняем ID сообщения
+                                        self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                    except telegram.error.RetryAfter as e:
+                                        # Обработка ошибки превышения лимита запросов
+                                        self.logger.warning(f"Превышен лимит запросов. Ожидание {e.retry_after} секунд")
+                                        time.sleep(e.retry_after)
+                                        # Повторная попытка отправки
+                                        sent_msg = query.message.reply_text(
+                                            msg, 
+                                            parse_mode='Markdown',
+                                            disable_web_page_preview=True
+                                        )
+                                        self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                    except Exception as e:
+                                        self.logger.error(f"Ошибка при отправке части сообщения: {e}")
+
                                 self.logger.info(f"Отправлено {len(messages)} сообщений по теме '{topic}'")
                             except Exception as e:
                                 self.logger.error(f"Ошибка при отправке сообщения: {e}")
@@ -891,7 +940,7 @@ class CommandHandlers:
                                     f"📚 Тема: {topic}\n\nПроизошла ошибка форматирования. Вот информация в упрощенном виде:",
                                     parse_mode=None
                                 )
-                                
+
                                 # Отправляем сообщения без форматирования
                                 for msg in messages:
                                     query.message.reply_text(msg, parse_mode=None)
@@ -961,17 +1010,36 @@ class CommandHandlers:
                         parse_mode='Markdown',
                         disable_web_page_preview=True
                     )
-                    
-                    # Отправляем каждую главу как отдельное сообщение
+
+                    # Отправляем каждую главу как отдельное сообщение с задержкой
+                    import time
                     for i, msg in enumerate(messages[1:], 1):
-                        sent_msg = update.message.reply_text(
-                            msg, 
-                            parse_mode='Markdown',
-                            disable_web_page_preview=True
-                        )
-                        # Сохраняем ID сообщения для возможности последующего удаления
-                        self.message_manager.save_message_id(update, context, sent_msg.message_id)
-                        
+                        try:
+                            # Добавляем небольшую задержку между сообщениями для предотвращения лимитов API
+                            if i > 1 and i % 3 == 0:  # Делаем паузу после каждого 3-го сообщения
+                                time.sleep(0.5)
+
+                            sent_msg = update.message.reply_text(
+                                msg, 
+                                parse_mode='Markdown',
+                                disable_web_page_preview=True
+                            )
+                            # Сохраняем ID сообщения для возможности последующего удаления
+                            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                        except telegram.error.RetryAfter as e:
+                            # Обработка ошибки превышения лимита запросов
+                            self.logger.warning(f"Превышен лимит запросов. Ожидание {e.retry_after} секунд")
+                            time.sleep(e.retry_after)
+                            # Повторная попытка отправки
+                            sent_msg = update.message.reply_text(
+                                msg, 
+                                parse_mode='Markdown',
+                                disable_web_page_preview=True
+                            )
+                            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                        except Exception as e:
+                            self.logger.error(f"Ошибка при отправке части сообщения: {e}")
+
                     self.logger.info(f"Отправлено {len(messages)} сообщений по теме '{topic}'")
                 except Exception as e:
                     self.logger.error(f"Ошибка при отправке сообщения: {e}")
@@ -979,7 +1047,7 @@ class CommandHandlers:
                     update.message.reply_text(
                         f"📚 Тема: {topic}\n\nПроизошла ошибка форматирования. Вот информация в упрощенном виде:"
                     )
-                    
+
                     # Отправляем сообщения без форматирования Markdown
                     for msg in messages:
                         update.message.reply_text(msg, parse_mode=None)
@@ -1314,7 +1382,7 @@ class CommandHandlers:
                 sanitized_text += char
 
         return sanitized_text
-        
+
     # Метод _normalize_russian_input перенесен в ConversationService
 
     def handle_conversation(self, update, context):
@@ -1337,7 +1405,7 @@ class CommandHandlers:
 
         user_id = update.effective_user.id
         self.logger.info(f"Обработка сообщения в режиме беседы от пользователя {user_id}")
-        
+
         # Обработка ввода ID нового администратора
         if hasattr(self, 'admin_panel') and context.user_data.get('waiting_for_admin_id', False):
             self.admin_panel.process_new_admin_id(update, context)
@@ -1346,7 +1414,7 @@ class CommandHandlers:
         # Используем ConversationService для обработки остальных сообщений
         try:
             from src.conversation_service import ConversationService
-            
+
             # Инициализируем сервис, если он еще не создан
             if not hasattr(self, 'conversation_service'):
                 self.logger.info("Инициализация ConversationService")
@@ -1355,19 +1423,19 @@ class CommandHandlers:
                     logger=self.logger,
                     history_map=self.history_map
                 )
-            
+
             # Обрабатываем сообщение и получаем результат
             self.logger.debug(f"Передача сообщения в ConversationService для пользователя {user_id}")
             self.conversation_service.handle_conversation(update, context, self.message_manager)
-            
+
             # Если ожидаем тему для карты, возвращаем состояние MAP
             if context.user_data.get('waiting_for_map_topic', False):
                 self.logger.info(f"Переход в режим карты для пользователя {user_id}")
                 return self.MAP
-                
+
             # В остальных случаях остаемся в режиме беседы
             return self.CONVERSATION
-            
+
         except Exception as e:
             self.logger.error(f"Ошибка при обработке беседы: {str(e)}")
             try:
@@ -1379,7 +1447,7 @@ class CommandHandlers:
                 self.message_manager.save_message_id(update, context, error_msg.message_id)
             except Exception as reply_error:
                 self.logger.error(f"Критическая ошибка: не удалось отправить сообщение об ошибке: {reply_error}")
-                
+
             return self.CONVERSATION
 
     def recommend_similar_topics(self, current_topic, context):
@@ -1479,3 +1547,4 @@ class CommandHandlers:
                 error_message,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
             )
+        }
