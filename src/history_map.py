@@ -211,3 +211,118 @@ class HistoryMap:
             return f"{base_url}?timeframe={start}-{end}"
 
         return base_url
+        
+    def generate_map_image(self, category=None, events=None, timeframe=None):
+        """
+        Генерирует изображение карты с отмеченными историческими событиями.
+        
+        Args:
+            category (str, optional): Категория событий
+            events (list, optional): Список конкретных событий
+            timeframe (tuple, optional): Временной диапазон в формате (начало, конец) - годы
+            
+        Returns:
+            str: Путь к сгенерированному изображению карты
+        """
+        import folium
+        import tempfile
+        import io
+        import time
+        from selenium import webdriver
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.chrome.options import Options
+        from webdriver_manager.chrome import ChromeDriverManager
+        from PIL import Image
+        
+        # Определяем события для отображения на карте
+        if category:
+            display_events = self.get_events_by_category(category)
+        elif events:
+            if isinstance(events, list):
+                display_events = events
+            else:
+                try:
+                    ids = [int(id_) for id_ in events.split(',')]
+                    display_events = [self.get_event_by_id(id_) for id_ in ids]
+                    display_events = [event for event in display_events if event]
+                except Exception as e:
+                    self.logger.error(f"Ошибка при обработке параметра events: {e}")
+                    display_events = self.get_all_events()
+        else:
+            display_events = self.get_all_events()
+            
+        # Создаем объект карты с центром на территории России
+        map_obj = folium.Map(location=[65, 97], zoom_start=3, tiles='OpenStreetMap')
+        
+        # Добавляем маркеры для каждого события
+        for event in display_events:
+            if 'location' in event and 'lat' in event['location'] and 'lng' in event['location']:
+                # Создаем всплывающее окно с информацией о событии
+                popup_html = f"""
+                <div style="width: 200px;">
+                    <h3>{event['title']}</h3>
+                    <p><strong>Дата:</strong> {event['date']}</p>
+                    <p><strong>Категория:</strong> {event['category']}</p>
+                    <p>{event['description']}</p>
+                </div>
+                """
+                
+                # Добавляем маркер на карту
+                folium.Marker(
+                    location=[event['location']['lat'], event['location']['lng']],
+                    popup=folium.Popup(popup_html, max_width=300),
+                    tooltip=event['title']
+                ).add_to(map_obj)
+                
+        # Создаем временный файл для сохранения HTML-карты
+        with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as tmp:
+            map_path = tmp.name
+            map_obj.save(map_path)
+        
+        # Настраиваем опции запуска Chrome в headless-режиме
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1200,800")
+        
+        # Создаем driver для WebKit
+        try:
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Открываем HTML-файл с картой
+            driver.get(f"file://{map_path}")
+            
+            # Даем время для полной загрузки карты
+            time.sleep(2)
+            
+            # Создаем директорию для сохранения карт, если она не существует
+            os.makedirs('generated_maps', exist_ok=True)
+            
+            # Создаем уникальное имя файла для карты
+            timestamp = int(time.time())
+            map_image_path = f"generated_maps/map_{timestamp}.png"
+            
+            # Делаем скриншот карты
+            driver.save_screenshot(map_image_path)
+            
+            # Обрезаем изображение для удаления ненужных элементов
+            img = Image.open(map_image_path)
+            img = img.crop((0, 0, 1200, 800))  # Обрезаем до размера 1200x800
+            img.save(map_image_path)
+            
+            # Закрываем драйвер
+            driver.quit()
+            
+            # Удаляем временный HTML-файл
+            os.unlink(map_path)
+            
+            self.logger.info(f"Изображение карты успешно сгенерировано: {map_image_path}")
+            return map_image_path
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка при генерации изображения карты: {e}")
+            # В случае ошибки возвращаем None
+            return None

@@ -1,6 +1,7 @@
 import telegram
 import re
 import random
+import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatAction
 from telegram.ext import ConversationHandler
 
@@ -14,7 +15,7 @@ class CommandHandlers:
         self.content_service = content_service
         self.logger = logger
         self.config = config
-        
+
         # Инициализируем карту исторических событий
         from src.history_map import HistoryMap
         self.history_map = HistoryMap(logger)
@@ -91,20 +92,20 @@ class CommandHandlers:
 
         # Очищаем историю чата только один раз для экономии ресурсов
         self.message_manager.clean_all_messages_except_active(update, context)
-        
+
         # Проверяем, нужно ли обрабатывать активные сообщения
         # Кэшируем результат data для предотвращения повторного доступа
-        callback_data = query.data
+        query_data = query.data
 
-        self.logger.info(f"Пользователь {user_id} нажал кнопку: {query.data}")
+        self.logger.info(f"Пользователь {user_id} нажал кнопку: {query_data}")
 
-        if query.data == 'back_to_menu':
+        if query_data == 'back_to_menu':
             query.edit_message_text(
                 "Выберите действие в меню ниже:",
                 reply_markup=self.ui_manager.main_menu()
             )
             return self.TOPIC
-        elif query.data == 'project_info':
+        elif query_data == 'project_info':
             # Загружаем информацию о проекте из файла
             try:
                 with open('static/presentation.txt', 'r', encoding='utf-8') as file:
@@ -200,7 +201,7 @@ class CommandHandlers:
                     self.message_manager.save_message_id(update, context, sent_msg.message_id)
 
             return self.TOPIC
-        elif query.data == 'download_detailed_presentation':
+        elif query_data == 'download_detailed_presentation':
             # Обработка кнопки скачивания подробной презентации
             try:
                 # Показываем сообщение о подготовке файла
@@ -252,7 +253,7 @@ class CommandHandlers:
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
             return self.TOPIC
-        elif query.data == 'history_map':
+        elif query_data == 'history_map':
             # Обработка кнопки интерактивной карты
             user_id = query.from_user.id
             self.logger.info(f"Пользователь {user_id} запросил историческую карту")
@@ -278,64 +279,154 @@ class CommandHandlers:
             )
             return self.MAP
 
-        elif query.data.startswith('map_category_'):
+        elif query_data.startswith('map_category_'):
             # Обработка выбора категории на карте
-            category = query.data[13:]  # map_category_{category}
+            category = query_data[13:]  # map_category_{category}
             user_id = query.from_user.id
             self.logger.info(f"Пользователь {user_id} выбрал категорию карты: {category}")
 
-            # Генерируем URL для просмотра карты с выбранной категорией
-            map_url = self.history_map.generate_map_url(category=category)
-
-            # Создаем кнопки для просмотра карты и возврата к выбору категории
+            # Добавляем клавиатуру с выбором формата карты
             keyboard = [
-                [InlineKeyboardButton("🌐 Открыть карту в браузере", url=map_url)],
-                [InlineKeyboardButton("⬅️ К выбору категории", callback_data='history_map')],
-                [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
+                [InlineKeyboardButton("🔗 Ссылка на карту", callback_data=f'map_url_{category}')],
+                [InlineKeyboardButton("🖼️ Изображение карты", callback_data=f'map_img_{category}')],
+                [InlineKeyboardButton("🔙 Назад к категориям", callback_data='history_map')]
             ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
+            # Отправляем сообщение с выбором формата карты
             query.edit_message_text(
                 f"📍 *Категория: {category}*\n\n"
                 f"Вы выбрали категорию исторических событий: *{category}*\n\n"
-                f"Нажмите на кнопку ниже, чтобы открыть интерактивную карту с событиями этой категории.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
+                f"Выберите формат карты:",
+                reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
             return self.MAP
 
-        elif query.data == 'map_random':
-            # Обработка выбора случайных событий
-            user_id = query.from_user.id
-            self.logger.info(f"Пользователь {user_id} запросил случайные события на карте")
+        elif query_data.startswith('map_url_'):
+            category = query_data.replace('map_url_', '')
+            map_url = self.history_map.generate_map_url(category=category)
 
+            # Отправляем сообщение с URL карты
+            context.bot.send_message(
+                chat_id=user_id,
+                text=f"🗺️ Вот карта с историческими событиями категории «{category}»:\n\n{map_url}",
+                parse_mode='HTML'
+            )
+            self.logger.info(f"Пользователь {user_id} получил ссылку на карту категории {category}")
+            return self.MAP
+
+        elif query_data.startswith('map_img_'):
+            category = query_data.replace('map_img_', '')
+
+            # Отправляем сообщение о том, что генерируем карту
+            status_message = context.bot.send_message(
+                chat_id=user_id,
+                text=f"🔄 Генерация изображения карты для категории «{category}»...",
+                parse_mode='HTML'
+            )
+
+            # Генерируем изображение карты выбранной категории
+            map_image_path = self.history_map.generate_map_image(category=category)
+
+            if map_image_path and os.path.exists(map_image_path):
+                # Отправляем изображение карты
+                with open(map_image_path, 'rb') as img:
+                    context.bot.send_photo(
+                        chat_id=user_id,
+                        photo=img,
+                        caption=f"🗺️ Карта исторических событий категории «{category}»",
+                        parse_mode='HTML'
+                    )
+
+                # Удаляем сообщение о генерации
+                context.bot.delete_message(
+                    chat_id=user_id,
+                    message_id=status_message.message_id
+                )
+
+                # Удаляем изображение карты после отправки
+                os.remove(map_image_path)
+
+                self.logger.info(f"Пользователь {user_id} получил изображение карты категории {category}")
+            else:
+                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
+                context.bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=status_message.message_id,
+                    text=f"❌ Не удалось сгенерировать изображение карты для категории «{category}». Попробуйте позже или воспользуйтесь ссылкой на карту.",
+                    parse_mode='HTML'
+                )
+                self.logger.error(f"Не удалось сгенерировать изображение карты категории {category} для пользователя {user_id}")
+            return self.MAP
+
+        elif query_data == 'map_random':
             # Получаем случайные события
             random_events = self.history_map.get_random_events(5)
-
-            # Генерируем URL для просмотра карты со случайными событиями
             map_url = self.history_map.generate_map_url(events=random_events)
 
-            # Формируем список событий для отображения
-            events_list = "\n".join([f"• *{event['title']}* ({event.get('date', 'Дата неизвестна')})" for event in random_events])
+            # Отправляем сообщение с URL карты
+            context.bot.send_message(
+                chat_id=user_id,
+                text=f"🗺️ Вот карта со случайными историческими событиями:\n\n{map_url}",
+                parse_mode='HTML'
+            )
+            self.logger.info(f"Пользователь {user_id} получил ссылку на карту со случайными событиями")
 
-            # Создаем кнопки для просмотра карты и возврата к выбору категории
-            keyboard = [
-                [InlineKeyboardButton("🌐 Открыть карту в браузере", url=map_url)],
-                [InlineKeyboardButton("🎲 Другие случайные события", callback_data='map_random')],
-                [InlineKeyboardButton("⬅️ К выбору категории", callback_data='history_map')],
-                [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
-            ]
+            # Добавляем кнопку для получения карты в виде изображения
+            keyboard = [[InlineKeyboardButton("🖼️ Получить изображение карты", callback_data='map_image')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
-            query.edit_message_text(
-                "🎲 *Случайные исторические события*\n\n"
-                "Для вас выбраны следующие события из истории России:\n"
-                f"{events_list}\n\n"
-                "Нажмите на кнопку ниже, чтобы увидеть эти события на интерактивной карте.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode='Markdown'
+            context.bot.send_message(
+                chat_id=user_id,
+                text="Или вы можете получить изображение карты:",
+                reply_markup=reply_markup
             )
             return self.MAP
 
-        elif query.data == 'conversation':
+        elif query_data == 'map_image':
+            # Отправляем сообщение о том, что генерируем карту
+            status_message = context.bot.send_message(
+                chat_id=user_id,
+                text="🔄 Генерация изображения карты...",
+                parse_mode='HTML'
+            )
+
+            # Генерируем изображение карты всех событий
+            map_image_path = self.history_map.generate_map_image()
+
+            if map_image_path and os.path.exists(map_image_path):
+                # Отправляем изображение карты
+                with open(map_image_path, 'rb') as img:
+                    context.bot.send_photo(
+                        chat_id=user_id,
+                        photo=img,
+                        caption="🗺️ Интерактивная карта исторических событий России",
+                        parse_mode='HTML'
+                    )
+
+                # Удаляем сообщение о генерации
+                context.bot.delete_message(
+                    chat_id=user_id,
+                    message_id=status_message.message_id
+                )
+
+                # Удаляем изображение карты после отправки
+                os.remove(map_image_path)
+
+                self.logger.info(f"Пользователь {user_id} получил изображение карты с историческими событиями")
+            else:
+                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
+                context.bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=status_message.message_id,
+                    text="❌ Не удалось сгенерировать изображение карты. Попробуйте позже или воспользуйтесь ссылкой на карту.",
+                    parse_mode='HTML'
+                )
+                self.logger.error(f"Не удалось сгенерировать изображение карты для пользователя {user_id}")
+            return self.MAP
+
+        elif query_data == 'conversation':
             # Обработка кнопки беседы о истории России
             query.edit_message_text(
                 "🗣️ *Беседа о истории России*\n\n"
@@ -344,7 +435,7 @@ class CommandHandlers:
                 parse_mode='Markdown'
             )
             return self.CONVERSATION
-        elif query.data == 'topic':
+        elif query_data == 'topic':
             # Генерируем список тем с помощью ИИ
             prompt = "Составь список из 30 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
             try:
@@ -385,7 +476,7 @@ class CommandHandlers:
                     reply_markup=self.ui_manager.main_menu()
                 )
             return self.CHOOSE_TOPIC
-        elif query.data == 'test':
+        elif query_data == 'test':
             topic = context.user_data.get('current_topic', None)
             if not topic:
                 query.edit_message_text(
@@ -435,7 +526,7 @@ class CommandHandlers:
                     reply_markup=self.ui_manager.main_menu()
                 )
             return self.ANSWER
-        elif query.data == 'more_topics':
+        elif query_data == 'more_topics':
             # Генерируем новый список тем с помощью ИИ
             # Добавляем случайный параметр для получения разных тем
             random_seed = random.randint(1, 1000)
@@ -465,8 +556,8 @@ class CommandHandlers:
                     reply_markup=self.ui_manager.main_menu()
                 )
             return self.CHOOSE_TOPIC
-        elif query.data == 'end_test' or query.data == 'cancel':
-            if query.data == 'end_test':
+        elif query_data == 'end_test' or query_data == 'cancel':
+            if query_data == 'end_test':
                 self.logger.info(f"Пользователь {user_id} досрочно завершил тест")
                 query.edit_message_text("Тест завершен досрочно. Возвращаемся в главное меню.")
                 query.message.reply_text("Выберите действие:", reply_markup=self.ui_manager.main_menu())
@@ -475,7 +566,7 @@ class CommandHandlers:
                 self.logger.info(f"Пользователь {user_id} отменил действие")
                 query.edit_message_text("Действие отменено. Нажми /start, чтобы начать заново.")
                 return ConversationHandler.END
-        elif query.data == 'custom_topic':
+        elif query_data == 'custom_topic':
             query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
             return self.CHOOSE_TOPIC
 
@@ -708,23 +799,23 @@ class CommandHandlers:
                 assessment = "👌 Удовлетворительно. Рекомендуется повторить материал."
             else:
                 assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
-                
+
             # Получаем рекомендации похожих тем
             similar_topics = self.recommend_similar_topics(topic, context)
-            
+
             # Формируем сообщение с результатами
             result_message = f"🎯 Тест по теме '*{topic}*' завершен!\n\n"
             result_message += f"Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n{assessment}\n\n"
-            
+
             # Добавляем рекомендации, если они есть
             if similar_topics:
                 result_message += "📚 *Рекомендуемые темы для изучения:*\n"
                 for i, rec_topic in enumerate(similar_topics, 1):
                     result_message += f"{i}. {rec_topic}\n"
                 result_message += "\n"
-                
+
             result_message += "Выбери следующее действие:"
-            
+
             update.message.reply_text(
                 result_message,
                 parse_mode='Markdown',
@@ -750,7 +841,7 @@ class CommandHandlers:
         if hasattr(self, 'admin_panel') and 'waiting_for_admin_id' in context.user_data:
             self.admin_panel.process_new_admin_id(update, context)
             return self.CONVERSATION
-            
+
         user_message = update.message.text
         user_id = update.message.from_user.id
 
@@ -775,13 +866,13 @@ class CommandHandlers:
                 'пётр', 'иван', 'павел', 'николай', 'александр', 'распутин', 'годы',
                 'период', 'боярин', 'дворян', 'казак'
             ]
-            
+
             # Проверка сообщения на соответствие исторической тематике
             msg_lower = user_message.lower()
-            
+
             # Проверяем наличие ключевых слов
             is_history_related = any(keyword in msg_lower for keyword in history_keywords)
-            
+
             # Если ключевых слов нет, но сообщение короткое и может быть запросом, предполагаем, что это исторический вопрос
             if not is_history_related and len(user_message) < 100 and ('?' in user_message or 'расскажи' in msg_lower):
                 is_history_related = True
@@ -792,7 +883,7 @@ class CommandHandlers:
                 prompt = f"""Ответь на исторический вопрос о России: "{user_message}"
 Отвечай кратко, основываясь на исторических фактах.
 Максимум 250 слов."""
-                
+
                 # Получаем ответ от API с индикатором набора текста
                 context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
                 # Ограничиваем размер ответа для экономии ресурсов
@@ -806,7 +897,7 @@ class CommandHandlers:
             # Отправляем ответ пользователю
             sent_msg = update.message.reply_text(response)
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
-            
+
             # Кнопка возврата в меню
             keyboard = [[InlineKeyboardButton("🔙 Вернуться в меню", callback_data='back_to_menu')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -817,10 +908,10 @@ class CommandHandlers:
                 reply_markup=reply_markup
             )
             self.message_manager.save_message_id(update, context, nav_msg.message_id)
-            
+
         except Exception as e:
             self.logger.log_error(e, f"Ошибка при обработке беседы для пользователя {user_id}")
-            
+
             # Отправляем сообщение об ошибке с кнопкой возврата
             error_msg = update.message.reply_text(
                 "К сожалению, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже или вернитесь в меню.",
@@ -833,21 +924,21 @@ class CommandHandlers:
     def recommend_similar_topics(self, current_topic, context):
         """
         Рекомендует пользователю похожие темы на основе текущей темы.
-        
+
         Args:
             current_topic (str): Текущая тема пользователя
             context: Контекст разговора
-            
+
         Returns:
             list: Список рекомендованных тем
         """
         try:
             # Формируем запрос на рекомендацию
             prompt = f"На основе темы '{current_topic}' предложи 3 связанные темы по истории России, которые могут заинтересовать пользователя. Перечисли их в формате нумерованного списка без дополнительных пояснений."
-            
+
             # Получаем ответ от API
             similar_topics_text = self.api_client.ask_grok(prompt, max_tokens=150, temp=0.4)
-            
+
             # Парсим темы
             similar_topics = []
             for line in similar_topics_text.split('\n'):
@@ -857,16 +948,16 @@ class CommandHandlers:
                     topic = re.sub(r'^[\d\.\-\s]+', '', line).strip()
                     if topic:
                         similar_topics.append(topic)
-            
+
             return similar_topics[:3]  # Возвращаем максимум 3 темы
         except Exception as e:
             self.logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
             return []
-            
+
     def admin_command(self, update, context):
         """
         Обрабатывает команду /admin для доступа к административной панели.
-        
+
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
