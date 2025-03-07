@@ -5,6 +5,7 @@ import random
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import ChatAction
 from telegram.ext import ConversationHandler
+from telegram.error import BadRequest, TimedOut, NetworkError
 
 class CommandHandlers:
     """Класс для обработки команд и взаимодействий с пользователем"""
@@ -193,11 +194,15 @@ class CommandHandlers:
             # Генерируем список тем с помощью ИИ
             prompt = "Составь список из 30 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
             try:
+                sent_message = None
                 try:
-                    query.edit_message_text("⏳ Загружаю список тем истории России...")
-                except Exception as e:
+                    sent_message = query.edit_message_text("⏳ Загружаю список тем истории России...")
+                except telegram.error.BadRequest as e:
                     self.logger.warning(f"Не удалось обновить сообщение о загрузке тем: {e}")
-                    query.message.reply_text("⏳ Загружаю список тем истории России...")
+                    sent_message = query.message.reply_text("⏳ Загружаю список тем истории России...")
+                    # Сохраняем ID нового сообщения
+                    if sent_message:
+                        self.message_manager.save_message_id(update, context, sent_message.message_id)
 
                 topics_text = self.api_client.ask_grok(prompt)
 
@@ -208,19 +213,31 @@ class CommandHandlers:
                 # Создаем клавиатуру с темами
                 reply_markup = self.ui_manager.create_topics_keyboard(filtered_topics)
 
+                # Определяем, какое сообщение редактировать
+                message_to_edit = sent_message or query.message
+                
                 try:
-                    query.edit_message_text(
-                        "📚 *Темы по истории России*\n\nВыберите тему для изучения или введите свою:",
-                        reply_markup=reply_markup,
-                        parse_mode='Markdown'
-                    )
-                except Exception as e:
+                    if sent_message:
+                        sent_message.edit_text(
+                            "📚 *Темы по истории России*\n\nВыберите тему для изучения или введите свою:",
+                            reply_markup=reply_markup,
+                            parse_mode='Markdown'
+                        )
+                    else:
+                        query.edit_message_text(
+                            "📚 *Темы по истории России*\n\nВыберите тему для изучения или введите свою:",
+                            reply_markup=reply_markup,
+                            parse_mode='Markdown'
+                        )
+                except telegram.error.BadRequest as e:
                     self.logger.warning(f"Не удалось обновить сообщение со списком тем: {e}")
-                    query.message.reply_text(
+                    sent_new_msg = query.message.reply_text(
                         "📚 *Темы по истории России*\n\nВыберите тему для изучения или введите свою:",
                         reply_markup=reply_markup,
                         parse_mode='Markdown'
                     )
+                    # Сохраняем ID нового сообщения
+                    self.message_manager.save_message_id(update, context, sent_new_msg.message_id)
 
                 self.logger.info(f"Пользователю {user_id} показаны темы для изучения")
             except Exception as e:
@@ -375,25 +392,37 @@ class CommandHandlers:
                             topic = topic.split('. ', 1)[1]
 
                         context.user_data['current_topic'] = topic
-                        query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
+                        
+                        try:
+                            query.edit_message_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
+                        except telegram.error.BadRequest as e:
+                            self.logger.warning(f"Не удалось отредактировать сообщение при выборе темы: {e}")
+                            # Отправляем новое сообщение вместо редактирования
+                            sent_msg = query.message.reply_text(f"📝 Загружаю информацию по теме: *{topic}*...", parse_mode='Markdown')
+                            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                            
                         self.logger.info(f"Пользователь {user_id} выбрал тему: {topic}")
 
-                        # Функция для обновления сообщения о загрузке
+                        # Функция для обновления сообщения о загрузке, с защитой от ошибок
                         def update_message(text):
-                            query.edit_message_text(text, parse_mode='Markdown')
+                            try:
+                                query.edit_message_text(text, parse_mode='Markdown')
+                            except telegram.error.BadRequest as e:
+                                self.logger.warning(f"Не удалось обновить сообщение о загрузке: {e}")
+                                sent_msg = query.message.reply_text(text, parse_mode='Markdown')
+                                self.message_manager.save_message_id(update, context, sent_msg.message_id)
 
                         # Получаем информацию о теме
                         messages = self.content_service.get_topic_info(topic, update_message)
 
-                        # Отправляем сообщения, проверяя возможность редактирования
+                        # Отправляем сообщения как новые (не пытаемся редактировать)
                         if messages:
-                            try:
-                                # Пробуем отредактировать первое сообщение
-                                query.edit_message_text(messages[0], parse_mode='Markdown')
-                            except Exception as e:
-                                # Если редактирование не удалось, отправляем как новое сообщение
-                                self.logger.warning(f"Не удалось отредактировать сообщение: {e}")
-                                query.message.reply_text(messages[0], parse_mode='Markdown')
+                            for msg in messages:
+                                try:
+                                    sent_msg = query.message.reply_text(msg, parse_mode='Markdown')
+                                    self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                                except Exception as e:
+                                    self.logger.error(f"Ошибка при отправке сообщения с темой: {e}")
 
                             # Отправляем остальные сообщения как новые
                             for msg in messages[1:]:

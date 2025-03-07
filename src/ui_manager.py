@@ -88,3 +88,59 @@ class UIManager:
             parts.append(current_part)
 
         return parts
+        
+    def parse_topics(self, topics_text):
+        """Парсит и очищает список тем из текста"""
+        # Используем регулярное выражение для извлечения тем
+        import re
+        # Ищем строки вида "1. Тема" или "1) Тема"
+        topics_match = re.findall(r'\d+[\.\)]\s*([^\n]+)', topics_text)
+        
+        # Очищаем темы от лишних символов и пробелов
+        filtered_topics = []
+        for topic in topics_match:
+            # Удаляем кавычки, точки в конце и лишние пробелы
+            cleaned_topic = topic.strip(' "\'.,;').strip()
+            if cleaned_topic:  # Проверяем, что тема не пустая
+                filtered_topics.append(cleaned_topic)
+                
+        # Если не нашли тем через регулярное выражение, попробуем разбить по строкам
+        if not filtered_topics:
+            lines = topics_text.strip().split('\n')
+            for line in lines:
+                # Чистим строку от номеров, лишних символов и пробелов
+                clean_line = re.sub(r'^\d+[\.\)]\s*', '', line).strip(' "\'.,;').strip()
+                if clean_line:  # Проверяем, что строка не пустая
+                    filtered_topics.append(clean_line)
+        
+        self.logger.info(f"Распознано {len(filtered_topics)} тем")
+        return filtered_topics
+    
+    def create_topics_keyboard(self, topics):
+        """Создаёт клавиатуру с темами для изучения"""
+        keyboard = []
+        
+        # Ограничиваем количество тем для отображения
+        max_topics = min(20, len(topics))
+        
+        # Формируем клавиатуру: по одной теме на строку
+        for i in range(max_topics):
+            # Добавляем номер для удобства
+            display_name = f"{i+1}. {topics[i]}"
+            # Обрезаем длинные темы для кнопок
+            if len(display_name) > 35:
+                display_name = display_name[:32] + "..."
+            
+            # Значение callback_data должно быть небольшим, используем индекс
+            keyboard.append([InlineKeyboardButton(display_name, callback_data=f"topic_{i+1}")])
+        
+        # Добавляем кнопки для дополнительных опций
+        keyboard.append([InlineKeyboardButton("🔄 Больше тем", callback_data="more_topics")])
+        keyboard.append([InlineKeyboardButton("✏️ Своя тема", callback_data="custom_topic")])
+        keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")])
+        
+        return InlineKeyboardMarkup(keyboard)
+        
+    def main_menu(self):
+        """Возвращает клавиатуру главного меню (alias для get_main_menu_keyboard)"""
+        return self.get_main_menu_keyboard()
