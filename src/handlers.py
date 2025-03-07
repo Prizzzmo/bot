@@ -438,10 +438,11 @@ class CommandHandlers:
 
                     # Удаляем файл карты после отправки
                     try:
-                        os.remove(map_path)
-                        self.logger.info(f"Файл карты удален: {map_path}")
+                        if os.path.exists(map_path):
+                            os.remove(map_path)
+                            self.logger.info(f"Файл карты удален: {map_path}")
                     except Exception as e:
-                        self.logger.error(f"Не удалось удалить файл карты {map_path}: {e}")
+                        self.logger.warning(f"Не удалось удалить файл карты {map_path}: {e}")
 
                     self.logger.info(f"Пользователь {user_id} получил карту категории {category}")
                 else:

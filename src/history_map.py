@@ -262,25 +262,34 @@ class HistoryMap:
                 timestamp = int(time.time())
                 map_image_path = f"generated_maps/map_{timestamp}.png"
 
-                # Создаем карту с matplotlib
-                fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
-
-                # Определяем границы карты России
-                ax.set_xlim(19, 190)  # Долгота от 19 до 190 градусов
-                ax.set_ylim(40, 83)   # Широта от 40 до 83 градусов
-
-                # Устанавливаем заголовок
-                title = "Карта исторических событий России"
-                if category:
-                    title += f" - {category}"
-                ax.set_title(title, fontsize=16, pad=20)
-
-                # Устанавливаем подписи для осей
-                ax.set_xlabel('Долгота', fontsize=12)
-                ax.set_ylabel('Широта', fontsize=12)
-
-                # Добавляем координатную сетку
-                ax.grid(True, alpha=0.3)
+                # Создаем карту с matplotlib с обработкой исключений
+                try:
+                    fig = Figure(figsize=(12, 10), dpi=150)
+                    ax = fig.add_subplot(111)
+                    
+                    # Определяем границы карты России
+                    ax.set_xlim(19, 190)  # Долгота от 19 до 190 градусов
+                    ax.set_ylim(40, 83)   # Широта от 40 до 83 градусов
+                    
+                    # Устанавливаем заголовок
+                    title = "Карта исторических событий России"
+                    if category:
+                        title += f" - {category}"
+                    ax.set_title(title, fontsize=16, pad=20)
+                    
+                    # Устанавливаем подписи для осей
+                    ax.set_xlabel('Долгота', fontsize=12)
+                    ax.set_ylabel('Широта', fontsize=12)
+                    
+                    # Добавляем координатную сетку
+                    ax.grid(True, alpha=0.3)
+                except Exception as e:
+                    self.logger.error(f"Ошибка при создании фигуры карты: {e}")
+                    # Пробуем создать фигуру с более простыми параметрами
+                    fig = Figure(figsize=(10, 8), dpi=100)
+                    ax = fig.add_subplot(111)
+                    ax.set_title("Карта исторических событий России", fontsize=14)
+                    ax.grid(True)
 
                 # Словарь для хранения цветов категорий
                 category_colors = {}
@@ -341,14 +350,29 @@ class HistoryMap:
                 # Оптимизируем размеры для лучшего отображения
                 plt.tight_layout(rect=[0, 0.1, 1, 0.95])
 
-                # Сохраняем карту
-                plt.savefig(map_image_path, bbox_inches='tight', pad_inches=0.5)
-                plt.close(fig)
-
-                # Если не удалось создать файл, возвращаем ошибку
-                if not os.path.exists(map_image_path):
-                    self.logger.error("Не удалось создать файл карты")
-                    return self._generate_simple_map(category, events, timeframe)
+                # Сохраняем карту с расширенной обработкой ошибок
+                try:
+                    # Используем Fig.savefig вместо plt.savefig для большей надежности
+                    fig.savefig(map_image_path, bbox_inches='tight', pad_inches=0.5)
+                    
+                    # Проверяем, что файл был успешно создан и имеет размер > 0
+                    if os.path.exists(map_image_path) and os.path.getsize(map_image_path) > 0:
+                        self.logger.info(f"Карта успешно сохранена в {map_image_path}")
+                    else:
+                        raise IOError("Файл карты создан, но имеет нулевой размер")
+                except Exception as e:
+                    self.logger.error(f"Ошибка при сохранении карты: {e}")
+                    # Попытка создать карту с более низким разрешением
+                    try:
+                        fig.savefig(map_image_path, dpi=80, format='png')
+                        if not os.path.exists(map_image_path):
+                            raise IOError("Файл не создан после второй попытки")
+                    except Exception as e2:
+                        self.logger.error(f"Вторая попытка сохранения карты не удалась: {e2}")
+                        return self._generate_simple_map(category, events, timeframe)
+                finally:
+                    # Всегда закрываем фигуру для освобождения ресурсов
+                    plt.close(fig)
 
                 # Сохраняем путь к карте в кэш
                 with self.cache_lock:
