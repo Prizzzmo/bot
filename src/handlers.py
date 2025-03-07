@@ -843,6 +843,20 @@ class CommandHandlers:
                             # Отправляем остальные сообщения как новые
                             for msg in messages[1:]:
                                 query.message.reply_text(msg, parse_mode='Markdown')
+                        elif isinstance(messages, list):
+                            # Обработка пустого списка сообщений
+                            self.logger.warning(f"Получен пустой список сообщений для темы: {topic}")
+                            query.edit_message_text(
+                                f"К сожалению, не удалось получить информацию по теме *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
+                                parse_mode='Markdown'
+                            )
+                        else:
+                            # Обработка случая, когда messages не является списком
+                            self.logger.warning(f"Неверный формат данных для темы: {topic}. Тип: {type(messages)}")
+                            query.edit_message_text(
+                                f"Произошла ошибка при обработке данных для темы *{topic}*. Пожалуйста, попробуйте выбрать другую тему.",
+                                parse_mode='Markdown'
+                            )
                         else:
                             # Обработка случая, когда список сообщений пуст
                             self.logger.warning(f"Получен пустой список сообщений для темы: {topic}")
