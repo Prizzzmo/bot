@@ -347,6 +347,8 @@ class CommandHandlers:
 
             map_html_path = self.history_map.generate_map_html(category=category)
 
+            import os  # Добавляем еще один импорт os здесь для доступа в контексте этого блока
+            
             if map_html_path and os.path.exists(map_html_path):
                 # Отправляем HTML-файл карты как документ
                 with open(map_html_path, 'rb') as file:
