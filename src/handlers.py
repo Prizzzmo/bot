@@ -210,24 +210,65 @@ class CommandHandlers:
                 download_message = "📥 *Скачать презентацию:*\n\n"
                 
                 # Отправляем файлы напрямую как документы
-                with open(docx_path, 'rb') as docx_file:
-                    sent_doc = context.bot.send_document(
-                        chat_id=update.effective_chat.id,
-                        document=docx_file,
-                        filename='История_России_подробная_презентация.docx',
-                        caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word."
-                    )
-                    self.message_manager.save_message_id(update, context, sent_doc.message_id)
+                try:
+                    with open(docx_path, 'rb') as docx_file:
+                        # Читаем содержимое файла
+                        file_content = docx_file.read()
+                        
+                        # Проверяем, что содержимое не пустое
+                        if len(file_content) > 0:
+                            # Отправляем документ из буфера памяти
+                            from io import BytesIO
+                            file_obj = BytesIO(file_content)
+                            file_obj.name = 'История_России_подробная_презентация.docx'
+                            
+                            sent_doc = context.bot.send_document(
+                                chat_id=update.effective_chat.id,
+                                document=file_obj,
+                                filename='История_России_подробная_презентация.docx',
+                                caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word."
+                            )
+                            self.message_manager.save_message_id(update, context, sent_doc.message_id)
+                        else:
+                            raise ValueError("Файл презентации пуст")
+                except Exception as docx_err:
+                    self.logger.error(f"Ошибка при отправке DOCX файла: {docx_err}")
+                    # Пытаемся создать файл снова
+                    try:
+                        from create_presentation_doc import create_presentation_docx
+                        new_docx_path = create_presentation_docx('detailed_presentation.md', 'История_России_новая_презентация.docx')
+                        
+                        with open(new_docx_path, 'rb') as new_docx_file:
+                            sent_doc = context.bot.send_document(
+                                chat_id=update.effective_chat.id,
+                                document=new_docx_file,
+                                filename='История_России_подробная_презентация.docx',
+                                caption="📚 Подробная иллюстрированная презентация бота по истории России в формате Word."
+                            )
+                            self.message_manager.save_message_id(update, context, sent_doc.message_id)
+                    except Exception as retry_err:
+                        self.logger.error(f"Повторная ошибка при создании и отправке DOCX: {retry_err}")
+                        query.message.reply_text(
+                            "К сожалению, произошла ошибка при отправке файла презентации. Пожалуйста, попробуйте позже.",
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                        )
 
                 # Также отправляем обычный текстовый файл для совместимости
-                with open('detailed_presentation.md', 'rb') as md_file:
-                    sent_md = context.bot.send_document(
-                        chat_id=update.effective_chat.id,
-                        document=md_file,
-                        filename='История_России_подробная_презентация.md',
-                        caption="📄 Версия презентации в текстовом формате Markdown."
+                try:
+                    with open('detailed_presentation.md', 'rb') as md_file:
+                        sent_md = context.bot.send_document(
+                            chat_id=update.effective_chat.id,
+                            document=md_file,
+                            filename='История_России_подробная_презентация.md',
+                            caption="📄 Версия презентации в текстовом формате Markdown."
+                        )
+                        self.message_manager.save_message_id(update, context, sent_md.message_id)
+                except Exception as md_err:
+                    self.logger.error(f"Ошибка при отправке MD файла: {md_err}")
+                    query.message.reply_text(
+                        "Не удалось отправить текстовую версию презентации. Попробуйте получить только Word-документ.", 
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                     )
-                    self.message_manager.save_message_id(update, context, sent_md.message_id)
 
                 self.logger.info(f"Пользователь {user_id} просмотрел информацию о проекте и получил файлы презентации")
             except telegram.error.BadRequest as e:
