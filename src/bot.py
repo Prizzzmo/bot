@@ -76,6 +76,32 @@ class Bot:
             # Попытка принудительного завершения updater если он был создан
             if hasattr(self, 'updater'):
                 self.updater.stop()
+                
+    def run_log_server(self):
+        """Запускает простой веб-сервер для отображения логов"""
+        try:
+            import http.server
+            import socketserver
+            import threading
+            import os
+            
+            # Определяем путь к директории с логами
+            log_dir = "logs"
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+                
+            # Устанавливаем порт и handler
+            PORT = 8080
+            Handler = http.server.SimpleHTTPRequestHandler
+            
+            # Настраиваем и запускаем сервер
+            self.logger.info(f"Запуск веб-сервера логов на порту {PORT}")
+            httpd = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
+            
+            # Запускаем сервер в отдельном потоке
+            httpd.serve_forever()
+        except Exception as e:
+            self.logger.error(f"Ошибка при запуске веб-сервера логов: {e}")
 
 
 class BotManager:
