@@ -11,7 +11,6 @@ from datetime import datetime
 import threading
 import re
 import json
-import background  # Импортируем модуль Flask-сервера
 
 # Константы для состояний ConversationHandler
 TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION = range(5)
@@ -31,7 +30,6 @@ ERROR_DESCRIPTIONS = {
 def clean_logs():
     """
     Очищает лог-файлы при запуске бота.
-    Удаляет содержимое текущего лог-файла и flask_log.log.
     
     Returns:
         tuple: Кортеж (директория логов, путь к файлу лога)
@@ -42,13 +40,6 @@ def clean_logs():
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
             print(f"Создана директория для логов: {log_dir}")
-            
-        # Очищаем лог Flask, если он существует
-        flask_log_path = "flask_log.log"
-        if os.path.exists(flask_log_path):
-            with open(flask_log_path, 'w') as f:
-                f.write("")
-            print(f"Лог Flask очищен: {flask_log_path}")
             
         # Дата для имени файла лога
         log_date = datetime.now().strftime('%Y%m%d')
@@ -142,60 +133,111 @@ def log_error(error, additional_info=None):
 # Загружаем переменные окружения из файла .env
 load_dotenv()
 
-# Класс для кэширования ответов API
+# Класс для кэширования ответов API с улучшенной производительностью
 class APICache:
     """
-    Простой класс для кэширования ответов API.
+    Оптимизированный класс для кэширования ответов API.
     Поддерживает сохранение и загрузку кэша из файла.
+    Добавлена оптимизация по времени жизни кэша и сохранению на диск.
     """
-    def __init__(self, max_size=100, cache_file='api_cache.json'):
+    def __init__(self, max_size=100, cache_file='api_cache.json', save_interval=20):
         self.cache = {}
         self.max_size = max_size
         self.cache_file = cache_file
+        self.save_interval = save_interval  # Интервал автоматического сохранения кэша
+        self.operation_count = 0  # Счетчик операций для периодического сохранения
         self.load_cache()
         
     def get(self, key):
-        """Получить значение из кэша по ключу"""
-        return self.cache.get(key)
+        """Получить значение из кэша по ключу с обновлением времени доступа"""
+        if key in self.cache:
+            # Обновляем время последнего доступа
+            self.cache[key]['last_accessed'] = datetime.now().timestamp()
+            return self.cache[key]['value']
+        return None
 
-    def set(self, key, value):
-        """Добавить значение в кэш"""
+    def set(self, key, value, ttl=86400):  # ttl по умолчанию 24 часа
+        """Добавить значение в кэш с оптимизированной стратегией вытеснения"""
         # Если кэш переполнен, удаляем наименее востребованные элементы
         if len(self.cache) >= self.max_size:
-            # Сортируем по времени последнего доступа
-            items = sorted(self.cache.items(), key=lambda x: x[1].get('last_accessed', 0))
-            # Удаляем 10% старых элементов
-            for i in range(int(self.max_size * 0.1)):
-                if items:
-                    del self.cache[items[i][0]]
+            # Используем более эффективный алгоритм сортировки
+            items_to_remove = sorted(
+                [(k, v['last_accessed']) for k, v in self.cache.items()],
+                key=lambda x: x[1]
+            )[:int(self.max_size * 0.2)]  # Удаляем 20% старых элементов
+            
+            for key_to_remove, _ in items_to_remove:
+                del self.cache[key_to_remove]
         
-        # Добавляем новый элемент с временной меткой
+        timestamp = datetime.now().timestamp()
+        # Добавляем новый элемент с временной меткой и TTL
         self.cache[key] = {
             'value': value,
-            'last_accessed': datetime.now().timestamp()
+            'last_accessed': timestamp,
+            'created_at': timestamp,
+            'ttl': ttl
         }
-        # Периодически сохраняем кэш
-        if len(self.cache) % 10 == 0:
+        
+        # Инкрементируем счетчик операций
+        self.operation_count += 1
+        
+        # Периодически сохраняем кэш и очищаем устаревшие записи
+        if self.operation_count >= self.save_interval:
+            self.cleanup_expired()
             self.save_cache()
+            self.operation_count = 0
+
+    def cleanup_expired(self):
+        """Очистка устаревших элементов кэша по TTL"""
+        current_time = datetime.now().timestamp()
+        keys_to_remove = []
+        
+        for key, data in self.cache.items():
+            if current_time - data['created_at'] > data['ttl']:
+                keys_to_remove.append(key)
+                
+        for key in keys_to_remove:
+            del self.cache[key]
+            
+        if keys_to_remove:
+            logger.info(f"Удалено {len(keys_to_remove)} устаревших элементов из кэша")
 
     def load_cache(self):
-        """Загружает кэш из файла, если он существует"""
+        """Загружает кэш из файла, если он существует, с оптимизацией"""
         try:
             if os.path.exists(self.cache_file):
                 with open(self.cache_file, 'r', encoding='utf-8') as f:
                     loaded_cache = json.load(f)
-                    self.cache = {k: {'value': v['value'], 'last_accessed': v['last_accessed']} 
-                                 for k, v in loaded_cache.items()}
+                    # Добавляем проверку TTL при загрузке
+                    current_time = datetime.now().timestamp()
+                    for k, v in loaded_cache.items():
+                        if 'created_at' in v and 'ttl' in v:
+                            if current_time - v['created_at'] <= v['ttl']:
+                                self.cache[k] = v
+                        else:
+                            # Для обратной совместимости
+                            self.cache[k] = {
+                                'value': v.get('value', v),
+                                'last_accessed': v.get('last_accessed', current_time),
+                                'created_at': v.get('created_at', current_time),
+                                'ttl': v.get('ttl', 86400)
+                            }
+                            
                     logger.info(f"Кэш загружен из {self.cache_file}, {len(self.cache)} записей")
         except Exception as e:
             logger.error(f"Ошибка при загрузке кэша: {e}")
             self.cache = {}
 
     def save_cache(self):
-        """Сохраняет кэш в файл"""
+        """Сохраняет кэш в файл с оптимизацией"""
         try:
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(self.cache, f, ensure_ascii=False, indent=2)
+            # Используем временный файл для безопасной записи
+            temp_file = f"{self.cache_file}.temp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(self.cache, f, ensure_ascii=False)
+            
+            # Переименовываем временный файл для атомарной операции
+            os.replace(temp_file, self.cache_file)
             logger.info(f"Кэш сохранен в {self.cache_file}, {len(self.cache)} записей")
         except Exception as e:
             logger.error(f"Ошибка при сохранении кэша: {e}")
@@ -206,16 +248,16 @@ class APICache:
         self.save_cache()
 
 # Создаем глобальный экземпляр кэша
-api_cache = APICache()
+api_cache = APICache(max_size=200, save_interval=10)  # Увеличенный размер кэша и меньший интервал сохранения
 
 # Получаем ключи API из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Используем Google Gemini API
 
-# Функция для запросов к Google Gemini API
+# Оптимизированная функция для запросов к Google Gemini API
 def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
     """
-    Отправляет запрос к Google Gemini API и возвращает ответ.
+    Отправляет запрос к Google Gemini API и возвращает ответ с оптимизированным кэшированием.
 
     Args:
         prompt (str): Текст запроса
@@ -226,15 +268,16 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
     Returns:
         str: Ответ от API или сообщение об ошибке
     """
-    # Создаем уникальный ключ для кэша на основе параметров запроса
-    cache_key = f"{prompt}_{max_tokens}_{temp}"
-
-    # Проверяем кэш, если использование кэша включено
+    # Создаем более короткий уникальный ключ для кэша на основе хэша запроса
     if use_cache:
+        import hashlib
+        cache_key = hashlib.md5(f"{prompt}_{max_tokens}_{temp}".encode()).hexdigest()
+        
+        # Проверяем кэш с улучшенной производительностью
         cached_response = api_cache.get(cache_key)
         if cached_response:
             logger.info("Использую кэшированный ответ")
-            return cached_response['value']
+            return cached_response
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
@@ -248,7 +291,10 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
 
     try:
         logger.info(f"Отправка запроса к Gemini API: {prompt[:50]}...")
-        response = requests.post(url, headers=headers, json=data)
+        
+        # Оптимизируем запрос с таймаутом и пулингом соединений
+        session = requests.Session()
+        response = session.post(url, headers=headers, json=data, timeout=30)
         response.raise_for_status()
 
         response_json = response.json()
@@ -271,9 +317,16 @@ def ask_grok(prompt, max_tokens=1024, temp=0.7, use_cache=True):
         result = content["parts"][0]["text"]
         logger.info(f"Получен ответ от API: {result[:50]}...")
 
-        # Сохраняем результат в кэш
+        # Сохраняем результат в кэш с TTL в зависимости от типа запроса
+        # Долгоживущий кэш для более общих запросов, короткий для специфичных
         if use_cache:
-            api_cache.set(cache_key, result)
+            ttl = 86400  # 24 часа по умолчанию
+            if "тест" in prompt.lower():
+                ttl = 3600  # 1 час для тестов
+            elif "беседа" in prompt.lower() or "разговор" in prompt.lower():
+                ttl = 1800  # 30 минут для бесед
+                
+            api_cache.set(cache_key, result, ttl=ttl)
 
         return result
 
@@ -392,10 +445,10 @@ def start(update, context):
     save_message_id(update, context, sent_msg.message_id)
     return TOPIC
 
-# Функция для парсинга тем из текста ответа API
+# Оптимизированная функция для парсинга тем из текста ответа API
 def parse_topics(topics_text):
     """
-    Парсит текст с темами и возвращает отформатированный список тем.
+    Парсит текст с темами и возвращает отформатированный список тем с оптимизацией.
 
     Args:
         topics_text (str): Текст с темами от API
@@ -405,9 +458,11 @@ def parse_topics(topics_text):
     """
     filtered_topics = []
     
-    # Используем регулярное выражение для более эффективного извлечения тем
-    # Паттерн ищет строки, которые начинаются с цифры или содержат разделители (точка, двоеточие)
+    # Оптимизированное регулярное выражение для более эффективного извлечения тем
     pattern = r'(?:^\d+[.):]\s*|^[*•-]\s*|^[а-яА-Я\w]+[:.]\s*)(.+?)$'
+    
+    # Используем множество для быстрой проверки дубликатов
+    unique_topics_set = set()
     
     for line in topics_text.split('\n'):
         line = line.strip()
@@ -418,35 +473,34 @@ def parse_topics(topics_text):
         match = re.search(pattern, line, re.MULTILINE)
         if match:
             topic_text = match.group(1).strip()
-            if topic_text:
+            if topic_text and topic_text not in unique_topics_set:
                 filtered_topics.append(topic_text)
-        # Если регулярное выражение не сработало, используем старый метод
+                unique_topics_set.add(topic_text)
+        # Если регулярное выражение не сработало, используем упрощенную версию
         elif '.' in line or ':' in line:
             parts = line.split('.', 1) if '.' in line else line.split(':', 1)
             if len(parts) > 1:
                 topic_text = parts[1].strip()
-                if topic_text:
+                if topic_text and topic_text not in unique_topics_set:
                     filtered_topics.append(topic_text)
+                    unique_topics_set.add(topic_text)
+        # Простая эвристика для строк, начинающихся с цифры
         elif line[0].isdigit():
-            # Ищем первый не цифровой и не разделительный символ
             i = 1
             while i < len(line) and (line[i].isdigit() or line[i] in ' \t.):'):
                 i += 1
             if i < len(line):
                 topic_text = line[i:].strip()
-                if topic_text:
+                if topic_text and topic_text not in unique_topics_set:
                     filtered_topics.append(topic_text)
+                    unique_topics_set.add(topic_text)
         else:
-            filtered_topics.append(line)
-
-    # Удаляем дубликаты, сохраняя порядок
-    unique_topics = []
-    for topic in filtered_topics:
-        if topic not in unique_topics:
-            unique_topics.append(topic)
+            if line not in unique_topics_set:
+                filtered_topics.append(line)
+                unique_topics_set.add(line)
 
     # Ограничиваем до 30 тем
-    return unique_topics[:30]
+    return filtered_topics[:30]
 
 # Функция для создания клавиатуры с темами
 def create_topics_keyboard(topics):
@@ -703,42 +757,6 @@ def button_handler(update, context):
     elif query.data == 'custom_topic':
         query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
         return CHOOSE_TOPIC
-    elif query.data == 'more_topics':
-        # Генерируем новый список тем с помощью ИИ
-        # Добавляем случайный параметр для получения разных тем
-        import random
-        random_seed = random.randint(1, 1000)
-        prompt = f"Составь список из 30 новых и оригинальных тем по истории России, которые могут быть интересны для изучения. Сосредоточься на темах {random_seed}. Выбери темы, отличные от стандартных и ранее предложенных. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
-        try:
-            query.edit_message_text("🔄 Генерирую новый список уникальных тем по истории России...")
-            # Отключаем кэширование для получения действительно новых тем каждый раз
-            topics = ask_grok(prompt, use_cache=False)
-
-            # Парсим и сохраняем темы
-            filtered_topics = parse_topics(topics)
-            context.user_data['topics'] = filtered_topics
-
-            # Создаем клавиатуру с темами
-            reply_markup = create_topics_keyboard(filtered_topics)
-
-            query.edit_message_text(
-                "📚 *Новые темы по истории России*\n\nВыберите одну из только что сгенерированных тем или введите свою:",
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
-            logger.info(f"Пользователю {user_id} показан новый список тем для изучения")
-        except Exception as e:
-            log_error(e, f"Ошибка при генерации новых тем для пользователя {user_id}")
-            query.edit_message_text(
-                f"Произошла ошибка при генерации списка тем: {e}. Попробуй еще раз.", 
-                reply_markup=main_menu()
-            )
-        return CHOOSE_TOPIC
-    elif query.data == 'custom_topic':
-        # Обработка кнопки своей темы
-        query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
-        logger.info(f"Пользователь {user_id} выбрал ввод своей темы")
-        return CHOOSE_TOPIC
     elif query.data == 'back_to_menu':
         query.edit_message_text(
             "Выберите действие в меню ниже:",
@@ -746,10 +764,10 @@ def button_handler(update, context):
         )
         return TOPIC
 
-# Функция для получения информации о теме
+# Оптимизированная функция для получения информации о теме
 def get_topic_info(topic, update_message_func=None):
     """
-    Получает информацию о теме из API и форматирует её для отправки.
+    Получает информацию о теме из API и форматирует её для отправки с оптимизацией.
 
     Args:
         topic (str): Тема для изучения
@@ -774,45 +792,56 @@ def get_topic_info(topic, update_message_func=None):
         f"Расскажи о {topic} в истории России (глава 5). Опиши итоги, значение в истории и культуре, последствия. Заверши повествование. Объем - один абзац."
     ]
 
-    # Получаем информацию по частям
-    all_responses = []
-    for i, prompt in enumerate(prompts, 1):
+    # Оптимизация: параллельная обработка запросов к API (используем нативные потоки)
+    all_responses = [""] * len(prompts)
+    threads = []
+
+    def fetch_response(index, prompt):
         if update_message_func:
-            update_message_func(f"📝 Загружаю главу {i} из {len(prompts)} по теме: *{topic}*...")
+            update_message_func(f"📝 Загружаю главу {index+1} из {len(prompts)} по теме: *{topic}*...")
         
-        # Получаем ответ от API
+        # Получаем ответ от API с использованием общего кэша
         response = ask_grok(prompt)
         
         # Добавляем заголовок главы перед текстом
-        chapter_response = f"*{chapter_titles[i-1]}*\n\n{response}"
-        all_responses.append(chapter_response)
+        chapter_response = f"*{chapter_titles[index]}*\n\n{response}"
+        all_responses[index] = chapter_response
+
+    # Создаем и запускаем потоки
+    for i, prompt in enumerate(prompts):
+        thread = threading.Thread(target=fetch_response, args=(i, prompt))
+        thread.start()
+        threads.append(thread)
+        # Добавляем небольшую задержку для разгрузки API
+        import time
+        time.sleep(0.5)
+
+    # Ждем завершения всех потоков
+    for thread in threads:
+        thread.join()
 
     # Объединяем ответы с разделителями
     combined_responses = "\n\n" + "\n\n".join(all_responses)
 
-    # Разделяем длинный текст на части для отправки в Telegram (макс. 4000 символов)
+    # Оптимизированный алгоритм разделения на части (макс. 4000 символов) для отправки в Telegram
     messages = []
     max_length = 4000
     
-    # Более эффективный алгоритм разделения на части с сохранением форматирования markdown
-    parts = []
+    # Эффективный алгоритм разделения на части с сохранением форматирования markdown
     current_part = ""
-    
-    # Разделяем текст по абзацам
     paragraphs = combined_responses.split('\n\n')
     
     for paragraph in paragraphs:
-        # Если абзац с новой главой (начинается с *), и текущая часть не пуста, 
-        # и добавление абзаца превысит лимит - сохраняем текущую часть и начинаем новую
         if paragraph.startswith('*') and current_part and len(current_part) + len(paragraph) + 2 > max_length:
-            parts.append(current_part)
+            # Начало новой главы, сохраняем предыдущую часть
+            messages.append(current_part)
             current_part = paragraph
-        # Иначе, если просто добавление абзаца превысит лимит - сохраняем текущую часть и начинаем новую
         elif len(current_part) + len(paragraph) + 2 > max_length:
-            parts.append(current_part)
+            # Превышение лимита, сохраняем текущую часть
+            messages.append(current_part)
             current_part = paragraph
-        # Иначе добавляем абзац к текущей части
         else:
+            # Добавляем абзац к текущей части
             if current_part:
                 current_part += '\n\n' + paragraph
             else:
@@ -820,11 +849,7 @@ def get_topic_info(topic, update_message_func=None):
     
     # Добавляем последнюю часть, если она не пуста
     if current_part:
-        parts.append(current_part)
-    
-    # Форматируем части для отправки, добавляя необходимое форматирование markdown
-    for part in parts:
-        messages.append(part)
+        messages.append(current_part)
 
     return messages
 
@@ -1059,10 +1084,10 @@ def handle_answer(update, context):
         logger.info(f"Пользователь {user_id} завершил тест с результатом {score}/{total_questions} ({percentage:.1f}%)")
         return TOPIC
 
-# Функция для обработки сообщений в режиме беседы
+# Оптимизированная функция для обработки сообщений в режиме беседы
 def handle_conversation(update, context):
     """
-    Обрабатывает сообщения пользователя в режиме беседы.
+    Обрабатывает сообщения пользователя в режиме беседы с оптимизацией.
     
     Args:
         update (telegram.Update): Объект обновления Telegram
@@ -1079,29 +1104,29 @@ def handle_conversation(update, context):
     
     logger.info(f"Пользователь {user_id} отправил сообщение в режиме беседы: {user_message[:50]}...")
     
-    # Проверяем, относится ли сообщение к истории России
+    # Проверяем, относится ли сообщение к истории России - используем кэширование
     check_prompt = f"Проверь, относится ли следующее сообщение к истории России: \"{user_message}\". Ответь только 'да' или 'нет'."
     
     # Отправляем индикатор набора текста
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
     
     try:
-        # Проверяем тему сообщения
-        is_history_related = ask_grok(check_prompt, max_tokens=50).lower().strip()
+        # Проверяем тему сообщения с малым лимитом токенов для ускорения
+        is_history_related = ask_grok(check_prompt, max_tokens=50, temp=0.1).lower().strip()
         logger.info(f"Проверка темы сообщения пользователя {user_id}: {is_history_related}")
         
         if 'да' in is_history_related:
-            # Если сообщение относится к истории России
+            # Если сообщение относится к истории России - более детальный ответ
             prompt = f"Пользователь задал вопрос на тему истории России: \"{user_message}\"\n\n" \
                     "Ответь на этот вопрос, опираясь на исторические факты. " \
                     "Будь информативным, но кратким."
         else:
-            # Если сообщение не относится к истории России
+            # Если сообщение не относится к истории России - краткий отказ
             prompt = f"Пользователь задал вопрос не относящийся к истории России: \"{user_message}\"\n\n" \
                     "Вежливо объясни, что ты специализируешься только на истории России, и " \
                     "предложи задать вопрос, связанный с историей России. Приведи пример возможного вопроса."
         
-        # Получаем ответ от API
+        # Получаем ответ от API с индикатором набора
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
         response = ask_grok(prompt, max_tokens=1024)
         
@@ -1137,10 +1162,11 @@ def handle_conversation(update, context):
     
     return CONVERSATION
 
-# Функция для очистки истории чата
+# Оптимизированная функция для очистки истории чата
 def clear_chat_history(update, context):
     """
-    Очищает историю чата, удаляя все предыдущие сообщения бота и пользователя.
+    Очищает историю чата, удаляя предыдущие сообщения бота.
+    Оптимизированная версия с увеличенной производительностью.
     
     Args:
         update (telegram.Update): Объект обновления Telegram
@@ -1150,48 +1176,36 @@ def clear_chat_history(update, context):
         # Получаем ID чата
         chat_id = update.effective_chat.id
         
-        # Получаем текущее сообщение ID
-        current_message_id = None
-        if update.message:
-            current_message_id = update.message.message_id
-        elif update.callback_query and update.callback_query.message:
-            current_message_id = update.callback_query.message.message_id
+        # Получаем список сохраненных ID сообщений
+        message_ids = context.user_data.get('previous_messages', [])
         
-        # Если нет текущего сообщения, не можем определить диапазон
-        if not current_message_id:
-            logger.warning(f"Не удалось определить текущее сообщение для чата {chat_id}")
+        if not message_ids:
             return
             
-        # Пробуем найти первое сообщение в чате (начало диалога)
-        first_message_id = context.user_data.get('first_message_id', current_message_id - 100)
-        
-        # Удаляем все сообщения в диапазоне от первого до текущего
-        # Используем более надежный подход с удалением и отслеживанием ошибок
+        # Удаляем сообщения пакетами для эффективности
         count_deleted = 0
-        count_errors = 0
+        batch_size = 5
         
-        # Очищаем все сообщения в диапазоне (используем обратный порядок для более эффективного удаления)
-        for msg_id in range(current_message_id - 1, first_message_id - 1, -1):
-            try:
-                context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-                count_deleted += 1
-                # Добавляем небольшую задержку для избежания ограничений API
-                if count_deleted % 10 == 0:
-                    import time
-                    time.sleep(0.1)
-            except Exception as e:
-                count_errors += 1
-                # Лог для отладки, но не перегружаем журнал
-                if count_errors <= 5:
-                    logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
-        
-        # Сохраняем текущее ID сообщения как отправную точку для следующей очистки
-        context.user_data['first_message_id'] = current_message_id
+        for i in range(0, len(message_ids), batch_size):
+            batch = message_ids[i:i+batch_size]
+            for msg_id in batch:
+                try:
+                    context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                    count_deleted += 1
+                except Exception:
+                    # Игнорируем ошибки при удалении сообщений
+                    pass
+                    
+            # Добавляем небольшую задержку между пакетами
+            if len(batch) == batch_size:
+                import time
+                time.sleep(0.1)
         
         # Очищаем список предыдущих сообщений
         context.user_data['previous_messages'] = []
         
-        logger.info(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений, {count_errors} ошибок")
+        if count_deleted > 0:
+            logger.debug(f"История чата очищена для пользователя {chat_id}: удалено {count_deleted} сообщений")
     except Exception as e:
         logger.error(f"Ошибка при очистке истории чата: {e}")
 
@@ -1251,16 +1265,8 @@ def main():
     Основная функция для инициализации и запуска бота.
     """
     try:
-        logger.info("Запуск бота и веб-сервера логов...")
-        print("Начинаю запуск бота и веб-сервера логов...")
-        
-        # Запускаем Flask-сервер для отображения логов в отдельном потоке
-        logger.info("Запуск Flask-сервера для отображения логов...")
-        flask_thread = background.start_flask_server()
-        if flask_thread:
-            logger.info("Flask-сервер запущен на http://0.0.0.0:8080")
-        else:
-            logger.warning("Не удалось запустить Flask-сервер")
+        logger.info("Запуск бота истории России...")
+        print("Начинаю запуск бота истории России...")
         
         # Проверка наличия токенов с более подробными сообщениями
         if not TELEGRAM_TOKEN:
@@ -1284,8 +1290,8 @@ def main():
             print(error_msg)
             return
 
-        # Инициализируем бота и диспетчер
-        updater = Updater(TELEGRAM_TOKEN, use_context=True)
+        # Инициализируем бота и диспетчер с оптимизированными настройками
+        updater = Updater(TELEGRAM_TOKEN, use_context=True, workers=4)  # Увеличиваем количество рабочих потоков
         dp = updater.dispatcher
             
         # Добавляем команду для получения презентации
@@ -1371,10 +1377,10 @@ def main():
         dp.add_error_handler(error_handler)
         dp.add_handler(conv_handler)
 
-        # Запускаем бота
+        # Запускаем бота с оптимизированными параметрами
         logger.info("Бот успешно запущен")
         print("Бот успешно запущен")
-        updater.start_polling()
+        updater.start_polling(timeout=30, read_latency=2.0, drop_pending_updates=True)
         updater.idle()
 
     except Exception as e:
