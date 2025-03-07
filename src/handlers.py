@@ -691,42 +691,80 @@ class CommandHandlers:
             try:
                 # Получаем тест через сервис контента
                 test_data = self.content_service.generate_test(topic)
-
+                
+                # Сбрасываем переменные для хранения вопросов
+                valid_questions = []
+                display_questions = []
+                
                 # Проверяем структуру полученных данных
                 if isinstance(test_data, dict):
+                    # Случай 1: Стандартный формат с оригинальными и отображаемыми вопросами
                     if 'original_questions' in test_data and 'display_questions' in test_data:
-                        valid_questions = test_data['original_questions']
-                        display_questions = test_data['display_questions']
+                        if (isinstance(test_data['original_questions'], list) and 
+                            isinstance(test_data['display_questions'], list) and
+                            len(test_data['original_questions']) > 0):
+                            valid_questions = test_data['original_questions']
+                            display_questions = test_data['display_questions']
+                        else:
+                            raise ValueError("Пустой список вопросов или неверный формат вопросов")
+                            
+                    # Случай 2: Ошибка в ответе API
                     elif 'status' in test_data and test_data['status'] == 'error':
-                        # Обрабатываем случай ошибки в ответе API
-                        self.logger.warning(f"Ошибка API при генерации теста: {test_data.get('content', '')}")
-                        raise ValueError(f"Не удалось сгенерировать тест: {test_data.get('content', 'Ошибка API')}")
-                    elif 'content' in test_data and isinstance(test_data['content'], list):
-                        # Обрабатываем случай, когда вопросы в поле content
+                        error_msg = test_data.get('content', 'Ошибка API')
+                        self.logger.warning(f"Ошибка API при генерации теста: {error_msg}")
+                        raise ValueError(f"Не удалось сгенерировать тест: {error_msg}")
+                        
+                    # Случай 3: Вопросы в поле content
+                    elif 'content' in test_data and isinstance(test_data['content'], list) and len(test_data['content']) > 0:
                         valid_questions = test_data['content']
                         display_questions = test_data['content']
+                        
+                    # Случай 4: Поиск вопросов в любом списковом поле
                     else:
-                        # Пытаемся извлечь содержимое из других полей
+                        found_questions = False
                         for field in test_data:
                             if isinstance(test_data[field], list) and len(test_data[field]) > 0:
-                                valid_questions = test_data[field]
-                                display_questions = test_data[field]
-                                break
-                        else:
+                                # Проверяем, что элементы списка - строки
+                                if all(isinstance(q, str) for q in test_data[field]):
+                                    valid_questions = test_data[field]
+                                    display_questions = test_data[field]
+                                    found_questions = True
+                                    break
+                        
+                        if not found_questions:
                             self.logger.warning(f"Неожиданная структура данных теста: {test_data}")
-                            raise ValueError("Неверный формат данных теста: отсутствуют вопросы")
+                            raise ValueError("Неверный формат данных теста: отсутствуют вопросы или неверный формат")
+                
+                # Случай 5: test_data - это список вопросов
                 elif isinstance(test_data, list) and len(test_data) > 0:
-                    # Обрабатываем случай, когда test_data это список вопросов
-                    valid_questions = test_data
-                    display_questions = test_data
+                    # Проверяем, что элементы списка - строки
+                    if all(isinstance(q, str) for q in test_data):
+                        valid_questions = test_data
+                        display_questions = test_data
+                    else:
+                        raise ValueError("Список вопросов содержит элементы неверного типа")
+                        
+                # Случай 6: Неверный формат данных
                 else:
-                    # Создаем дефолтную структуру для обработки ошибок
-                    self.logger.warning(f"Неожиданный формат test_data: {type(test_data)}")
+                    self.logger.warning(f"Неожиданный формат test_data: {type(test_data).__name__}")
                     raise ValueError(f"Неверный формат данных теста: получен {type(test_data).__name__}")
 
+                # Валидация данных: проверяем наличие правильных ответов
+                valid_test = False
+                for question in valid_questions:
+                    if re.search(r"Правильный ответ:\s*[1-4]", question):
+                        valid_test = True
+                        break
+                
+                if not valid_test:
+                    self.logger.warning("В вопросах не найдены правильные ответы")
+                    raise ValueError("Неверный формат вопросов: не найдены правильные ответы")
+
+                # Сохраняем данные в контексте пользователя
                 context.user_data['questions'] = valid_questions
                 context.user_data['current_question'] = 0
                 context.user_data['score'] = 0
+                context.user_data['total_questions'] = len(valid_questions)
 
                 # Сохраняем оригинальные вопросы для проверки ответов
                 context.user_data['original_questions'] = valid_questions
@@ -737,20 +775,27 @@ class CommandHandlers:
                 keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
+                # Отправляем сообщение с началом теста
                 query.edit_message_text(
                     f"📝 *Тест по теме: {topic}*\n\nНачинаем тест из {len(valid_questions)} вопросов! Вот первый вопрос:",
                     parse_mode='Markdown'
                 )
-                query.message.reply_text(display_questions[0])
-                query.message.reply_text(
-                    "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
-                    reply_markup=reply_markup
-                )
-                self.logger.info(f"Тест по теме '{topic}' успешно сгенерирован для пользователя {user_id}")
+                
+                # Проверяем существование первого вопроса
+                if len(display_questions) > 0:
+                    query.message.reply_text(display_questions[0])
+                    query.message.reply_text(
+                        "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
+                        reply_markup=reply_markup
+                    )
+                    self.logger.info(f"Тест по теме '{topic}' успешно сгенерирован для пользователя {user_id}")
+                else:
+                    raise ValueError("Не удалось получить вопросы для теста")
+                    
             except Exception as e:
                 self.logger.log_error(e, f"Ошибка при генерации вопросов для пользователя {user_id}")
                 query.edit_message_text(
-                    f"Произошла ошибка при генерации вопросов: {e}. Попробуй еще раз.", 
+                    f"Произошла ошибка при генерации теста: {e}. Пожалуйста, попробуйте еще раз.", 
                     reply_markup=self.ui_manager.main_menu()
                 )
             return self.ANSWER
@@ -1033,17 +1078,18 @@ class CommandHandlers:
         user_answer = update.message.text.strip()
         user_id = update.message.from_user.id
 
-        # Очищаем историю чата перед ответом на новый вопрос (двойной вызов)
-        self.message_manager.clear_chat_history(update, context)
+        # Очищаем историю чата перед ответом на новый вопрос
         self.message_manager.clear_chat_history(update, context)
 
+        # Получаем сохраненные данные теста
         questions = context.user_data.get('questions', [])
         current_question = context.user_data.get('current_question', 0)
 
-        if not questions:
-            self.logger.warning(f"Пользователь {user_id} пытается ответить на вопрос, но вопросы отсутствуют")
+        # Проверка наличия вопросов
+        if not questions or current_question >= len(questions):
+            self.logger.warning(f"Пользователь {user_id} пытается ответить на вопрос, но вопросы отсутствуют или индекс вне диапазона")
             update.message.reply_text(
-                "Ошибка: вопросы не найдены. Начните тест заново.",
+                "Ошибка: вопросы не найдены или тест завершен. Начните тест заново.",
                 reply_markup=self.ui_manager.main_menu()
             )
             return self.TOPIC
@@ -1052,29 +1098,74 @@ class CommandHandlers:
         original_questions = context.user_data.get('original_questions', questions)
         display_questions = context.user_data.get('display_questions', questions)
 
-        # Парсим правильный ответ из оригинального текста вопроса
+        # Проверка валидности пользовательского ввода
+        if not user_answer.isdigit() or int(user_answer) < 1 or int(user_answer) > 4:
+            sent_msg = update.message.reply_text(
+                "⚠️ Пожалуйста, введите номер ответа (от 1 до 4).\n"
+                "Попробуйте снова:"
+            )
+            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+            return self.ANSWER
+
+        # Парсим правильный ответ из оригинального текста вопроса с улучшенной обработкой ошибок
         try:
-            correct_answer_match = re.search(r"Правильный ответ:\s*(\d+)", original_questions[current_question])
-            if correct_answer_match:
-                correct_answer = correct_answer_match.group(1)
-            else:
+            correct_answer = None
+            # Поиск с более гибким регулярным выражением
+            patterns = [
+                r"Правильный ответ:\s*(\d+)",
+                r"Правильный:\s*(\d+)",
+                r"Ответ:\s*(\d+)",
+                r"Верный ответ:\s*(\d+)"
+            ]
+            
+            for pattern in patterns:
+                correct_answer_match = re.search(pattern, original_questions[current_question])
+                if correct_answer_match:
+                    correct_answer = correct_answer_match.group(1)
+                    break
+                    
+            if not correct_answer:
+                # Попытка найти правильный ответ в конце текста
+                lines = original_questions[current_question].split('\n')
+                for line in reversed(lines):
+                    if re.search(r"\d+", line):
+                        match = re.search(r"\d+", line)
+                        if match:
+                            correct_answer = match.group(0)
+                            break
+            
+            if not correct_answer:
                 raise ValueError("Формат правильного ответа не найден")
+                
+            # Проверка валидности правильного ответа
+            if int(correct_answer) < 1 or int(correct_answer) > 4:
+                self.logger.warning(f"Некорректный правильный ответ {correct_answer} в вопросе {current_question+1}")
+                correct_answer = "1"  # Установка значения по умолчанию
+                
         except (IndexError, ValueError) as e:
-            self.logger.error(f"Ошибка при обработке ответа пользователя {user_id}: {e}")
+            self.logger.error(f"Ошибка при обработке ответа пользователя {user_id} на вопрос {current_question+1}: {e}")
             update.message.reply_text(
-                "Ошибка в формате вопросов. Попробуй начать тест заново, нажав 'Пройти тест'.", 
+                "Обнаружена ошибка в формате вопроса. Переходим к следующему вопросу или завершаем тест.", 
                 reply_markup=self.ui_manager.main_menu()
             )
-            return self.TOPIC
+            # Переходим к следующему вопросу без учета этого
+            context.user_data['current_question'] = current_question + 1
+            
+            # Если остались вопросы, показываем следующий
+            if context.user_data['current_question'] < len(display_questions):
+                return self._show_next_question(update, context, display_questions)
+            else:
+                return self._show_test_results(update, context, questions)
 
         # Проверяем ответ пользователя
-        if user_answer == correct_answer:
+        is_correct = user_answer == correct_answer
+        if is_correct:
+            # Увеличиваем счетчик правильных ответов
             context.user_data['score'] = context.user_data.get('score', 0) + 1
             sent_msg = update.message.reply_text("✅ Правильно!")
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
             self.logger.info(f"Пользователь {user_id} ответил верно на вопрос {current_question+1}")
         else:
-            # Не показываем правильный ответ
             sent_msg = update.message.reply_text("❌ Неправильно!")
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
             self.logger.info(f"Пользователь {user_id} ответил неверно на вопрос {current_question+1}")
@@ -1082,26 +1173,80 @@ class CommandHandlers:
         # Переходим к следующему вопросу
         context.user_data['current_question'] = current_question + 1
 
+        # Если остались вопросы, показываем следующий
         if context.user_data['current_question'] < len(display_questions):
-            next_question = context.user_data['current_question'] + 1
-            sent_msg1 = update.message.reply_text(f"Вопрос {next_question} из {len(display_questions)}:")
+            return self._show_next_question(update, context, display_questions)
+        else:
+            return self._show_test_results(update, context, questions)
+
+    def _show_next_question(self, update, context, display_questions):
+        """
+        Показывает следующий вопрос теста.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+            display_questions (list): Список вопросов для отображения
+
+        Returns:
+            int: Следующее состояние разговора
+        """
+        try:
+            current_question = context.user_data.get('current_question', 0)
+            total_questions = len(display_questions)
+            
+            # Отправляем номер вопроса
+            sent_msg1 = update.message.reply_text(f"Вопрос {current_question+1} из {total_questions}:")
             self.message_manager.save_message_id(update, context, sent_msg1.message_id)
 
-            sent_msg2 = update.message.reply_text(display_questions[context.user_data['current_question']])
+            # Отправляем текст вопроса
+            sent_msg2 = update.message.reply_text(display_questions[current_question])
             self.message_manager.save_message_id(update, context, sent_msg2.message_id)
 
             # Создаем клавиатуру с кнопкой для завершения теста
             keyboard = [[InlineKeyboardButton("❌ Закончить тест", callback_data='end_test')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            sent_msg3 = update.message.reply_text("Напиши цифру правильного ответа (1, 2, 3 или 4).", reply_markup=reply_markup)
+            # Отправляем инструкцию для ответа
+            sent_msg3 = update.message.reply_text(
+                "Напиши цифру правильного ответа (1, 2, 3 или 4).", 
+                reply_markup=reply_markup
+            )
             self.message_manager.save_message_id(update, context, sent_msg3.message_id)
+            
             return self.ANSWER
-        else:
-            # Тест завершен, показываем результаты
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка при отображении следующего вопроса: {e}")
+            update.message.reply_text(
+                "Произошла ошибка при отображении вопроса. Завершаем тест.", 
+                reply_markup=self.ui_manager.main_menu()
+            )
+            return self._show_test_results(update, context, display_questions)
+
+    def _show_test_results(self, update, context, questions):
+        """
+        Показывает результаты теста.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+            questions (list): Список вопросов
+
+        Returns:
+            int: Следующее состояние разговора
+        """
+        try:
+            user_id = update.message.from_user.id
             score = context.user_data.get('score', 0)
             total_questions = len(questions)
-            percentage = (score / total_questions) * 100
+            
+            # Защита от деления на ноль
+            if total_questions > 0:
+                percentage = (score / total_questions) * 100
+            else:
+                percentage = 0
+                
             topic = context.user_data.get('current_topic', 'выбранной теме')
 
             # Оценка усвоенного материала
@@ -1130,12 +1275,30 @@ class CommandHandlers:
 
             result_message += "Выбери следующее действие:"
 
+            # Отправляем результаты теста
             update.message.reply_text(
                 result_message,
                 parse_mode='Markdown',
                 reply_markup=self.ui_manager.main_menu()
             )
+            
             self.logger.info(f"Пользователь {user_id} завершил тест с результатом {score}/{total_questions} ({percentage:.1f}%)")
+            
+            # Очищаем данные теста
+            context.user_data.pop('questions', None)
+            context.user_data.pop('current_question', None)
+            context.user_data.pop('score', None)
+            context.user_data.pop('original_questions', None)
+            context.user_data.pop('display_questions', None)
+            
+            return self.TOPIC
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка при отображении результатов теста: {e}")
+            update.message.reply_text(
+                f"Произошла ошибка при формировании результатов теста: {e}",
+                reply_markup=self.ui_manager.main_menu()
+            )
             return self.TOPIC
 
     def _sanitize_markdown(self, text):
