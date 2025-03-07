@@ -811,44 +811,43 @@ class CommandHandlers:
 
         return self.CONVERSATION
 
+    def recommend_similar_topics(self, current_topic, context):
+        """
+        Рекомендует пользователю похожие темы на основе текущей темы.
+        
+        Args:
+            current_topic (str): Текущая тема пользователя
+            context: Контекст разговора
+            
+        Returns:
+            list: Список рекомендованных тем
+        """
+        try:
+            # Формируем запрос на рекомендацию
+            prompt = f"На основе темы '{current_topic}' предложи 3 связанные темы по истории России, которые могут заинтересовать пользователя. Перечисли их в формате нумерованного списка без дополнительных пояснений."
+            
+            # Получаем ответ от API
+            similar_topics_text = self.api_client.ask_grok(prompt, max_tokens=150, temp=0.4)
+            
+            # Парсим темы
+            similar_topics = []
+            for line in similar_topics_text.split('\n'):
+                # Ищем строки с форматом "1. Тема" или "- Тема"
+                if (line.strip().startswith(('1.', '2.', '3.', '-'))):
+                    # Удаляем префикс и лишние пробелы
+                    topic = re.sub(r'^[\d\.\-\s]+', '', line).strip()
+                    if topic:
+                        similar_topics.append(topic)
+            
+            return similar_topics[:3]  # Возвращаем максимум 3 темы
+        except Exception as e:
+            self.logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
+            return []
+            
     def admin_command(self, update, context):
         """
         Обрабатывает команду /admin для доступа к административной панели.
-
-def recommend_similar_topics(self, current_topic, context):
-    """
-    Рекомендует пользователю похожие темы на основе текущей темы.
-    
-    Args:
-        current_topic (str): Текущая тема пользователя
-        context: Контекст разговора
         
-    Returns:
-        list: Список рекомендованных тем
-    """
-    try:
-        # Формируем запрос на рекомендацию
-        prompt = f"На основе темы '{current_topic}' предложи 3 связанные темы по истории России, которые могут заинтересовать пользователя. Перечисли их в формате нумерованного списка без дополнительных пояснений."
-        
-        # Получаем ответ от API
-        similar_topics_text = self.api_client.ask_grok(prompt, max_tokens=150, temp=0.4)
-        
-        # Парсим темы
-        similar_topics = []
-        for line in similar_topics_text.split('\n'):
-            # Ищем строки с форматом "1. Тема" или "- Тема"
-            if (line.strip().startswith(('1.', '2.', '3.', '-'))):
-                # Удаляем префикс и лишние пробелы
-                topic = re.sub(r'^[\d\.\-\s]+', '', line).strip()
-                if topic:
-                    similar_topics.append(topic)
-        
-        return similar_topics[:3]  # Возвращаем максимум 3 темы
-    except Exception as e:
-        self.logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
-        return []
-
-
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
