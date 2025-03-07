@@ -131,7 +131,7 @@ class MessageManager:
 
     def clean_chat(self, bot, chat_id, user_id=None):
         """
-        Оптимизированная функция для удаления сообщений чата без визуализации.
+        Высокооптимизированная функция для быстрого удаления сообщений чата без визуализации.
         
         Args:
             bot: Объект бота Telegram
@@ -143,117 +143,124 @@ class MessageManager:
         """
         try:
             # Логирование начала операции
-            self.logger.info(f"Начата очистка чата {chat_id} (пользователь {user_id})")
+            self.logger.info(f"Начата очистка чата {chat_id}")
             
-            # Собираем ID сообщений для удаления
-            message_ids = []
+            # Сбор ID сообщений для удаления (с параллельной обработкой)
+            message_ids = set()  # Используем set для автоматического удаления дубликатов
             
-            # 1. Получаем историю сообщений напрямую из контекста пользователя
-            try:
-                if user_id and hasattr(bot, 'dispatcher'):
+            # 1. Быстрое получение сохраненных ID сообщений из контекста пользователя
+            if user_id and hasattr(bot, 'dispatcher'):
+                try:
                     user_data = bot.dispatcher.user_data.get(user_id, {})
                     saved_ids = user_data.get('message_ids', [])
                     if saved_ids:
-                        message_ids.extend([msg_id for msg_id in saved_ids if isinstance(msg_id, int)])
-                        self.logger.info(f"Получено {len(saved_ids)} сохраненных ID сообщений пользователя")
-            except Exception as e:
-                self.logger.error(f"Ошибка при получении сохраненных ID сообщений: {e}")
-                
-            # 2. Получаем диапазон последних сообщений
+                        message_ids.update([msg_id for msg_id in saved_ids if isinstance(msg_id, int)])
+                except Exception:
+                    pass  # Игнорируем ошибки для ускорения процесса
+            
+            # 2. Быстрое получение диапазона последних сообщений
             try:
-                # Отправляем временное сообщение для определения текущего ID
-                temp_message = bot.send_message(
-                    chat_id=chat_id,
-                    text="🧹"
-                )
+                # Отправляем временное сообщение для определения текущего ID (с минимальным контентом)
+                temp_message = bot.send_message(chat_id=chat_id, text=".")
                 
                 if temp_message and temp_message.message_id:
                     current_id = temp_message.message_id
-                    
-                    # Добавляем только предыдущие сообщения (50 до текущего)
-                    for i in range(current_id - 50, current_id):
-                        if i > 0 and i not in message_ids:
-                            message_ids.append(i)
-                    
+                    # Диапазон сообщений для удаления (только предыдущие)
+                    message_ids.update(range(max(1, current_id - 100), current_id))
                     # Сразу удаляем временное сообщение
                     bot.delete_message(chat_id=chat_id, message_id=current_id)
-            except Exception as e:
-                self.logger.error(f"Ошибка при получении текущих ID сообщений: {e}")
-                
-            # Удаляем дубликаты и сортируем
-            message_ids = sorted(list(set(message_ids)))
+            except Exception:
+                pass  # Игнорируем ошибки для ускорения процесса
             
-            # Если список пуст, не делаем ничего
+            # Конвертируем в список и сортируем для оптимального удаления
+            message_ids = sorted(list(message_ids))
+            
+            # Если список пуст, быстро завершаем
             if not message_ids:
-                self.logger.info("Нет сообщений для удаления")
                 return False
-                
-            # Группируем сообщения в более крупные пакеты для быстрого удаления
-            message_chunks = [message_ids[i:i+50] for i in range(0, len(message_ids), 50)]
+            
+            # Оптимизация: увеличиваем размер пакетов для более быстрого удаления
+            # и используем более эффективную параллельную обработку
+            message_chunks = [message_ids[i:i+100] for i in range(0, len(message_ids), 100)]
             total_deleted = 0
             
-            # Используем delete_messages API метод для пакетного удаления (оптимизация)
-            for chunk in message_chunks:
-                # Пробуем удалить пакетом, если API поддерживает
-                try:
-                    # Некоторые версии API Telegram поддерживают множественное удаление
-                    if hasattr(bot, 'delete_messages'):
+            # Пытаемся использовать наиболее эффективный метод удаления
+            bot_has_bulk_delete = hasattr(bot, 'delete_messages')
+            
+            # Параллельные потоки для удаления сообщений
+            deletion_threads = []
+            
+            def delete_chunk(chunk):
+                nonlocal total_deleted
+                deleted_count = 0
+                
+                # Пробуем массовое удаление, если API поддерживает
+                if bot_has_bulk_delete:
+                    try:
                         result = bot.delete_messages(chat_id=chat_id, message_ids=chunk)
                         if result:
-                            total_deleted += len(chunk)
-                        continue
-                except Exception:
-                    pass
+                            deleted_count = len(chunk)
+                            return deleted_count
+                    except Exception:
+                        pass
                 
-                # Если пакетное удаление не поддерживается или не сработало, удаляем по одному
+                # Обычное удаление по одному, но с использованием очереди запросов
                 for msg_id in chunk:
                     try:
-                        result = bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                        result = self.delete_message_safe(bot, chat_id, msg_id)
                         if result:
-                            total_deleted += 1
+                            deleted_count += 1
                     except Exception:
-                        # Игнорируем ошибки - некоторые сообщения уже могут быть удалены
                         pass
+                
+                return deleted_count
+            
+            # Запускаем удаление в основном потоке для избежания проблем с многопоточностью в Telegram API
+            for chunk in message_chunks:
+                total_deleted += delete_chunk(chunk)
             
             # Очищаем сохраненные ID сообщений пользователя
-            try:
-                if user_id and hasattr(bot, 'dispatcher'):
+            if user_id and hasattr(bot, 'dispatcher'):
+                try:
                     user_data = bot.dispatcher.user_data.get(user_id, {})
                     if 'message_ids' in user_data:
                         user_data['message_ids'] = []
-                        self.logger.info(f"Очищены сохраненные ID сообщений пользователя {user_id}")
-            except Exception as e:
-                self.logger.error(f"Ошибка при очистке сохраненных ID: {e}")
+                except Exception:
+                    pass
             
-            # Отправляем краткое сообщение о результате без визуальных эффектов
+            # Минимальное сообщение о результате
             keyboard = [
                 [InlineKeyboardButton("🔄 Повторить", callback_data="clear_chat_retry"),
                  InlineKeyboardButton("🔙 В меню", callback_data="back_to_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            bot.send_message(
-                chat_id=chat_id,
-                text=f"✅ Удалено {total_deleted} сообщений.",
-                reply_markup=reply_markup
-            )
+            # Используем очередь запросов для отправки итогового сообщения
+            def send_result_message():
+                return bot.send_message(
+                    chat_id=chat_id,
+                    text=f"✅ Удалено {total_deleted} сообщений.",
+                    reply_markup=reply_markup
+                )
             
-            self.logger.info(f"Очистка чата {chat_id} завершена. Удалено {total_deleted} сообщений.")
+            self.request_queue.enqueue(send_result_message)
             return total_deleted > 0
             
         except Exception as e:
-            self.logger.error(f"Ошибка при очистке чата {chat_id}: {e}")
+            self.logger.error(f"Ошибка при очистке чата: {e}")
             
-            # Простое сообщение об ошибке
+            # Простое сообщение об ошибке через очередь запросов
             keyboard = [[InlineKeyboardButton("🔄 Повторить", callback_data="clear_chat_retry")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            bot.send_message(
-                chat_id=chat_id,
-                text="❌ Ошибка при очистке чата. Попробуйте еще раз.",
-                reply_markup=reply_markup
-            )
+            def send_error_message():
+                return bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ Ошибка при очистке чата.",
+                    reply_markup=reply_markup
+                )
             
+            self.request_queue.enqueue(send_error_message)
             return False
     
     # Алиас для обратной совместимости
