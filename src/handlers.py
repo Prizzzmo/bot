@@ -329,56 +329,98 @@ class CommandHandlers:
                     text="❌ Не удалось сгенерировать карту. Пожалуйста, попробуйте позже.",
                     parse_mode='HTML'
                 )
-            
+
             context.bot.delete_message(chat_id=user_id, message_id=status_message.message_id)
             return self.MAP
-            
+
         elif query_data.startswith('map_img_'):
             category = query_data.replace('map_img_', '')
-            
-            import os  # Добавляем импорт os здесь
 
             # Отправляем сообщение о том, что генерируем карту
             status_message = context.bot.send_message(
                 chat_id=user_id,
-                text=f"🔄 Генерация HTML-карты для категории «{category}»...",
+                text=f"🔄 Генерация карты для категории «{category}»...",
                 parse_mode='HTML'
             )
 
-            map_html_path = self.history_map.generate_map_html(category=category)
+            try:
+                # Пробуем сначала сгенерировать изображение карты
+                map_path = self.history_map.generate_map_image(category=category)
 
-            import os  # Добавляем еще один импорт os здесь для доступа в контексте этого блока
-            
-            if map_html_path and os.path.exists(map_html_path):
-                # Отправляем HTML-файл карты как документ
-                with open(map_html_path, 'rb') as file:
-                    context.bot.send_document(
+                if map_path and os.path.exists(map_path):
+                    # Определяем, это изображение или HTML-файл
+                    is_image = map_path.endswith(('.png', '.jpg', '.jpeg'))
+
+                    if is_image:
+                        # Отправляем как изображение
+                        with open(map_path, 'rb') as img_file:
+                            context.bot.send_photo(
+                                chat_id=user_id,
+                                photo=img_file,
+                                caption=f"🗺️ Карта исторических событий категории «{category}»",
+                                parse_mode='HTML'
+                            )
+                    else:
+                        # Отправляем как документ (HTML-файл)
+                        with open(map_path, 'rb') as html_file:
+                            context.bot.send_document(
+                                chat_id=user_id,
+                                document=html_file,
+                                filename=f"Карта_исторических_событий_{category}.html",
+                                caption=f"🗺️ Интерактивная карта исторических событий категории «{category}»\nОткройте файл в браузере для просмотра интерактивной карты.",
+                                parse_mode='HTML'
+                            )
+
+                    # Удаляем сообщение о генерации
+                    context.bot.delete_message(
                         chat_id=user_id,
-                        document=file,
-                        filename=f"Карта_исторических_событий_{category}.html",
-                        caption=f"🗺️ Интерактивная карта исторических событий категории «{category}»\nОткройте файл в браузере для просмотра интерактивной карты.",
+                        message_id=status_message.message_id
+                    )
+
+                    # Удаляем файл карты после отправки
+                    try:
+                        os.remove(map_path)
+                        self.logger.info(f"Файл карты удален: {map_path}")
+                    except Exception as e:
+                        self.logger.error(f"Не удалось удалить файл карты {map_path}: {e}")
+
+                    self.logger.info(f"Пользователь {user_id} получил карту категории {category}")
+                else:
+                    # Если не удалось сгенерировать карту
+                    context.bot.send_message(
+                        chat_id=user_id,
+                        text=f"❌ Не удалось сгенерировать карту для категории «{category}». Пожалуйста, попробуйте позже.",
                         parse_mode='HTML'
                     )
 
-                # Удаляем сообщение о генерации
-                context.bot.delete_message(
+                    # Удаляем сообщение о генерации
+                    context.bot.delete_message(
+                        chat_id=user_id, 
+                        message_id=status_message.message_id
+                    )
+            except Exception as e:
+                self.logger.error(f"Ошибка при генерации карты: {e}")
+                context.bot.send_message(
                     chat_id=user_id,
-                    message_id=status_message.message_id
-                )
-
-                # Удаляем HTML-файл карты после отправки
-                os.remove(map_html_path)
-
-                self.logger.info(f"Пользователь {user_id} получил HTML-карту категории {category}")
-            else:
-                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
-                context.bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=status_message.message_id,
-                    text=f"❌ Не удалось сгенерировать HTML-карту для категории «{category}». Попробуйте позже или воспользуйтесь ссылкой на карту.",
+                    text=f"❌ Произошла ошибка при генерации карты: {str(e)}. Пожалуйста, попробуйте позже.",
                     parse_mode='HTML'
                 )
-                self.logger.error(f"Не удалось сгенерировать HTML-карту категории {category} для пользователя {user_id}")
+
+                # Удаляем сообщение о генерации
+                try:
+                    context.bot.delete_message(
+                        chat_id=user_id, 
+                        message_id=status_message.message_id
+                    )
+                except:
+                    pass
+
+            # Запускаем очистку старых карт
+            try:
+                self.history_map.clean_old_maps()
+            except Exception as e:
+                self.logger.error(f"Ошибка при очистке старых карт: {e}")
+
             return self.MAP
 
         elif query_data == 'map_random':

@@ -14,3 +14,5 @@ requests
 docx
 pillow
 jinja2
+basemap
+matplotlib
