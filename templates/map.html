@@ -166,7 +166,6 @@
         events.forEach(event => {
             if (event.location && event.location.lat && event.location.lng) {
                 const marker = L.marker([event.location.lat, event.location.lng])
-                    .addTo(map)
                     .bindPopup(`
                         <div class="event-info">
                             <div class="event-title">${event.title}</div>
@@ -178,6 +177,29 @@
                 markers[event.id] = marker;
             }
         });
+        
+        // Функция для загрузки только видимых маркеров
+        function updateVisibleMarkers() {
+            const bounds = map.getBounds();
+            events.forEach(event => {
+                if (event.location && event.location.lat && event.location.lng) {
+                    const latLng = L.latLng(event.location.lat, event.location.lng);
+                    if (bounds.contains(latLng)) {
+                        if (!map.hasLayer(markers[event.id])) {
+                            markers[event.id].addTo(map);
+                        }
+                    } else {
+                        if (map.hasLayer(markers[event.id])) {
+                            map.removeLayer(markers[event.id]);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Обновляем маркеры при загрузке и изменении области видимости
+        map.on('moveend', updateVisibleMarkers);
+        updateVisibleMarkers();
         
         // Функция для фильтрации событий по категории
         function filterEventsByCategory(category) {

@@ -26,12 +26,12 @@ def main():
 
     # Загружаем конфигурацию
     config = Config()
-    
+
     # Создаем пул процессов для асинхронных и тяжелых задач
     from concurrent.futures import ThreadPoolExecutor
     # Ограничиваем количество потоков для экономии ресурсов
     thread_pool = ThreadPoolExecutor(max_workers=3)
-    
+
     # Создаем необходимые сервисы
     ui_manager = UIManager(logger)
     # Создаем кэш для API запросов с оптимизированными параметрами
@@ -49,20 +49,11 @@ def main():
     # Создаем карту исторических событий и запускаем веб-сервер
     from src.history_map import HistoryMap
     from src.web_server import MapServer
-    
+
     history_map = HistoryMap(logger)
     map_server = MapServer(history_map, logger)
     map_server.run()
-    
-    # Уже инициализировано выше, повторная инициализация не требуется
-    # from src.history_map import HistoryMap
-    # history_map = HistoryMap(logger)
 
-    # Создаем и запускаем веб-сервер для карты
-    from src.web_server import MapServer
-    map_server = MapServer(history_map, logger)
-    map_server.run()
-    
     logger.info("Веб-сервер с интерактивной картой запущен на порту 8080")
 
     # Создаем обработчик команд

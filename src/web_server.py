@@ -57,7 +57,22 @@ class MapServer:
         def get_categories():
             """API для получения категорий"""
             categories = self.history_map.get_categories()
-            return jsonify(categories)
+            response = jsonify(categories)
+            response.cache_control.max_age = 3600  # кэширование на 1 час
+            return response
+            
+        @self.app.after_request
+        def add_header(response):
+            """Добавление заголовков кэширования для статических ресурсов"""
+            if 'text/html' in response.headers.get('Content-Type', ''):
+                response.cache_control.max_age = 600  # HTML-страницы - 10 минут
+            elif 'text/css' in response.headers.get('Content-Type', ''):
+                response.cache_control.max_age = 86400  # CSS - 1 день
+            elif 'application/javascript' in response.headers.get('Content-Type', ''):
+                response.cache_control.max_age = 86400  # JS - 1 день
+            elif 'image/' in response.headers.get('Content-Type', ''):
+                response.cache_control.max_age = 604800  # Изображения - 7 дней
+            return response
 
     def run(self):
         """Запуск веб-сервера в отдельном потоке"""
