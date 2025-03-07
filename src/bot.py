@@ -1,6 +1,5 @@
 import threading
-from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, CallbackQueryHandler
-from telegram.ext import Filters
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 
 from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
 
@@ -111,11 +110,8 @@ class Bot:
             self.logger.info(f"Запуск веб-сервера логов на порту {PORT}")
             httpd = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
             
-            # Запускаем сервер
-            try:
-                httpd.serve_forever()
-            except Exception as e:
-                self.logger.error(f"Ошибка в веб-сервере: {e}")
+            # Запускаем сервер в отдельном потоке
+            httpd.serve_forever()
         except Exception as e:
             self.logger.error(f"Ошибка при запуске веб-сервера логов: {e}")
 

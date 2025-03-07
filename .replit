@@ -1,35 +1,18 @@
-run = "python main.py"
-language = "python3"
-hidden = [".venv", ".config", "**/__pycache__", "**/.mypy_cache", "**/*.pyc"]
+entrypoint = "main.py"
 modules = ["python-3.11"]
 
-# Replit Packages configuration
 [nix]
-channel = "stable-23_11"
-
-[env]
-VIRTUAL_ENV = "${REPL_HOME}/.venv"
-PATH = "${VIRTUAL_ENV}/bin"
-PYTHONPATH = "$PYTHONHOME/lib/python3.10:${workspaceFolder}"
-
-[packager]
-language = "python3"
-ignoredPackages = ["unit_tests"]
-
-[packager.features]
-enabledForHosting = false
-packageSearch = true
-guessImports = true
+channel = "stable-24_05"
 
 [unitTest]
 language = "python3"
 
-[languages.python3]
-pattern = "**/*.py"
-syntax = "python"
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix"]
 
-[languages.python3.languageServer]
-start = ["pylsp"]
+[deployment]
+run = ["python3", "main.py"]
+deploymentTarget = "cloudrun"
 
 [workflows]
 runButton = "Run"
