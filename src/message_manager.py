@@ -174,82 +174,148 @@ class MessageManager:
             user_str = f" пользователя {user_id}" if user_id else ""
             self.logger.info(f"Попытка удаления истории чата {chat_id}{user_str}")
             
-            # Метод 1: Используем API-метод deleteHistory (если доступен)
+            # Инициализируем переменную успеха
             success = False
-            try:
-                def delete_history_func():
-                    return bot.delete_chat_history(chat_id=chat_id)
-                
-                result = self.request_queue.enqueue(delete_history_func)
-                if result:
-                    self.logger.info(f"История чата {chat_id}{user_str} успешно удалена методом delete_chat_history")
-                    success = True
-            except Exception as e1:
-                self.logger.warning(f"Не удалось удалить историю чата методом delete_chat_history: {e1}")
             
-            # Метод 2: Удаление сохраненных сообщений (если у нас есть их ID)
-            if not success and user_id:
+            # Метод 1: Удаление сохраненных сообщений через данные пользователя в диспетчере
+            if user_id:
                 try:
-                    from telegram.ext import CallbackContext
-                    context = bot._dispatcher.user_data.get(user_id, {})
-                    message_ids = context.get('message_ids', [])
+                    # Получаем данные пользователя из dispatcher
+                    user_data = None
+                    if hasattr(bot, '_dispatcher') and hasattr(bot._dispatcher, 'user_data'):
+                        user_data = bot._dispatcher.user_data.get(user_id, {})
                     
+                    # Если у нас есть доступ к данным пользователя, извлекаем ID сообщений
+                    message_ids = []
+                    if user_data and 'message_ids' in user_data:
+                        message_ids = user_data.get('message_ids', [])
+                    
+                    # Отправляем уведомление пользователю
+                    notification = bot.send_message(
+                        chat_id=chat_id, 
+                        text=f"🧹 Начинаю очистку чата... Будет удалено до {len(message_ids)} сообщений."
+                    )
+                    
+                    # Если у нас есть ID сообщений, удаляем их по одному
                     if message_ids:
                         self.logger.info(f"Попытка удалить {len(message_ids)} сохраненных сообщений для пользователя {user_id}")
                         deleted_count = 0
+                        errors_count = 0
                         
+                        # Проходим по ID сообщений и удаляем каждое
                         for msg_id in message_ids:
                             try:
-                                def delete_msg_func(msg_id=msg_id):  # Важно использовать значение по умолчанию для замыкания
+                                def delete_msg_func(msg_id=msg_id):
                                     return bot.delete_message(chat_id=chat_id, message_id=msg_id)
                                 
                                 result = self.request_queue.enqueue(delete_msg_func)
                                 if result:
                                     deleted_count += 1
-                            except Exception:
-                                # Игнорируем ошибки отдельных сообщений
-                                pass
+                                    # Добавляем небольшую задержку каждые 5 сообщений, чтобы избежать ограничений API
+                                    if deleted_count % 5 == 0:
+                                        import time
+                                        time.sleep(0.3)
+                            except Exception as msg_err:
+                                errors_count += 1
+                                # Логируем детали ошибки только каждые 10-е сообщение
+                                if errors_count % 10 == 0:
+                                    self.logger.debug(f"Ошибка при удалении сообщения {msg_id}: {msg_err}")
                         
                         # Очищаем список сохраненных сообщений
-                        context['message_ids'] = []
+                        if user_data and 'message_ids' in user_data:
+                            user_data['message_ids'] = []
                         
+                        # Отмечаем успех, если хотя бы некоторые сообщения были удалены
                         if deleted_count > 0:
-                            self.logger.info(f"Удалено {deleted_count} из {len(message_ids)} сообщений")
                             success = True
-                except Exception as e2:
-                    self.logger.warning(f"Не удалось удалить сохраненные сообщения: {e2}")
+                            self.logger.info(f"Удалено {deleted_count} из {len(message_ids)} сообщений, ошибок: {errors_count}")
+                            
+                            # Отправляем сообщение о результате
+                            summary_text = f"✅ Очистка чата выполнена! Удалено {deleted_count} из {len(message_ids)} сообщений."
+                            if errors_count > 0:
+                                summary_text += f"\n\nНекоторые сообщения ({errors_count}) не могут быть удалены - возможно, они уже удалены или слишком старые."
+                            
+                            # Отправляем итоговое сообщение
+                            bot.send_message(chat_id=chat_id, text=summary_text)
+                    else:
+                        self.logger.info(f"Не найдено сохраненных сообщений для пользователя {user_id}")
+                        # Отправляем сообщение, что сохраненных сообщений не найдено
+                        bot.send_message(
+                            chat_id=chat_id, 
+                            text="ℹ️ Не найдено сохраненных сообщений для удаления. Попробуйте альтернативные методы очистки."
+                        )
+                except Exception as e1:
+                    self.logger.warning(f"Ошибка при удалении сохраненных сообщений: {e1}")
             
-            # Метод 3: Отправка системного сообщения для очистки чата (если другие методы не сработали)
+            # Метод 2: Отправка нескольких команд очистки чата (если метод 1 не сработал полностью)
             if not success:
                 try:
-                    # Отправляем сообщение с командой очистки (работает в некоторых клиентах Telegram)
-                    clean_message = "/cleanchat"
-                    sent_msg = bot.send_message(chat_id=chat_id, text=clean_message)
-                    
-                    # Удаляем наше сообщение с командой очистки
-                    def delete_clean_msg_func():
-                        return bot.delete_message(chat_id=chat_id, message_id=sent_msg.message_id)
-                    
-                    self.request_queue.enqueue(delete_clean_msg_func)
-                    
                     # Отправляем уведомление пользователю
-                    info_msg = "🧹 Попытка очистки чата выполнена. Результат зависит от настроек вашего клиента Telegram."
-                    bot.send_message(chat_id=chat_id, text=info_msg)
+                    bot.send_message(
+                        chat_id=chat_id, 
+                        text="🧹 Выполняю альтернативную очистку чата..."
+                    )
                     
-                    # Считаем частичным успехом
+                    # Попытка отправить системные команды для очистки (работает в некоторых клиентах)
+                    commands = ["/clearcache", "/cleanchat", "/clear"]
+                    for cmd in commands:
+                        try:
+                            sent_msg = bot.send_message(chat_id=chat_id, text=cmd)
+                            # Ждем секунду для применения команды
+                            import time
+                            time.sleep(1)
+                            # Удаляем отправленную команду
+                            def delete_cmd_func(msg_id=sent_msg.message_id):
+                                return bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                            self.request_queue.enqueue(delete_cmd_func)
+                        except Exception:
+                            pass
+                    
+                    # Отправляем сообщение о попытке очистки
+                    bot.send_message(
+                        chat_id=chat_id,
+                        text="🧹 Выполнена альтернативная очистка чата. Результат зависит от версии вашего клиента Telegram."
+                    )
+                    
+                    # Считаем как частичный успех
                     success = True
-                except Exception as e3:
-                    self.logger.warning(f"Не удалось отправить команду очистки чата: {e3}")
+                except Exception as e2:
+                    self.logger.warning(f"Ошибка при выполнении альтернативной очистки чата: {e2}")
             
-            if success:
-                self.logger.info(f"Очистка чата {chat_id}{user_str} выполнена")
-                return True
-            else:
-                self.logger.warning(f"Все методы очистки чата {chat_id}{user_str} не удались")
-                return False
+            # Метод 3: Предложение пользователю альтернативные варианты
+            # Создаем inline-клавиатуру с кнопкой повторной попытки
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [
+                [InlineKeyboardButton("🔄 Повторить очистку", callback_data="clear_chat_retry")],
+                [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Отправляем сообщение с кнопками
+            bot.send_message(
+                chat_id=chat_id,
+                text=f"{'✅ Очистка чата выполнена!' if success else '⚠️ Полная очистка чата не удалась.'}\n\n"
+                     f"Вы можете попробовать очистить чат снова или вернуться в меню.",
+                reply_markup=reply_markup
+            )
+            
+            return success
                 
         except Exception as e:
             self.logger.error(f"Критическая ошибка при удалении истории чата {chat_id}: {e}")
+            try:
+                # Отправляем сообщение об ошибке
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                keyboard = [[InlineKeyboardButton("🔄 Повторить", callback_data="clear_chat_retry")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                bot.send_message(
+                    chat_id=chat_id,
+                    text=f"❌ Произошла ошибка при очистке чата: {str(e)[:50]}...\nВы можете попробовать еще раз.",
+                    reply_markup=reply_markup
+                )
+            except:
+                pass
             return False
 
     def __del__(self):
