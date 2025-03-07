@@ -1,5 +1,6 @@
 import telegram
 import re
+import time
 import random
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatAction
@@ -208,7 +209,7 @@ class CommandHandlers:
 
                 # Отправляем отдельное сообщение со ссылками на скачивание
                 download_message = "📥 *Скачать презентацию:*\n\n"
-                
+
                 # Проверяем наличие Replit Object Storage и инициализируем
                 try:
                     from replit.object_storage import Client
@@ -221,7 +222,7 @@ class CommandHandlers:
                 except Exception as storage_init_error:
                     obj_storage_available = False
                     self.logger.error(f"Ошибка при инициализации Object Storage: {storage_init_error}")
-                
+
                 # Проверяем, есть ли файл в Object Storage (если доступно)
                 docx_in_storage = False
                 if obj_storage_available:
@@ -231,7 +232,7 @@ class CommandHandlers:
                         self.logger.info(f"Файл презентации в Object Storage: {docx_in_storage}")
                     except Exception as storage_check_error:
                         self.logger.error(f"Ошибка при проверке файла в Object Storage: {storage_check_error}")
-                
+
                 # Отправляем файл, используя оптимальную стратегию
                 try:
                     # Сначала пытаемся отправить из Object Storage, если возможно
@@ -243,7 +244,7 @@ class CommandHandlers:
                             file_buffer = BytesIO()
                             storage_client.download_to_file('История_России_подробная_презентация.docx', file_buffer)
                             file_buffer.seek(0)
-                            
+
                             # Проверяем размер файла
                             if file_buffer.getbuffer().nbytes > 0:
                                 # Отправляем из буфера
@@ -257,29 +258,29 @@ class CommandHandlers:
                                 )
                                 self.message_manager.save_message_id(update, context, sent_doc.message_id)
                                 self.logger.info("Презентация успешно отправлена из Object Storage")
-                                
+
                             else:
                                 raise ValueError("Файл из Object Storage пуст")
-                                
+
                         except Exception as storage_send_error:
                             self.logger.error(f"Ошибка при отправке из Object Storage: {storage_send_error}")
                             # Переходим к обычному методу отправки
                             raise ValueError("Не удалось отправить из Object Storage")
-                    
+
                     # Если не удалось отправить из Object Storage, пробуем из локального файла
                     if os.path.exists(docx_path) and os.path.getsize(docx_path) > 0:
                         self.logger.info("Отправка презентации из локального файла")
                         with open(docx_path, 'rb') as docx_file:
                             # Читаем содержимое файла
                             file_content = docx_file.read()
-                            
+
                             # Проверяем, что содержимое не пустое
                             if len(file_content) > 0:
                                 # Отправляем документ из буфера памяти
                                 from io import BytesIO
                                 file_obj = BytesIO(file_content)
                                 file_obj.name = 'История_России_подробная_презентация.docx'
-                                
+
                                 # Попытка отправить с установленным таймаутом
                                 sent_doc = context.bot.send_document(
                                     chat_id=update.effective_chat.id,
@@ -290,7 +291,7 @@ class CommandHandlers:
                                 )
                                 self.message_manager.save_message_id(update, context, sent_doc.message_id)
                                 self.logger.info("Презентация успешно отправлена из локального файла")
-                                
+
                                 # Сохраняем в Object Storage для будущего использования, если он доступен
                                 if obj_storage_available and not docx_in_storage:
                                     try:
@@ -303,17 +304,17 @@ class CommandHandlers:
                                 raise ValueError("Локальный файл презентации пуст")
                     else:
                         raise ValueError(f"Локальный файл не существует или пуст: {docx_path}")
-                        
+
                 except Exception as docx_err:
                     self.logger.error(f"Ошибка при отправке DOCX файла: {docx_err}")
-                    
+
                     # Создаем новую презентацию и пробуем отправить еще раз
                     try:
                         self.logger.info("Пересоздание презентации после ошибки")
                         # Пересоздаем презентацию
                         from create_presentation_doc import create_presentation_docx
                         new_docx_path = create_presentation_docx('detailed_presentation.md', 'История_России_новая_презентация.docx')
-                        
+
                         # Сохраняем в Object Storage, если доступно
                         if obj_storage_available:
                             try:
@@ -322,7 +323,7 @@ class CommandHandlers:
                                 self.logger.info("Новая презентация успешно сохранена в Object Storage")
                             except Exception as storage_err:
                                 self.logger.error(f"Ошибка при сохранении файла в Object Storage: {storage_err}")
-                        
+
                         # Отправляем документ
                         self.logger.info("Отправка пересозданной презентации")
                         with open(new_docx_path, 'rb') as new_docx_file:
@@ -335,7 +336,7 @@ class CommandHandlers:
                             )
                             self.message_manager.save_message_id(update, context, sent_doc.message_id)
                             self.logger.info("Пересозданная презентация успешно отправлена")
-                            
+
                     except Exception as retry_err:
                         self.logger.error(f"Повторная ошибка при создании и отправке DOCX: {retry_err}")
                         # Информируем пользователя о проблеме и предлагаем ссылку на меню
@@ -348,7 +349,7 @@ class CommandHandlers:
                 try:
                     md_path = 'detailed_presentation.md'
                     md_in_storage = False
-                    
+
                     # Проверяем наличие MD-файла в Object Storage
                     if obj_storage_available:
                         try:
@@ -356,7 +357,7 @@ class CommandHandlers:
                             self.logger.info(f"MD-файл в Object Storage: {md_in_storage}")
                         except Exception as md_check_error:
                             self.logger.error(f"Ошибка при проверке MD-файла в Object Storage: {md_check_error}")
-                    
+
                     # Пытаемся отправить из Object Storage если возможно
                     if obj_storage_available and md_in_storage:
                         self.logger.info("Отправка MD-файла из Object Storage")
@@ -366,7 +367,7 @@ class CommandHandlers:
                             md_buffer = BytesIO()
                             storage_client.download_to_file(md_path, md_buffer)
                             md_buffer.seek(0)
-                            
+
                             # Проверяем размер файла
                             if md_buffer.getbuffer().nbytes > 0:
                                 # Отправляем из буфера
@@ -382,12 +383,12 @@ class CommandHandlers:
                                 self.logger.info("MD-файл успешно отправлен из Object Storage")
                             else:
                                 raise ValueError("MD-файл из Object Storage пуст")
-                                
+
                         except Exception as md_storage_send_error:
                             self.logger.error(f"Ошибка при отправке MD-файла из Object Storage: {md_storage_send_error}")
                             # Переходим к обычному методу отправки
                             raise ValueError("Не удалось отправить MD-файл из Object Storage")
-                    
+
                     # Если не удалось отправить из Object Storage, пробуем из локального файла
                     if os.path.exists(md_path) and os.path.getsize(md_path) > 0:
                         self.logger.info("Отправка MD-файла из локального хранилища")
@@ -400,7 +401,7 @@ class CommandHandlers:
                                 timeout=30
                             )
                             self.message_manager.save_message_id(update, context, sent_md.message_id)
-                            
+
                             # Сохраняем в Object Storage для будущего использования, если он доступен
                             if obj_storage_available and not md_in_storage:
                                 try:
@@ -411,7 +412,7 @@ class CommandHandlers:
                                     self.logger.error(f"Не удалось сохранить MD-файл в Object Storage: {md_backup_error}")
                     else:
                         raise ValueError(f"Локальный MD-файл не существует или пуст: {md_path}")
-                    
+
                 except Exception as md_err:
                     self.logger.error(f"Ошибка при отправке MD файла: {md_err}")
                     query.message.reply_text(
@@ -680,7 +681,7 @@ class CommandHandlers:
 
                     self.logger.info(f"Пользователь {user_id} получил карту категории {category}")
                 else:
-                    # Если не удалось сгенерировать карту, отправляем стандартную
+                                        # Если не удалось сгенерировать карту, отправляем стандартную
                     default_map_path = 'static/default_map.png'
                     if os.path.exists(default_map_path):
                         try:
@@ -1377,7 +1378,7 @@ class CommandHandlers:
             # Увеличиваем счетчик правильных ответов
             context.user_data['score'] = context.user_data.get('score', 0) + 1
             sent_msg = update.message.reply_text("✅ Правильно!")
-            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+            self.message_manager.save_message_id(update, context, context, sent_msg.message_id)
             self.logger.info(f"Пользователь {user_id} ответил верно на вопрос {current_question+1}")
         else:
             sent_msg = update.message.reply_text(f"❌ Неправильно! Правильный ответ: {correct_answer}")
