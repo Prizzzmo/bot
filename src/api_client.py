@@ -17,7 +17,7 @@ class APIClient:
 
         # Получаем доступные модели
         try:
-            self.models = genai.list_models()
+            self.models = list(genai.list_models())
             self.logger.info(f"Доступно моделей Gemini: {len(self.models)}")
 
             # Выбираем модель для работы (gemini-pro)
