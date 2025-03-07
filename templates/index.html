@@ -1,0 +1,266 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+        }
+        .dashboard-card {
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+        }
+        .stats-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .stats-label {
+            font-size: 1rem;
+            color: #6c757d;
+        }
+        .chart-container {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="mb-4">
+            <h1 class="display-4">Мониторинг исторического бота</h1>
+            <p class="lead">Система мониторинга и управления образовательным ботом по истории России</p>
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <div class="container-fluid">
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav">
+                            <li class="nav-item">
+                                <a class="nav-link active" href="/">Главная</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/logs">Логи</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/statistics">Статистика</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/admin">Администрирование</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/map">Историческая карта</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <div class="row" id="stats-overview">
+            <div class="col-md-3">
+                <div class="card dashboard-card">
+                    <div class="card-body text-center">
+                        <div class="stats-value" id="total-users">-</div>
+                        <div class="stats-label">Всего пользователей</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card dashboard-card">
+                    <div class="card-body text-center">
+                        <div class="stats-value" id="active-users">-</div>
+                        <div class="stats-label">Активных за сутки</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card dashboard-card">
+                    <div class="card-body text-center">
+                        <div class="stats-value" id="total-requests">-</div>
+                        <div class="stats-label">Всего запросов</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card dashboard-card">
+                    <div class="card-body text-center">
+                        <div class="stats-value" id="total-topics">-</div>
+                        <div class="stats-label">Изученных тем</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Активность пользователей</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <img src="/api/chart/daily_activity" class="img-fluid" alt="График активности" id="activity-chart">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Популярные темы</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group" id="popular-topics">
+                            <li class="list-group-item">Загрузка...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Последние логи</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Время</th>
+                                        <th>Уровень</th>
+                                        <th>Сообщение</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-logs">
+                                    <tr>
+                                        <td colspan="3" class="text-center">Загрузка...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="text-center">
+                                <a href="/logs" class="btn btn-primary">Все логи</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Функция для загрузки общей статистики
+        function loadStatistics() {
+            fetch('/api/statistics')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-users').textContent = data.total_users || '0';
+                    document.getElementById('active-users').textContent = data.active_users ? data.active_users.daily : '0';
+                    document.getElementById('total-requests').textContent = data.total_requests || '0';
+                    document.getElementById('total-topics').textContent = data.total_topics || '0';
+                    
+                    // Обновляем список популярных тем
+                    const topicsList = document.getElementById('popular-topics');
+                    topicsList.innerHTML = '';
+                    
+                    if (data.popular_topics && data.popular_topics.length > 0) {
+                        data.popular_topics.forEach(topic => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            li.innerHTML = `
+                                ${topic.name}
+                                <span class="badge bg-primary rounded-pill">${topic.count}</span>
+                            `;
+                            topicsList.appendChild(li);
+                        });
+                    } else {
+                        topicsList.innerHTML = '<li class="list-group-item">Нет данных</li>';
+                    }
+                    
+                    // Обновляем график активности
+                    const activityChart = document.getElementById('activity-chart');
+                    activityChart.src = `/api/chart/daily_activity?t=${new Date().getTime()}`;
+                })
+                .catch(error => {
+                    console.error('Ошибка при загрузке статистики:', error);
+                });
+        }
+        
+        // Функция для загрузки последних логов
+        function loadRecentLogs() {
+            fetch('/api/logs?limit=5')
+                .then(response => response.json())
+                .then(data => {
+                    const logsTable = document.getElementById('recent-logs');
+                    logsTable.innerHTML = '';
+                    
+                    if (data && data.length > 0) {
+                        data.forEach(log => {
+                            const tr = document.createElement('tr');
+                            
+                            // Определяем класс строки в зависимости от уровня лога
+                            if (log.level === 'ERROR') {
+                                tr.className = 'table-danger';
+                            } else if (log.level === 'WARNING') {
+                                tr.className = 'table-warning';
+                            }
+                            
+                            tr.innerHTML = `
+                                <td>${log.timestamp}</td>
+                                <td><span class="badge ${getBadgeClass(log.level)}">${log.level}</span></td>
+                                <td>${log.message}</td>
+                            `;
+                            logsTable.appendChild(tr);
+                        });
+                    } else {
+                        logsTable.innerHTML = '<tr><td colspan="3" class="text-center">Нет доступных логов</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при загрузке логов:', error);
+                });
+        }
+        
+        // Получение класса для значка уровня лога
+        function getBadgeClass(level) {
+            switch (level) {
+                case 'ERROR':
+                    return 'bg-danger';
+                case 'WARNING':
+                    return 'bg-warning text-dark';
+                case 'INFO':
+                    return 'bg-info text-dark';
+                case 'DEBUG':
+                    return 'bg-secondary';
+                default:
+                    return 'bg-primary';
+            }
+        }
+        
+        // Автоматическое обновление данных каждые 30 секунд
+        function startAutoRefresh() {
+            loadStatistics();
+            loadRecentLogs();
+            
+            setInterval(() => {
+                loadStatistics();
+                loadRecentLogs();
+            }, 30000);
+        }
+        
+        // Запускаем автообновление при загрузке страницы
+        document.addEventListener('DOMContentLoaded', startAutoRefresh);
+    </script>
+</body>
+</html>
