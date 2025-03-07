@@ -1,4 +1,3 @@
-
 import random
 import json
 import os
@@ -6,12 +5,12 @@ from datetime import datetime
 
 class HistoryMap:
     """Класс для работы с интерактивной картой исторических событий"""
-    
+
     def __init__(self, logger):
         self.logger = logger
         self.events_file = 'historical_events.json'
         self._ensure_events_file_exists()
-        
+
     def _ensure_events_file_exists(self):
         """Создает файл с историческими событиями, если он не существует"""
         if not os.path.exists(self.events_file):
@@ -84,12 +83,12 @@ class HistoryMap:
                     "Экономические события"
                 ]
             }
-            
+
             with open(self.events_file, 'w', encoding='utf-8') as f:
                 json.dump(default_events, f, ensure_ascii=False, indent=2)
-            
+
             self.logger.info(f"Создан файл с историческими событиями: {self.events_file}")
-    
+
     def get_all_events(self):
         """Возвращает все исторические события"""
         try:
@@ -99,7 +98,7 @@ class HistoryMap:
         except Exception as e:
             self.logger.error(f"Ошибка при чтении файла событий: {e}")
             return []
-            
+
     def get_categories(self):
         """Возвращает список категорий событий"""
         try:
@@ -109,12 +108,12 @@ class HistoryMap:
         except Exception as e:
             self.logger.error(f"Ошибка при чтении категорий: {e}")
             return []
-    
+
     def get_events_by_category(self, category):
         """Возвращает события по указанной категории"""
         events = self.get_all_events()
         return [event for event in events if event.get('category') == category]
-    
+
     def get_event_by_id(self, event_id):
         """Возвращает событие по ID"""
         events = self.get_all_events()
@@ -122,18 +121,18 @@ class HistoryMap:
             if event.get('id') == event_id:
                 return event
         return None
-    
+
     def add_event(self, title, date, description, location, category):
         """Добавляет новое историческое событие"""
         try:
             with open(self.events_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             events = data.get('events', [])
-            
+
             # Генерируем новый ID
             new_id = max([event.get('id', 0) for event in events], default=0) + 1
-            
+
             # Создаем новое событие
             new_event = {
                 "id": new_id,
@@ -143,37 +142,51 @@ class HistoryMap:
                 "location": location,
                 "category": category
             }
-            
+
             # Добавляем событие в список
             events.append(new_event)
             data['events'] = events
-            
+
             # Сохраняем обновленные данные
             with open(self.events_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-                
+
             self.logger.info(f"Добавлено новое историческое событие: {title}")
             return new_id
         except Exception as e:
             self.logger.error(f"Ошибка при добавлении события: {e}")
             return None
-    
+
     def get_random_events(self, count=3):
         """Возвращает случайные исторические события"""
         events = self.get_all_events()
         if len(events) <= count:
             return events
         return random.sample(events, count)
-    
-    def generate_map_url(self, events=None, category=None):
-        """Генерирует URL для просмотра карты с выбранными событиями"""
+
+    def generate_map_url(self, category=None, events=None, timeframe=None):
+        """
+        Генерирует URL для интерактивной карты с дополнительными опциями.
+
+        Args:
+            category (str, optional): Категория событий
+            events (list, optional): Список конкретных событий
+            timeframe (tuple, optional): Временной диапазон в формате (начало, конец) - годы
+
+        Returns:
+            str: URL для просмотра карты
+        """
         base_url = "https://" + os.environ.get("REPL_SLUG", "history-map") + "." + os.environ.get("REPL_OWNER", "repl") + ".repl.co/map"
-        
+
         if category:
             return f"{base_url}?category={category}"
-        
+
         if events:
             event_ids = ','.join(str(event['id']) for event in events)
             return f"{base_url}?events={event_ids}"
-            
+
+        if timeframe:
+            start, end = timeframe
+            return f"{base_url}?timeframe={start}-{end}"
+
         return base_url

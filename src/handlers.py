@@ -691,6 +691,7 @@ class CommandHandlers:
             score = context.user_data.get('score', 0)
             total_questions = len(questions)
             percentage = (score / total_questions) * 100
+            topic = context.user_data.get('current_topic', 'выбранной теме')
 
             # Оценка усвоенного материала
             if percentage >= 90:
@@ -701,10 +702,26 @@ class CommandHandlers:
                 assessment = "👌 Удовлетворительно. Рекомендуется повторить материал."
             else:
                 assessment = "📚 Неудовлетворительно. Тебе стоит изучить тему заново."
-
+                
+            # Получаем рекомендации похожих тем
+            similar_topics = self.recommend_similar_topics(topic, context)
+            
+            # Формируем сообщение с результатами
+            result_message = f"🎯 Тест по теме '*{topic}*' завершен!\n\n"
+            result_message += f"Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n{assessment}\n\n"
+            
+            # Добавляем рекомендации, если они есть
+            if similar_topics:
+                result_message += "📚 *Рекомендуемые темы для изучения:*\n"
+                for i, rec_topic in enumerate(similar_topics, 1):
+                    result_message += f"{i}. {rec_topic}\n"
+                result_message += "\n"
+                
+            result_message += "Выбери следующее действие:"
+            
             update.message.reply_text(
-                f"🎯 Тест завершен! Ты ответил правильно на {score} из {total_questions} вопросов ({percentage:.1f}%).\n\n{assessment}\n\n"
-                "Выбери следующее действие:",
+                result_message,
+                parse_mode='Markdown',
                 reply_markup=self.ui_manager.main_menu()
             )
             self.logger.info(f"Пользователь {user_id} завершил тест с результатом {score}/{total_questions} ({percentage:.1f}%)")
@@ -797,6 +814,40 @@ class CommandHandlers:
     def admin_command(self, update, context):
         """
         Обрабатывает команду /admin для доступа к административной панели.
+
+def recommend_similar_topics(self, current_topic, context):
+    """
+    Рекомендует пользователю похожие темы на основе текущей темы.
+    
+    Args:
+        current_topic (str): Текущая тема пользователя
+        context: Контекст разговора
+        
+    Returns:
+        list: Список рекомендованных тем
+    """
+    try:
+        # Формируем запрос на рекомендацию
+        prompt = f"На основе темы '{current_topic}' предложи 3 связанные темы по истории России, которые могут заинтересовать пользователя. Перечисли их в формате нумерованного списка без дополнительных пояснений."
+        
+        # Получаем ответ от API
+        similar_topics_text = self.api_client.ask_grok(prompt, max_tokens=150, temp=0.4)
+        
+        # Парсим темы
+        similar_topics = []
+        for line in similar_topics_text.split('\n'):
+            # Ищем строки с форматом "1. Тема" или "- Тема"
+            if (line.strip().startswith(('1.', '2.', '3.', '-'))):
+                # Удаляем префикс и лишние пробелы
+                topic = re.sub(r'^[\d\.\-\s]+', '', line).strip()
+                if topic:
+                    similar_topics.append(topic)
+        
+        return similar_topics[:3]  # Возвращаем максимум 3 темы
+    except Exception as e:
+        self.logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
+        return []
+
 
         Args:
             update (telegram.Update): Объект обновления Telegram

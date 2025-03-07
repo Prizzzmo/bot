@@ -1,5 +1,8 @@
 import threading
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
+import logging
+import logging.handlers
+import os
 
 from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
 from src.config import MAP #Added import for MAP constant
@@ -94,7 +97,9 @@ class Bot:
                 self.updater.stop()
 
     def run_log_server(self):
-        """Запускает простой веб-сервер для отображения логов"""
+        """Запускает простой веб-сервер для отображения логов с системой ротации"""
+        # Реализуем ротацию логов для экономии места
+        self.setup_log_rotation()
         from flask import Flask, render_template_string, send_file, request
         import os
         from datetime import datetime
@@ -390,11 +395,31 @@ class Bot:
             self.logger.error(f"Ошибка при запуске веб-сервера логов: {e}")
 
 
+    def setup_log_rotation(self):
+        log_dir = "logs"
+        log_file = os.path.join(log_dir, "bot.log")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        # Configure logging
+        self.logger.setLevel(logging.INFO)  # Set logging level
+        handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5) # 10MB max file size, 5 backups
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+
 class BotManager:
     """Класс для управления запуском бота и его жизненным циклом"""
 
     def __init__(self):
-        self.logger = None
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
 
     def run(self):
         """Запускает основную функцию для инициализации и запуска бота"""

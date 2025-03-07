@@ -1,5 +1,5 @@
 import os
-from src.config import Config
+from src.config import Config, MAP
 from src.logger import Logger
 from src.api_cache import APICache
 from src.api_client import APIClient
@@ -66,6 +66,10 @@ def main():
     api_client = APIClient(config.gemini_api_key, api_cache, logger)
     message_manager = MessageManager(logger)
     content_service = ContentService(api_client, logger)
+    
+    # Инициализируем сервис аналитики
+    from src.analytics import Analytics
+    analytics = Analytics(logger)
 
     # Создаем карту исторических событий
     from src.history_map import HistoryMap
