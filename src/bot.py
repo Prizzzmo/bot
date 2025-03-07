@@ -98,15 +98,42 @@ class Bot:
                 self.updater.stop()
 
     def run_log_server(self):
-        """Запускает простой веб-сервер для отображения логов с системой ротации"""
+        """Запускает оптимизированный веб-сервер для отображения логов с системой ротации"""
         # Реализуем ротацию логов для экономии места
         self.setup_log_rotation()
         from flask import Flask, render_template_string, send_file, request
         import os
         from datetime import datetime
+        from functools import lru_cache
+        import time
 
-        # Создаем приложение Flask
+        # Создаем приложение Flask с оптимизированной настройкой
         app = Flask(__name__)
+        
+        # Кэшируем список логов на 30 секунд для уменьшения нагрузки на файловую систему
+        @lru_cache(maxsize=1)
+        def get_log_files_cached(cache_time):
+            """Возвращает кэшированный список лог-файлов"""
+            cache_key = int(time.time() // 30)  # Обновление каждые 30 секунд
+            log_files = []
+            log_dir = "logs"
+            if os.path.exists(log_dir):
+                for file in os.listdir(log_dir):
+                    if file.startswith('bot_log_') and file.endswith('.log'):
+                        log_path = os.path.join(log_dir, file)
+                        size = os.path.getsize(log_path)
+                        mtime = os.path.getmtime(log_path)
+                        mtime_str = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+                        log_files.append({
+                            'name': file,
+                            'path': log_path,
+                            'size': f"{size / 1024:.1f} KB",
+                            'mtime': mtime_str
+                        })
+            
+            # Сортируем по времени изменения (новые сверху)
+            log_files.sort(key=lambda x: x['name'], reverse=True)
+            return log_files
 
         @app.route('/')
         def index():

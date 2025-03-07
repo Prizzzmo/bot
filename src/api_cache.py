@@ -59,16 +59,23 @@ class APICache:
             self.operation_count = 0
 
     def cleanup_expired(self):
-        """Очистка устаревших элементов кэша по TTL"""
+        """Очистка устаревших элементов кэша по TTL с оптимизацией памяти"""
         current_time = datetime.now().timestamp()
-        keys_to_remove = []
+        keys_to_remove = [key for key, data in self.cache.items() if current_time - data['created_at'] > data['ttl']]
 
-        for key, data in self.cache.items():
-            if current_time - data['created_at'] > data['ttl']:
-                keys_to_remove.append(key)
-
+        # Удаляем устаревшие ключи
         for key in keys_to_remove:
             del self.cache[key]
+
+        # Очищаем кэш, если он слишком большой (>80% от max_size)
+        if len(self.cache) > self.max_size * 0.8:
+            # Сортируем по времени последнего доступа и оставляем только 50% наиболее новых элементов
+            sorted_keys = sorted(self.cache.items(), key=lambda x: x[1]['last_accessed'], reverse=True)
+            keys_to_keep = sorted_keys[:int(self.max_size * 0.5)]
+            
+            # Обновляем кэш только нужными элементами
+            new_cache = {k: self.cache[k] for k, _ in keys_to_keep}
+            self.cache = new_cache
 
         if keys_to_remove:
             self.logger.info(f"Удалено {len(keys_to_remove)} устаревших элементов из кэша")

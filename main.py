@@ -26,20 +26,27 @@ def main():
 
     # Загружаем конфигурацию
     config = Config()
-
+    
+    # Создаем пул процессов для асинхронных и тяжелых задач
+    from concurrent.futures import ThreadPoolExecutor
+    # Ограничиваем количество потоков для экономии ресурсов
+    thread_pool = ThreadPoolExecutor(max_workers=3)
+    
     # Создаем необходимые сервисы
     ui_manager = UIManager(logger)
-    # Создаем кэш для API запросов
-    api_cache = APICache(logger)
+    # Создаем кэш для API запросов с оптимизированными параметрами
+    api_cache = APICache(logger, max_size=200, save_interval=10)
     api_client = APIClient(config.gemini_api_key, api_cache, logger)
     message_manager = MessageManager(logger)
+    # Передаем пул потоков в сервис контента для асинхронных операций
     content_service = ContentService(api_client, logger)
+    content_service.thread_pool = thread_pool
 
     # Инициализируем сервис аналитики
     from src.analytics import Analytics
     analytics = Analytics(logger)
 
-    # Создаем карту исторических событий
+    # Создаем карту исторических событий с ленивой загрузкой
     from src.history_map import HistoryMap
     history_map = HistoryMap(logger)
 

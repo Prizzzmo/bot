@@ -99,30 +99,32 @@ class ContentService:
         return messages
     
     def generate_test(self, topic):
-        """Генерирует тест по заданной теме"""
-        prompt = f"Составь 15 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <цифра>'. Каждый вопрос должен заканчиваться строкой '---'."
+        """Генерирует тест по заданной теме с оптимизацией"""
+        # Уменьшаем количество запрашиваемых вопросов для снижения нагрузки
+        prompt = f"Составь 10 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса с вариантами ответов укажи правильный ответ в формате 'Правильный ответ: <цифра>'. Каждый вопрос должен заканчиваться строкой '---'."
         try:
-            # Увеличиваем лимит токенов для получения полных вопросов
-            questions = self.api_client.ask_grok(prompt, max_tokens=2048)
+            # Оптимизируем запрос, используем кэш если возможно
+            questions = self.api_client.ask_grok(prompt, max_tokens=1500, temp=0.2)
 
-            # Очистка и валидация вопросов
+            # Используем более эффективное разделение вопросов
             question_list = [q.strip() for q in questions.split('---') if q.strip()]
-
-            # Проверка наличия правильных ответов в каждом вопросе
+            
+            # Оптимизированная фильтрация валидных вопросов
             valid_questions = []
+            display_questions = []
+            
+            regexp = re.compile(r"Правильный ответ:\s*(\d+)")
+            
             for q in question_list:
                 if 'Правильный ответ:' in q:
                     valid_questions.append(q)
-
-            if not valid_questions:
-                raise ValueError("Не удалось сгенерировать корректные вопросы для теста")
-
-            # Очищаем правильные ответы из текста вопросов для отображения пользователю
-            display_questions = []
-            for q in valid_questions:
-                # Удаляем строку с правильным ответом из текста вопроса
-                cleaned_q = re.sub(r"Правильный ответ:\s*\d+", "", q).strip()
-                display_questions.append(cleaned_q)
+                    # Сразу создаем очищенный вопрос для отображения
+                    cleaned_q = regexp.sub("", q).strip()
+                    display_questions.append(cleaned_q)
+            
+            # Проверка наличия достаточного количества вопросов
+            if len(valid_questions) < 5:
+                raise ValueError("Недостаточно корректных вопросов для теста")
 
             return {
                 'original_questions': valid_questions,
@@ -130,4 +132,18 @@ class ContentService:
             }
         except Exception as e:
             self.logger.error(f"Ошибка при генерации теста: {e}")
-            raise e
+            # Пробуем запросить меньше вопросов при ошибке
+            try:
+                fallback_prompt = f"Составь 5 вопросов с вариантами ответа (1, 2, 3, 4) по теме '{topic}' в истории России. После каждого вопроса укажи 'Правильный ответ: <цифра>'."
+                questions = self.api_client.ask_grok(fallback_prompt, max_tokens=800, temp=0.1)
+                
+                # Минимальная обработка
+                valid_questions = [q for q in questions.split('\n\n') if 'Правильный ответ:' in q]
+                display_questions = [re.sub(r"Правильный ответ:\s*\d+", "", q).strip() for q in valid_questions]
+                
+                return {
+                    'original_questions': valid_questions,
+                    'display_questions': display_questions
+                }
+            except:
+                raise e  # Если и резервный вариант не сработал, пробрасываем исходную ошибку

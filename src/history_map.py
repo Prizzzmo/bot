@@ -9,6 +9,8 @@ class HistoryMap:
     def __init__(self, logger):
         self.logger = logger
         self.events_file = 'historical_events.json'
+        self.events = None  # Ленивая загрузка данных
+        self._events_loaded = False
         self._ensure_events_file_exists()
 
     def _ensure_events_file_exists(self):
@@ -89,15 +91,33 @@ class HistoryMap:
 
             self.logger.info(f"Создан файл с историческими событиями: {self.events_file}")
 
+    def _load_events(self):
+        """Загружает события из JSON файла с отложенной загрузкой"""
+        if self._events_loaded:
+            return self.events
+
+        try:
+            with open('historical_events.json', 'r', encoding='utf-8') as f:
+                self.events = json.load(f)
+                self._events_loaded = True
+                self.logger.info(f"Загружено {len(self.events)} исторических событий")
+                return self.events
+        except Exception as e:
+            self.logger.error(f"Ошибка при загрузке исторических событий: {e}")
+            self.events = []
+            self._events_loaded = True
+            return self.events
+
+    @property
+    def events_data(self):
+        """Свойство для получения данных событий с ленивой загрузкой"""
+        if not self._events_loaded:
+            return self._load_events()
+        return self.events
+
     def get_all_events(self):
         """Возвращает все исторические события"""
-        try:
-            with open(self.events_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get('events', [])
-        except Exception as e:
-            self.logger.error(f"Ошибка при чтении файла событий: {e}")
-            return []
+        return self.events_data
 
     def get_categories(self):
         """Возвращает список категорий событий"""
@@ -152,6 +172,7 @@ class HistoryMap:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
             self.logger.info(f"Добавлено новое историческое событие: {title}")
+            self._events_loaded = False #Invalidate cache
             return new_id
         except Exception as e:
             self.logger.error(f"Ошибка при добавлении события: {e}")
