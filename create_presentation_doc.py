@@ -173,12 +173,22 @@ def create_presentation_docx(md_file_path, output_docx_path):
                 code_run = code_paragraph.add_run(code_text)
                 code_run.font.name = 'Courier New'
                 code_run.font.size = Pt(10)
-                code_paragraph.style = doc.styles.add_style('CodeBlock', docx.enum.style.WD_STYLE_TYPE.PARAGRAPH)
-                code_paragraph.style.font.name = 'Courier New'
-                code_paragraph.style.font.size = Pt(10)
-                code_paragraph.paragraph_format.space_before = Pt(6)
-                code_paragraph.paragraph_format.space_after = Pt(6)
-                code_paragraph.paragraph_format.left_indent = Inches(0.5)
+                
+                # Check if style already exists
+                code_style_name = 'CodeBlock'
+                try:
+                    code_style = doc.styles[code_style_name]
+                except KeyError:
+                    # Create style if it doesn't exist
+                    code_style = doc.styles.add_style(code_style_name, docx.enum.style.WD_STYLE_TYPE.PARAGRAPH)
+                    code_style.font.name = 'Courier New'
+                    code_style.font.size = Pt(10)
+                    code_style.paragraph_format.space_before = Pt(6)
+                    code_style.paragraph_format.space_after = Pt(6)
+                    code_style.paragraph_format.left_indent = Inches(0.5)
+                
+                # Apply the style
+                code_paragraph.style = code_style
                 
                 # Создаем серый фон для блока кода
                 for paragraph in doc.paragraphs:
