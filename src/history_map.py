@@ -378,16 +378,27 @@ class HistoryMap:
             str: Путь к сгенерированному изображению карты или None в случае ошибки
         """
         try:
+            # Проверяем наличие событий для отображения
+            display_events = self._get_display_events(category, events, timeframe)
+            if not display_events:
+                self.logger.warning("Не найдено событий для отображения на карте")
+                return None
+                
             # Импортируем и устанавливаем неинтерактивный бэкенд до импорта plt
             import matplotlib
             matplotlib.use('Agg')  # Используем Agg бэкенд, который не требует GUI
             
-            import matplotlib.pyplot as plt
-            from matplotlib.figure import Figure
-            from mpl_toolkits.basemap import Basemap
-            import numpy as np
-            from matplotlib.patches import Polygon
-            from matplotlib.collections import PatchCollection
+            # Импортируем необходимые модули с проверкой
+            try:
+                import matplotlib.pyplot as plt
+                from matplotlib.figure import Figure
+                from mpl_toolkits.basemap import Basemap
+                import numpy as np
+                from matplotlib.patches import Polygon
+                from matplotlib.collections import PatchCollection
+            except ImportError as e:
+                self.logger.error(f"Ошибка импорта библиотек для генерации карты: {e}")
+                raise ImportError(f"Отсутствует необходимая библиотека: {e}")
             
             # Получаем события для отображения
             display_events = self._get_display_events(category, events, timeframe)
@@ -549,7 +560,139 @@ class HistoryMap:
             return map_image_path
         except (ImportError, Exception) as e:
             self.logger.error(f"Не удалось сгенерировать изображение с помощью matplotlib: {e}")
+            # Пробуем использовать простую альтернативную генерацию карты
+            try:
+                return self._generate_simple_map(category, events, timeframe)
+            except Exception as alt_error:
+                self.logger.error(f"Не удалось сгенерировать даже простую карту: {alt_error}")
+                return None
+                
+    def _generate_simple_map(self, category=None, events=None, timeframe=None):
+        """
+        Генерирует простую карту без использования сложных библиотек (резервный метод).
+        
+        Args:
+            category (str, optional): Категория событий
+            events (list, optional): Список конкретных событий
+            timeframe (tuple, optional): Временной диапазон
+            
+        Returns:
+            str: Путь к сгенерированному изображению карты
+        """
+        from PIL import Image, ImageDraw, ImageFont
+        import os
+        import time
+        
+        # Получаем события для отображения
+        display_events = self._get_display_events(category, events, timeframe)
+        if not display_events:
+            # Если нет событий, возвращаем стандартную карту
+            static_map_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                                          'static', 'default_map.png')
+            if os.path.exists(static_map_path):
+                return static_map_path
             return None
+            
+        # Создаем уникальное имя файла
+        timestamp = int(time.time())
+        output_path = f"generated_maps/map_{timestamp}_simple.png"
+        
+        # Загружаем базовое изображение карты России
+        base_map_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                                    'static', 'default_map.png')
+        
+        if not os.path.exists(base_map_path):
+            self.logger.error("Базовая карта не найдена")
+            return None
+            
+        # Открываем базовое изображение
+        base_map = Image.open(base_map_path)
+        
+        # Создаем объект для рисования
+        draw = ImageDraw.Draw(base_map)
+        
+        # Пробуем загрузить шрифт, если не получается - используем стандартный
+        try:
+            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+            title_font = ImageFont.truetype(font_path, 24)
+            location_font = ImageFont.truetype(font_path, 16)
+            footnote_font = ImageFont.truetype(font_path, 12)
+        except (OSError, IOError):
+            self.logger.warning("Не удалось загрузить шрифт, используем стандартный")
+            title_font = ImageFont.load_default()
+            location_font = ImageFont.load_default()
+            footnote_font = ImageFont.load_default()
+        
+        # Получаем размеры карты
+        width, height = base_map.size
+        
+        # Добавляем заголовок
+        title = "Карта исторических событий России"
+        if category:
+            title += f" - {category}"
+        
+        draw.text((width//2, 30), title, fill=(0, 0, 0), font=title_font, anchor="mt")
+        
+        # Упрощенная система координат (преобразование географических координат в пиксели изображения)
+        # Россия примерно от 19° до 190° долготы и от 40° до 83° широты
+        def geo_to_pixel(lat, lng):
+            # Очень грубое преобразование, но для простого отображения подойдет
+            px = int((lng - 19) / (190 - 19) * width)
+            py = int(height - (lat - 40) / (83 - 40) * height)
+            return px, py
+        
+        # Отображаем события на карте
+        footnotes = []
+        
+        # Цвета для точек
+        colors = [(255, 0, 0), (0, 0, 255), (0, 128, 0), (128, 0, 128), 
+                 (0, 128, 128), (255, 165, 0), (128, 128, 128)]
+                 
+        for i, event in enumerate(display_events, 1):
+            try:
+                lat = event.get('location', {}).get('lat', 0)
+                lng = event.get('location', {}).get('lng', 0)
+                title = event.get('title', 'Неизвестное событие')
+                desc = event.get('description', '')
+                date = event.get('date', '')
+                
+                # Преобразуем координаты
+                px, py = geo_to_pixel(lat, lng)
+                
+                # Определяем цвет для события
+                color = colors[i % len(colors)]
+                
+                # Рисуем точку
+                dot_radius = 5
+                draw.ellipse((px-dot_radius, py-dot_radius, px+dot_radius, py+dot_radius), 
+                            fill=color, outline=(0, 0, 0))
+                
+                # Рисуем номер события
+                draw.text((px, py-15), str(i), fill=(0, 0, 0), font=location_font)
+                
+                # Добавляем сноску
+                year = date.split('-')[0] if '-' in date else date
+                footnote = f"{i}. {title} ({year}): {desc}"
+                footnotes.append(footnote)
+            except Exception as e:
+                self.logger.warning(f"Ошибка отображения события {event.get('title')}: {e}")
+        
+        # Добавляем сноски
+        footer_y = height - 10 - (len(footnotes) * 15)
+        draw.rectangle((10, footer_y-10, width-10, height-10), 
+                      fill=(255, 255, 255, 220), outline=(0, 0, 0))
+        
+        for i, footnote in enumerate(footnotes):
+            # Обрезаем слишком длинные сноски
+            if len(footnote) > 80:
+                footnote = footnote[:77] + "..."
+            draw.text((20, footer_y + i*15), footnote, fill=(0, 0, 0), font=footnote_font)
+        
+        # Сохраняем изображение
+        base_map.save(output_path)
+        self.logger.info(f"Создана простая карта: {output_path}")
+        
+        return output_path
             
     def generate_map_by_topic(self, topic):
         """

@@ -357,19 +357,48 @@ class CommandHandlers:
 
                 if map_path and os.path.exists(map_path):
                     # Отправляем изображение
-                    with open(map_path, 'rb') as img_file:
-                        context.bot.send_photo(
-                            chat_id=user_id,
-                            photo=img_file,
-                            caption=f"🗺️ Карта исторических событий категории «{category}»",
-                            parse_mode='HTML'
-                        )
+                    try:
+                        with open(map_path, 'rb') as img_file:
+                            context.bot.send_photo(
+                                chat_id=user_id,
+                                photo=img_file,
+                                caption=f"🗺️ Карта исторических событий категории «{category}»",
+                                parse_mode='HTML'
+                            )
+                    except Exception as img_error:
+                        self.logger.error(f"Ошибка при отправке изображения карты: {img_error}")
+                        # Пробуем отправить резервное стандартное изображение
+                        default_map_path = 'static/default_map.png'
+                        if os.path.exists(default_map_path):
+                            try:
+                                with open(default_map_path, 'rb') as default_img:
+                                    context.bot.send_photo(
+                                        chat_id=user_id,
+                                        photo=default_img,
+                                        caption=f"🗺️ Стандартная карта (не удалось сгенерировать специальную карту для категории «{category}»)",
+                                        parse_mode='HTML'
+                                    )
+                            except Exception as e:
+                                context.bot.send_message(
+                                    chat_id=user_id,
+                                    text=f"❌ Произошла ошибка при отправке карты: {str(e)}",
+                                    parse_mode='HTML'
+                                )
+                        else:
+                            context.bot.send_message(
+                                chat_id=user_id,
+                                text=f"❌ Не удалось сгенерировать и отправить карту.",
+                                parse_mode='HTML'
+                            )
 
                     # Удаляем сообщение о генерации
-                    context.bot.delete_message(
-                        chat_id=user_id,
-                        message_id=status_message.message_id
-                    )
+                    try:
+                        context.bot.delete_message(
+                            chat_id=user_id,
+                            message_id=status_message.message_id
+                        )
+                    except Exception as delete_error:
+                        self.logger.error(f"Не удалось удалить сообщение о генерации: {delete_error}")
 
                     # Удаляем файл карты после отправки
                     try:
@@ -380,12 +409,29 @@ class CommandHandlers:
 
                     self.logger.info(f"Пользователь {user_id} получил карту категории {category}")
                 else:
-                    # Если не удалось сгенерировать карту
-                    context.bot.send_message(
-                        chat_id=user_id,
-                        text=f"❌ Не удалось сгенерировать карту для категории «{category}». Пожалуйста, попробуйте позже.",
-                        parse_mode='HTML'
-                    )
+                    # Если не удалось сгенерировать карту, отправляем стандартную
+                    default_map_path = 'static/default_map.png'
+                    if os.path.exists(default_map_path):
+                        try:
+                            with open(default_map_path, 'rb') as default_img:
+                                context.bot.send_photo(
+                                    chat_id=user_id,
+                                    photo=default_img,
+                                    caption=f"🗺️ Стандартная карта (не удалось сгенерировать специальную карту для категории «{category}»)",
+                                    parse_mode='HTML'
+                                )
+                        except Exception as e:
+                            context.bot.send_message(
+                                chat_id=user_id,
+                                text=f"❌ Не удалось отправить карту: {str(e)}",
+                                parse_mode='HTML'
+                            )
+                    else:
+                        context.bot.send_message(
+                            chat_id=user_id,
+                            text=f"❌ Не удалось сгенерировать карту для категории «{category}». Пожалуйста, попробуйте позже.",
+                            parse_mode='HTML'
+                        )
 
                     # Удаляем сообщение о генерации
                     context.bot.delete_message(
