@@ -33,8 +33,26 @@ class Config:
     """Класс для работы с конфигурацией приложения"""
 
     def __init__(self):
-        self.telegram_token = os.getenv("TELEGRAM_TOKEN")
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        """
+        Инициализация конфигурации с загрузкой параметров
+        из переменных окружения и .env файла
+        """
+        load_dotenv()  # Загружаем переменные из .env файла
+
+        # Базовая конфигурация
+        self.telegram_token = os.getenv('TELEGRAM_TOKEN', '')
+        self.gemini_api_key = os.getenv('GEMINI_API_KEY', '')
+        self.allow_subscribers = os.getenv('ALLOW_SUBSCRIBERS', 'true').lower() == 'true'
+        self.admin_config_file = os.getenv('ADMIN_CONFIG_FILE', 'admins.json')
+        self.log_level = os.getenv('LOG_LEVEL', 'warning').upper()
+
+        # Конфигурация для распределенного кэширования
+        self.use_distributed_cache = os.getenv('USE_DISTRIBUTED_CACHE', 'false').lower() == 'true'
+        self.redis_url = os.getenv('REDIS_URL', '')
+
+        # Конфигурация для мониторинга производительности
+        self.enable_performance_monitoring = os.getenv('ENABLE_PERFORMANCE_MONITORING', 'true').lower() == 'true'
+        self.metrics_file = os.getenv('METRICS_FILE', 'performance_metrics.json')
 
     def validate(self):
         """Проверка наличия и валидности токенов"""

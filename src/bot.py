@@ -1,4 +1,5 @@
 import threading
+import time
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 import logging
 import logging.handlers
@@ -18,13 +19,13 @@ class Bot:
         self.updater = None
         self.test_service = test_service
         self.topic_service = topic_service
-        
+
         # Сервисы бота
         self.api_client = api_client
         self.analytics = analytics
         self.history_map_service = history_map_service
         self.text_cache_service = text_cache_service
-        
+
         # Контейнер сервисов, будет установлен из фабрики
         self.service_container = None
 
