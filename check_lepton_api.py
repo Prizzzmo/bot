@@ -1,45 +1,47 @@
 
-import requests
 import json
+import os
+from leptonai.client import Client
 
 def check_lepton_api(api_key):
     """
     Проверяет работоспособность Lepton API с использованием предоставленного ключа.
+    Использует официальную библиотеку leptonai для более надежного соединения.
     """
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    # Эндпоинт API Lepton
-    url = "https://api.lepton.ai/api/v1/completions"
-    
-    # Тестовый запрос к API
-    payload = {
-        "model": "meta-llama/Llama-3-8b-chat-hf",  # Используем Llama-3 модель
-        "prompt": "Расскажи кратко, что такое Lepton AI?",
-        "max_tokens": 150,
-        "temperature": 0.7
-    }
+    os.environ["LEPTON_API_TOKEN"] = api_key
     
     print(f"Проверка API Lepton с ключом: {api_key[:5]}...{api_key[-5:]}")
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        # Создаем клиент Lepton
+        client = Client(api_key=api_key)
         
-        if response.status_code == 200:
-            result = response.json()
-            print("\n✅ API ключ работает!")
-            print(f"Статус код: {response.status_code}")
-            print("\nТекст ответа:")
-            if "choices" in result and len(result["choices"]) > 0:
-                print(result["choices"][0]["text"].strip())
-            else:
-                print(json.dumps(result, indent=2, ensure_ascii=False))
-            return True
+        # Проверяем доступность API
+        models = client.list_models()
+        
+        print("\n✅ API ключ работает!")
+        print("\nДоступные модели:")
+        for model in models:
+            print(f" - {model}")
+        
+        # Тестовый запрос к модели
+        prompt = "Расскажи кратко, что такое Lepton AI?"
+        print(f"\nОтправка тестового запроса к модели: {models[0] if models else 'meta-llama/Llama-3-8b-chat-hf'}")
+        
+        response = client.completion(
+            model=models[0] if models else "meta-llama/Llama-3-8b-chat-hf",
+            prompt=prompt,
+            max_tokens=150,
+            temperature=0.7
+        )
+        
+        print("\nТекст ответа:")
+        if "choices" in response and len(response["choices"]) > 0:
+            print(response["choices"][0]["text"].strip())
         else:
-            print(f"\n❌ Ошибка API: {response.status_code}")
-            print(response.text)
-            return False
+            print(json.dumps(response, indent=2, ensure_ascii=False))
+        
+        return True
+        
     except Exception as e:
         print(f"\n❌ Исключение при обращении к API: {e}")
         return False
