@@ -35,14 +35,26 @@ class HistoryMap(BaseService):
             bool: True если инициализация прошла успешно, иначе False
         """
         try:
-            # Проверяем доступность файла исторических событий
-            if not self._ensure_events_file_exists():
-                return False
-
+            # Проверяем доступность файла исторических событий и создаем его, если необходимо
+            self._ensure_events_file_exists()
+            
+            # Проверяем, что данные событий загружены
+            if not self.events_data or not self.events_data.get("events"):
+                self.events_data = self._load_events_data()
+                if not self.events_data or not self.events_data.get("events"):
+                    self._logger.warning("Не удалось загрузить данные о исторических событиях")
+                    # Продолжаем работу, т.к. метод _ensure_events_file_exists создаст файл с дефолтными данными
+            
             # Проверяем доступность директории для карт
             if not os.path.exists('generated_maps'):
                 os.makedirs('generated_maps', exist_ok=True)
-
+                self._logger.info("Создана директория для карт: generated_maps")
+            
+            # Создаем директорию для статических ресурсов, если она не существует
+            if not os.path.exists('static'):
+                os.makedirs('static', exist_ok=True)
+                self._logger.info("Создана директория для статических ресурсов: static")
+            
             return True
         except Exception as e:
             self._logger.error(f"Ошибка при инициализации HistoryMap: {e}")
