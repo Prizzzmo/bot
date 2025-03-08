@@ -9,6 +9,10 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
+from gemini_api_keys import GEMINI_API_KEYS, get_random_key
+
+# Индекс текущего API ключа
+current_key_index = 0
 
 def ensure_directories():
     """Создает все необходимые директории для работы скрипта"""
@@ -27,17 +31,6 @@ def ensure_directories():
 
 # Создаем все необходимые директории
 ensure_directories()
-
-# Загружаем переменные окружения из .env файла
-load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("API ключ Gemini не найден. Проверьте файл .env.")
-
-# Настраиваем клиент Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.0-flash')
 
 # Путь к файлу базы данных
 DB_FILE = "history_db_generator/russian_history_database.json"
@@ -66,9 +59,44 @@ def hash_string(text):
     """Создает хеш строки для использования в идентификаторах."""
     return hashlib.md5(text.encode()).hexdigest()[:8]
 
+def initialize_gemini_client(api_key):
+    """
+    Инициализирует клиент Gemini с указанным API ключом.
+    
+    Args:
+        api_key: Ключ API для Gemini
+        
+    Returns:
+        Model: Инициализированная модель Gemini
+    """
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel('gemini-2.0-flash')
+
+def get_next_api_key():
+    """
+    Получает следующий API ключ из списка ключей.
+    
+    Returns:
+        str: Следующий API ключ
+        int: Индекс выбранного ключа
+    """
+    global current_key_index
+    
+    # Переходим к следующему ключу
+    current_key_index = (current_key_index + 1) % len(GEMINI_API_KEYS)
+    new_key = GEMINI_API_KEYS[current_key_index]
+    
+    print(f"Переключение на API ключ {current_key_index+1}/{len(GEMINI_API_KEYS)}: {new_key[:5]}...{new_key[-5:]}")
+    return new_key, current_key_index
+
+# Инициализируем клиент Gemini с первым ключом API
+current_api_key = GEMINI_API_KEYS[current_key_index]
+print(f"Используется API ключ {current_key_index+1}/{len(GEMINI_API_KEYS)}: {current_api_key[:5]}...{current_api_key[-5:]}")
+model = initialize_gemini_client(current_api_key)
+
 def call_gemini_api(prompt, temperature=0.3, max_output_tokens=1024, retry_count=5, retry_delay=10):
     """
-    Отправляет запрос к API Gemini с механизмом повторных попыток.
+    Отправляет запрос к API Gemini с механизмом повторных попыток и ротацией ключей API.
     
     Args:
         prompt: Текст запроса
@@ -80,6 +108,8 @@ def call_gemini_api(prompt, temperature=0.3, max_output_tokens=1024, retry_count
     Returns:
         str: Ответ от модели
     """
+    global model, current_api_key, current_key_index
+    
     generation_config = {
         "temperature": temperature,
         "max_output_tokens": max_output_tokens,
@@ -87,7 +117,11 @@ def call_gemini_api(prompt, temperature=0.3, max_output_tokens=1024, retry_count
         "top_k": 40,
     }
     
-    for attempt in range(retry_count):
+    # Счетчик смены ключей API
+    key_rotation_count = 0
+    max_key_rotations = len(GEMINI_API_KEYS) * 2  # Максимальное количество ротаций ключей
+    
+    for attempt in range(retry_count * len(GEMINI_API_KEYS)):  # Увеличиваем количество попыток
         try:
             # Добавляем базовую задержку между запросами для соблюдения rate limits
             if attempt > 0:
@@ -97,26 +131,44 @@ def call_gemini_api(prompt, temperature=0.3, max_output_tokens=1024, retry_count
             return response.text
         except Exception as e:
             error_str = str(e).lower()
-            print(f"Ошибка при запросе к API (попытка {attempt+1}/{retry_count}): {e}")
+            print(f"Ошибка при запросе к API (попытка {attempt+1}/{retry_count * len(GEMINI_API_KEYS)}): {e}")
             
-            if attempt < retry_count - 1:
-                # Используем разные стратегии задержки в зависимости от типа ошибки
+            # При ошибках квоты, ограничения запросов или других сбоях API - ротируем ключи
+            if "quota" in error_str or "exhausted" in error_str or "rate" in error_str or "limit" in error_str or "error" in error_str:
+                # Если мы не превысили лимит ротаций
+                if key_rotation_count < max_key_rotations:
+                    # Получаем следующий ключ API
+                    current_api_key, current_key_index = get_next_api_key()
+                    
+                    # Инициализируем клиент с новым ключом
+                    model = initialize_gemini_client(current_api_key)
+                    
+                    print(f"Переключение на ключ API {current_key_index+1}/{len(GEMINI_API_KEYS)}")
+                    key_rotation_count += 1
+                    
+                    # Добавляем небольшую задержку перед повторной попыткой
+                    time.sleep(3)
+                    continue
+            
+            # Если достигли последнего ключа API или это другая ошибка, пробуем стандартную стратегию задержки
+            if attempt < retry_count * len(GEMINI_API_KEYS) - 1:
+                # Определяем стратегию задержки в зависимости от типа ошибки
                 if "quota" in error_str or "exhausted" in error_str or "rate" in error_str:
                     # Для ошибок квоты делаем более длительную задержку
-                    delay = retry_delay * (3 ** attempt)  # Более агрессивная экспоненциальная задержка
+                    delay = retry_delay * (2 ** min(attempt % retry_count, 3))  # Ограничиваем экспоненциальный рост
                     print(f"Превышен лимит запросов. Повторная попытка через {delay} секунд...")
                 else:
                     # Для других ошибок - стандартная задержка
-                    delay = retry_delay * (2 ** attempt)
+                    delay = retry_delay * (2 ** min(attempt % retry_count, 2))
                     print(f"Повторная попытка через {delay} секунд...")
                     
                 time.sleep(delay)
             else:
-                print(f"Не удалось получить ответ после {retry_count} попыток.")
+                print(f"Не удалось получить ответ после {retry_count * len(GEMINI_API_KEYS)} попыток и ротации всех API ключей.")
                 
                 # Если это ошибка квоты, рекомендуем более длительную паузу
                 if "quota" in error_str or "exhausted" in error_str:
-                    print("Рекомендуется сделать паузу на несколько часов из-за исчерпания лимита API.")
+                    print("Рекомендуется сделать паузу на несколько часов из-за исчерпания лимита всех API ключей.")
                     
                 return ""
 
@@ -795,7 +847,7 @@ def generate_database():
 
 if __name__ == "__main__":
     print("=== Генератор базы данных исторических событий России ===")
-    print(f"Используется API ключ: {GEMINI_API_KEY[:5]}...{GEMINI_API_KEY[-5:]}")
+    print(f"Доступно {len(GEMINI_API_KEYS)} API ключей для Gemini")
     print(f"Файл базы данных: {DB_FILE}")
     
     try:
