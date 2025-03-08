@@ -124,9 +124,9 @@ class BotFactory:
         )
         container.register("web_server", web_server)
 
-        #Data Migration Initialization (Added)
-        data_migration = DataMigration(logger, config) # Added line
-        container.register("data_migration", data_migration) #Added line
+        #Data Migration Initialization
+        data_migration = DataMigration(logger) # Use default data directory
+        container.register("data_migration", data_migration)
 
         # Инициализируем все сервисы
         logger.info("Инициализация всех сервисов...")
