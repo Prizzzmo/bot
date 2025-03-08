@@ -347,8 +347,8 @@ class HistoryMap(BaseService):
                     return None
 
             # Создаем уникальное имя файла для изображения с проверкой на доступность
-                timestamp = int(time.time())
-                map_image_path = f"generated_maps/map_{timestamp}.png"
+            timestamp = int(time.time())
+            map_image_path = f"generated_maps/map_{timestamp}.png"
 
             # Проверяем, что директория существует и доступна для записи
             if not os.access('generated_maps', os.W_OK):
