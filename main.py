@@ -1,4 +1,3 @@
-
 """
 Главный модуль для запуска образовательного Telegram бота по истории России.
 
@@ -17,11 +16,13 @@ from dotenv import load_dotenv
 
 from src.config import Config
 from src.factory import BotFactory
+# Added for data migration
+from src.data_migration import DataMigration # Placeholder -  needs actual implementation
 
 def main():
     """
     Главная функция для инициализации и запуска бота.
-    
+
     Выполняет следующие шаги:
     1. Загружает переменные окружения
     2. Настраивает базовое логирование
@@ -30,7 +31,7 @@ def main():
     5. Настраивает и запускает бота
     """
     logger = None
-    
+
     try:
         # Загружаем переменные окружения из .env файла
         load_dotenv()
@@ -71,6 +72,14 @@ def main():
             logger.error("Ошибка при настройке бота!")
             return
 
+        # Проверяем необходимость миграции данных
+        data_migration = DataMigration(logger) # Placeholder - needs actual implementation
+        if data_migration.check_and_migrate():
+            logger.info("Миграция данных успешно завершена или не требовалась")
+        else:
+            logger.warning("Возникли проблемы при миграции данных, проверьте логи")
+
+
         # Запускаем бота напрямую в основном потоке
         bot.run()
 
@@ -83,7 +92,7 @@ def main():
         else:
             print(f"Критическая ошибка: {e}")
             print(traceback.format_exc())
-        
+
         # Завершаем процесс с кодом ошибки
         sys.exit(1)
 

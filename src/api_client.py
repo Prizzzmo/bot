@@ -166,13 +166,31 @@ class APIClient(BaseService):
                 return result
 
             except Exception as e:
-                self._logger.warning(f"Ошибка запроса к Gemini API (попытка {attempt+1}/{max_retries}): {e}")
-                if attempt < max_retries - 1:
-                    # Используем более эффективную задержку
-                    time.sleep(retry_delay * (2 ** attempt))  # Экспоненциальная задержка с base 2
+                error_type = type(e).__name__
+                error_details = str(e)
+                
+                # Classify error for better handling
+                if "quota" in error_details.lower() or "rate" in error_details.lower():
+                    self._logger.warning(f"Превышен лимит запросов к Gemini API (попытка {attempt+1}/{max_retries}): {error_type} - {error_details}")
+                    retry_delay_extended = retry_delay * (3 ** attempt)  # Более длительная задержка для rate-limiting
+                elif "timeout" in error_type.lower() or "timeout" in error_details.lower():
+                    self._logger.warning(f"Таймаут запроса к Gemini API (попытка {attempt+1}/{max_retries}): {error_details}")
+                    retry_delay_extended = retry_delay * (2 ** attempt)
+                elif "connection" in error_type.lower() or "network" in error_details.lower():
+                    self._logger.warning(f"Проблема сетевого подключения к Gemini API (попытка {attempt+1}/{max_retries}): {error_details}")
+                    retry_delay_extended = retry_delay * (2 ** attempt)
                 else:
-                    self._logger.error(f"Не удалось получить ответ от Gemini API после {max_retries} попыток: {e}")
-                    raise
+                    self._logger.warning(f"Ошибка запроса к Gemini API (попытка {attempt+1}/{max_retries}): {error_type} - {error_details}")
+                    retry_delay_extended = retry_delay * (2 ** attempt)
+                
+                if attempt < max_retries - 1:
+                    # Применяем стратегию отступа в зависимости от типа ошибки
+                    self._logger.info(f"Повторная попытка через {retry_delay_extended} секунд")
+                    time.sleep(retry_delay_extended)
+                else:
+                    self._logger.error(f"Не удалось получить ответ от Gemini API после {max_retries} попыток: {error_type} - {error_details}")
+                    # Создаем более информативное исключение
+                    raise Exception(f"Исчерпаны попытки запроса к Gemini API: {error_type} - {error_details}")
 
     def validate_historical_topic(self, topic: str) -> bool:
         """

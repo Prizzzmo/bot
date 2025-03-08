@@ -14,7 +14,7 @@ class APICache(ICache):
     Поддерживает персистентное хранение и управление временем жизни кэша.
     """
 
-    def __init__(self, logger: ILogger, max_size: int = 1000, cache_file: str = 'api_cache.json'):
+    def __init__(self, logger: ILogger, max_size: int = 1000, cache_file: str = 'api_cache.json', memory_limit_mb: int = 200):
         """
         Инициализация системы кэширования.
 
@@ -22,11 +22,15 @@ class APICache(ICache):
             logger (ILogger): Логгер для записи информации о работе кэша
             max_size (int): Максимальный размер кэша
             cache_file (str): Путь к файлу для персистентного хранения кэша
+            memory_limit_mb (int): Ограничение памяти для кэша в МБ
         """
         self.logger = logger
         self.max_size = max_size
         self.cache_file = cache_file
+        self.memory_limit_mb = memory_limit_mb
         self.cache: Dict[str, Dict[str, Any]] = {}
+        self.access_counter = {}  # Для отслеживания частоты использования элементов кэша
+        self.last_cleanup_time = time.time()
         self.lock = threading.RLock()  # Для потокобезопасности
         self.stats = {
             "hits": 0,
@@ -69,8 +73,9 @@ class APICache(ICache):
                     self.stats["misses"] += 1
                     return None
 
-            # Обновляем время последнего доступа
+            # Обновляем время последнего доступа и счетчик
             cache_item["last_accessed"] = current_time
+            self.access_counter[key] = self.access_counter.get(key, 0) + 1
             self.stats["hits"] += 1
             return cache_item["value"]
 
@@ -101,6 +106,7 @@ class APICache(ICache):
 
             # Сохраняем кэш в файл
             self._save_cache()
+            self._cleanup_cache() #Added cleanup after set
 
     def remove(self, key: str) -> bool:
         """
@@ -115,6 +121,8 @@ class APICache(ICache):
         with self.lock:
             if key in self.cache:
                 del self.cache[key]
+                if key in self.access_counter:
+                    del self.access_counter[key]
                 self.stats["removes"] += 1
                 self._save_cache()
                 return True
@@ -124,6 +132,7 @@ class APICache(ICache):
         """Очистка всего кэша"""
         with self.lock:
             self.cache.clear()
+            self.access_counter.clear()
             self.stats["clears"] += 1
             self._save_cache()
 
@@ -138,6 +147,7 @@ class APICache(ICache):
             stats = self.stats.copy()
             stats["size"] = len(self.cache)
             stats["max_size"] = self.max_size
+            stats["memory_limit_mb"] = self.memory_limit_mb
 
             # Добавляем информацию о заполненности кэша
             if self.max_size > 0:
@@ -160,6 +170,8 @@ class APICache(ICache):
 
         # Удаляем элемент
         del self.cache[lru_key]
+        if lru_key in self.access_counter:
+            del self.access_counter[lru_key]
         self.stats["evictions"] += 1
 
     def _save_cache(self) -> None:
@@ -196,6 +208,8 @@ class APICache(ICache):
             # Удаляем истекшие элементы одним батчем
             for key in expired_keys:
                 del self.cache[key]
+                if key in self.access_counter:
+                    del self.access_counter[key]
 
             if expired_keys:
                 self.logger.debug(f"Очищено {len(expired_keys)} истекших элементов кэша")
@@ -262,3 +276,12 @@ class APICache(ICache):
         except Exception as e:
             self.logger.error(f"Ошибка при очистке кэша API запросов: {e}")
             return 0
+
+    def _cleanup_cache(self):
+        """
+        Очищает кэш, если он превышает лимит памяти.
+        """
+        with self.lock:
+            #TODO: Add actual memory check and cleanup logic.  This is a placeholder.
+            if len(self.cache) > self.max_size:
+                self._evict_lru()

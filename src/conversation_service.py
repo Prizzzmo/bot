@@ -5,10 +5,9 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatAction
 class ConversationService:
     """Класс для обработки бесед с пользователем об истории России"""
 
-    def __init__(self, api_client, logger, history_map=None):
+    def __init__(self, api_client, logger):
         self.api_client = api_client
         self.logger = logger
-        self.history_map = history_map
 
     def handle_conversation(self, update, context, message_manager):
         """
@@ -36,7 +35,8 @@ class ConversationService:
         # Обработка специальных состояний
         # Проверяем, ожидаем ли мы ввод пользовательской темы для карты
         if user_data.get('waiting_for_map_topic', False):
-            return self._handle_map_topic(update, context)
+            return None #Removed _handle_map_topic handling
+
 
         # Проверяем, ожидаем ли мы ввод ID нового администратора
         if user_data.get('waiting_for_admin_id', False):
@@ -70,7 +70,6 @@ class ConversationService:
 
             # Клавиатура с дополнительными опциями
             keyboard = [
-                [InlineKeyboardButton("🗺️ Карта исторических событий", callback_data='history_map')],
                 [InlineKeyboardButton("📚 Изучить тему", callback_data='topic')],
                 [InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]
             ]
@@ -204,93 +203,6 @@ class ConversationService:
                     self.logger.error(f"Не удалось отправить кнопки: {e}")
 
         return sent_message_ids
-
-    def _handle_map_topic(self, update, context):
-        """Обрабатывает ввод пользовательской темы для карты"""
-        if not self.history_map:
-            update.message.reply_text("К сожалению, сервис карт временно недоступен.")
-            return None
-
-        user_topic = update.message.text
-        user_id = update.message.from_user.id
-
-        # Немедленно сбрасываем флаг ожидания
-        context.user_data['waiting_for_map_topic'] = False
-
-        self.logger.debug(f"Пользователь {user_id} запросил карту по теме: {user_topic}")
-
-        # Отправляем сообщение о генерации
-        status_message = update.message.reply_text(
-            f"🔄 Генерация карты по теме «{user_topic}»...",
-            parse_mode='HTML'
-        )
-
-        try:
-            # Запускаем генерацию карты с таймаутом
-            import concurrent.futures
-            import os
-
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                # Запускаем задачу с таймаутом 30 секунд
-                future = executor.submit(self.history_map.generate_map_by_topic, user_topic)
-                try:
-                    map_image_path = future.result(timeout=30)
-                except concurrent.futures.TimeoutError:
-                    map_image_path = None
-                    self.logger.error(f"Превышено время ожидания при генерации карты по теме {user_topic}")
-
-            if map_image_path and os.path.exists(map_image_path):
-                # Отправляем изображение карты
-                with open(map_image_path, 'rb') as img:
-                    update.message.reply_photo(
-                        photo=img,
-                        caption=f"🗺️ Карта по теме «{user_topic}»",
-                        parse_mode='HTML'
-                    )
-
-                # Удаляем изображение после отправки
-                try:
-                    os.remove(map_image_path)
-                except Exception:
-                    pass
-
-                # Предлагаем вернуться к выбору категорий
-                keyboard = [
-                    [InlineKeyboardButton("🔍 Другая тема", callback_data='map_search_topic'),
-                     InlineKeyboardButton("🔙 К категориям", callback_data='history_map')],
-                    [InlineKeyboardButton("📋 Главное меню", callback_data='back_to_menu')]
-                ]
-            else:
-                # Если не удалось сгенерировать карту
-                keyboard = [
-                    [InlineKeyboardButton("🔍 Другая тема", callback_data='map_search_topic'),
-                     InlineKeyboardButton("🔙 К категориям", callback_data='history_map')]
-                ]
-                update.message.reply_text(
-                    f"❌ Не удалось найти достаточно событий по теме «{user_topic}».",
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-        except Exception as e:
-            self.logger.error(f"Ошибка при генерации карты: {str(e)}")
-            keyboard = [
-                [InlineKeyboardButton("🔍 Другая тема", callback_data='map_search_topic'),
-                 InlineKeyboardButton("🔙 К категориям", callback_data='history_map')]
-            ]
-            update.message.reply_text(
-                f"❌ Произошла ошибка при генерации карты. Попробуйте другую тему.",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-
-        # Удаляем сообщение о генерации
-        try:
-            context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=status_message.message_id
-            )
-        except:
-            pass
-
-        return None  # Значение MAP будет возвращено в handlers.py
 
     def _is_history_related(self, user_message, user_data):
         """Определяет, связано ли сообщение с историей России"""
