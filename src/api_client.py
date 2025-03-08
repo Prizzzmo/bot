@@ -36,12 +36,6 @@ class APIClient(BaseService):
     # Текущая версия API
     API_VERSION = "3.0.0"
 
-    Обеспечивает взаимодействие с моделью Gemini Pro для:
-    - Генерации исторического контента
-    - Проверки релевантности запросов
-    - Создания тестовых заданий
-    """
-
     def __init__(self, api_key: str, cache: ICache, logger: ILogger):
         """
         Инициализация API клиента для Google Gemini.
