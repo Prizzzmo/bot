@@ -638,13 +638,11 @@ class CommandHandlers:
                             parse_mode='HTML'
                         )
                         # Map feature has been removed
-                            context.bot.send_message(
-                                chat_id=user_id,
-                                text="❌ Функционал карт был удален из системы",
-                                parse_mode='HTML'
-                            )править карту.",
-                                parse_mode='HTML'
-                            )
+                        context.bot.send_message(
+                            chat_id=user_id,
+                            text="❌ Функционал карт был удален из системы",
+                            parse_mode='HTML'
+                        )
 
                     # Удаляем сообщение о генерации
                     try:
