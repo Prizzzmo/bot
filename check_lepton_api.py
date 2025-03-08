@@ -13,9 +13,9 @@ def check_lepton_api(api_key):
     
     print(f"Проверка API Lepton с ключом: {api_key[:5]}...{api_key[-5:]}")
     try:
-        # Создаем клиент Lepton без передачи ключа в конструктор
-        # Клиент будет использовать LEPTON_API_TOKEN из переменных окружения
-        client = Client()
+        # Создаем клиент Lepton с указанием конечной точки API
+        # Согласно документации, клиент требует указания workspace или URL
+        client = Client("https://api.lepton.ai")
         
         # Проверяем доступность API
         models = client.list_models()
@@ -26,18 +26,19 @@ def check_lepton_api(api_key):
             print(f" - {model}")
         
         # Тестовый запрос к модели
+        model_name = models[0] if models else "meta-llama/Llama-3-8b-chat-hf"
         prompt = "Расскажи кратко, что такое Lepton AI?"
-        print(f"\nОтправка тестового запроса к модели: {models[0] if models else 'meta-llama/Llama-3-8b-chat-hf'}")
+        print(f"\nОтправка тестового запроса к модели: {model_name}")
         
         response = client.completion(
-            model=models[0] if models else "meta-llama/Llama-3-8b-chat-hf",
+            model=model_name,
             prompt=prompt,
             max_tokens=150,
             temperature=0.7
         )
         
         print("\nТекст ответа:")
-        if "choices" in response and len(response["choices"]) > 0:
+        if isinstance(response, dict) and "choices" in response and len(response["choices"]) > 0:
             print(response["choices"][0]["text"].strip())
         else:
             print(json.dumps(response, indent=2, ensure_ascii=False))
