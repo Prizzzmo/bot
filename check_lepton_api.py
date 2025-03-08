@@ -8,12 +8,14 @@ def check_lepton_api(api_key):
     Проверяет работоспособность Lepton API с использованием предоставленного ключа.
     Использует официальную библиотеку leptonai для более надежного соединения.
     """
+    # Устанавливаем API ключ в переменные окружения
     os.environ["LEPTON_API_TOKEN"] = api_key
     
     print(f"Проверка API Lepton с ключом: {api_key[:5]}...{api_key[-5:]}")
     try:
-        # Создаем клиент Lepton
-        client = Client(api_key=api_key)
+        # Создаем клиент Lepton без передачи ключа в конструктор
+        # Клиент будет использовать LEPTON_API_TOKEN из переменных окружения
+        client = Client()
         
         # Проверяем доступность API
         models = client.list_models()
