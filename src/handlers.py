@@ -54,9 +54,8 @@ class CommandHandlers:
         user = update.message.from_user
         self.logger.info(f"Пользователь {user.id} ({user.first_name}) запустил бота")
 
-        # Очищаем историю чата при старте (опционально)
+        # История чата сохраняется
         chat_id = update.effective_chat.id
-        self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
 
         # Отправляем приветственное сообщение и сохраняем его ID
         sent_message = update.message.reply_text(
@@ -1052,15 +1051,9 @@ class CommandHandlers:
                 )
             return self.CHOOSE_TOPIC
         elif query_data == 'clear_chat_retry':
-            # Обработка повторной очистки чата через callback
-            self.logger.info(f"Пользователь {user_id} запросил повторную очистку чата")
-            query.answer("Начинаю повторную очистку...")
-
-            # Сначала обновляем сообщение с информацией о процессе
-            query.edit_message_text("⏳ Выполняю повторную очистку чата...")
-
-            # Выполняем очистку
-            success = self.message_manager.delete_chat_history(context.bot, update.effective_chat.id, user_id)
+            # Обработка запроса на очистку чата через callback (функциональность отключена)
+            self.logger.info(f"Пользователь {user_id} запросил очистку чата (функция отключена)")
+            query.answer("Функция очистки чата отключена")
 
             # Создаем клавиатуру для дополнительных действий
             keyboard = [
@@ -1068,21 +1061,15 @@ class CommandHandlers:
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            # Обновляем сообщение с результатом
-            if success:
-                query.edit_message_text(
-                    "✅ Повторная очистка чата успешно выполнена!",
-                    reply_markup=reply_markup
-                )
-            else:
-                query.edit_message_text(
-                    "⚠️ Повторная очистка выполнена частично. Некоторые сообщения могли остаться.",
-                    reply_markup=reply_markup
-                )
+            # Обновляем сообщение
+            query.edit_message_text(
+                "⚠️ Функция очистки чата отключена в текущей версии.",
+                reply_markup=reply_markup
+            )
 
             # Отправляем новое сообщение с главным меню
             sent_msg = query.message.reply_text(
-                "Чат очищен. Что дальше?", 
+                "Выберите другое действие:", 
                 reply_markup=self.ui_manager.main_menu()
             )
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
@@ -1850,37 +1837,16 @@ class CommandHandlers:
     def clear_chat_command(self, update, context):
         """
         Обрабатывает команду /clear для полной очистки чата.
+        Функциональность удаления сообщений отключена.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
         """
         user = update.message.from_user
-        chat_id = update.effective_chat.id
-
-        # Проверяем права администратора (если необходимо)
-        is_admin = False
-        if hasattr(self, 'admin_panel'):
-            is_admin = self.admin_panel.is_admin(user.id)
-
-        # Только админы могут очищать чат (опционально)
-        if is_admin:
-            update.message.reply_text("🧹 Начинаю очистку истории чата...")
-            success = self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
-
-            if success:
-                update.message.reply_text("✅ История чата успешно очищена!")
-            else:
-                update.message.reply_text("❌ Не удалось очистить историю чата. Попробуйте позже.")
-        else:
-            # Обычные пользователи могут очищать только свою историю
-            update.message.reply_text("🧹 Очищаю вашу историю чата...")
-            success = self.message_manager.delete_chat_history(context.bot, chat_id, user.id)
-
-            if success:
-                update.message.reply_text("✅ Ваша история чата успешно очищена!")
-            else:
-                update.message.reply_text("❌ Не удалось очистить историю чата. Попробуйте позже.")
+        
+        # Отправляем сообщение о том, что функциональность отключена
+        update.message.reply_text("⚠️ Функция очистки чата отключена в текущей версии.")
 
     def admin_callback(self, update, context):
         """
