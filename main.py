@@ -71,13 +71,8 @@ def main():
             logger.error("Ошибка при настройке бота!")
             return
 
-        # Запускаем бота в отдельном потоке для обеспечения возможности мониторинга
-        import threading
-        bot_thread = threading.Thread(target=bot.run, daemon=True)
-        bot_thread.start()
-        
-        # Присоединяемся к потоку бота
-        bot_thread.join()
+        # Запускаем бота напрямую в основном потоке
+        bot.run()
 
     except KeyboardInterrupt:
         logger.info("Бот остановлен пользователем")

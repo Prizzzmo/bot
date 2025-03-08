@@ -103,7 +103,14 @@ class Bot:
             self.logger.info("Бот успешно запущен")
 
             # Остаемся в режиме работы до получения Ctrl+C
-            self.updater.idle()
+            # Используем собственную реализацию idle
+            import time
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                self.logger.info("Бот получил сигнал завершения")
+                self.updater.stop()
         except Exception as e:
             self.logger.error(f"Ошибка запуска бота: {e}")
             # Попытка принудительного завершения updater если он был создан
