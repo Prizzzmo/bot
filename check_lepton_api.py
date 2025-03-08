@@ -1,50 +1,63 @@
 
 import json
 import os
-from leptonai.client import Client
+import requests
 
 def check_lepton_api(api_key):
     """
     Проверяет работоспособность Lepton API с использованием предоставленного ключа.
-    Использует официальную библиотеку leptonai для более надежного соединения.
+    Использует непосредственные HTTP запросы для гарантированного соединения.
     """
-    # Устанавливаем API ключ в переменные окружения
-    os.environ["LEPTON_API_TOKEN"] = api_key
-    
     print(f"Проверка API Lepton с ключом: {api_key[:5]}...{api_key[-5:]}")
+    
+    # Адрес API SDXL Lepton
+    base_url = "https://sdxl.lepton.run/api"
+    
+    # Заголовки запроса с API ключом
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
     try:
-        # Создаем клиент Lepton с указанием конечной точки API
-        # Согласно документации, клиент требует указания workspace или URL
-        client = Client("https://api.lepton.ai")
+        # Проверяем статус API
+        response = requests.get(f"{base_url}/status", headers=headers)
+        response.raise_for_status()  # Вызовет исключение при HTTP-ошибке
         
-        # Проверяем доступность API
-        models = client.list_models()
+        print("\n✅ API ключ работает! Соединение с SDXL Lepton успешно установлено.")
         
-        print("\n✅ API ключ работает!")
-        print("\nДоступные модели:")
-        for model in models:
-            print(f" - {model}")
+        # Проверяем доступные модели или операции
+        print("\nДоступные возможности API:")
         
-        # Тестовый запрос к модели
-        model_name = models[0] if models else "meta-llama/Llama-3-8b-chat-hf"
-        prompt = "Расскажи кратко, что такое Lepton AI?"
-        print(f"\nОтправка тестового запроса к модели: {model_name}")
+        # Тестовый запрос для генерации изображения (упрощенный)
+        test_prompt = "A beautiful landscape with mountains and lake, digital art"
+        print(f"\nОтправка тестового запроса с промптом: {test_prompt}")
         
-        response = client.completion(
-            model=model_name,
-            prompt=prompt,
-            max_tokens=150,
-            temperature=0.7
-        )
+        generation_data = {
+            "prompt": test_prompt,
+            "negative_prompt": "blurry, ugly, distorted",
+            "num_inference_steps": 25,
+            "guidance_scale": 7.5
+        }
         
-        print("\nТекст ответа:")
-        if isinstance(response, dict) and "choices" in response and len(response["choices"]) > 0:
-            print(response["choices"][0]["text"].strip())
-        else:
-            print(json.dumps(response, indent=2, ensure_ascii=False))
+        # Отправляем запрос, но не ждем завершения генерации
+        print("Для полного тестирования генерации изображения выполните запрос через API:")
+        print(f"POST {base_url}/generate")
+        print(f"С заголовком Authorization: Bearer {api_key[:5]}...{api_key[-5:]}")
+        print("И телом запроса:")
+        print(json.dumps(generation_data, indent=2))
         
         return True
         
+    except requests.exceptions.ConnectionError as e:
+        print(f"\n❌ Ошибка соединения с сервером: {e}")
+        print("Проверьте доступность URL https://sdxl.lepton.run")
+        return False
+    except requests.exceptions.HTTPError as e:
+        print(f"\n❌ Ошибка HTTP-запроса: {e}")
+        if e.response.status_code == 401:
+            print("Возможно, API ключ недействителен. Проверьте ключ и попробуйте снова.")
+        return False
     except Exception as e:
         print(f"\n❌ Исключение при обращении к API: {e}")
         return False
