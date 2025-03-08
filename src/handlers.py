@@ -24,13 +24,12 @@ class CommandHandlers:
         self.topic_service = TopicService(api_client, logger)
 
         # Импортируем константы состояний из config
-        from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION, MAP
+        from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
         self.TOPIC = TOPIC
         self.CHOOSE_TOPIC = CHOOSE_TOPIC
         self.TEST = TEST
         self.ANSWER = ANSWER
         self.CONVERSATION = CONVERSATION
-        self.MAP = MAP
 
         # Кэш для предотвращения повторных нажатий кнопок
         self.callback_cache = {}
@@ -468,413 +467,6 @@ class CommandHandlers:
                     self.message_manager.save_message_id(update, context, sent_err.message_id)
 
             return self.TOPIC
-        elif query_data == 'history_map':
-            # Обработка кнопки интерактивной карты
-            user_id = query.from_user.id
-            self.logger.info(f"Пользователь {user_id} запросил историческую карту")
-
-            # Создаем клавиатуру для выбора категории событий на карте
-            categories = self.history_map.get_categories()
-            keyboard = []
-
-            # Добавляем кнопки для каждой категории (максимум 10 на странице)
-            category_buttons = []
-            for i, category in enumerate(categories[:10]):
-                category_buttons.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
-                # Создаем ряды по 2 кнопки
-                if i % 2 == 1 or i == len(categories[:10])-1:
-                    keyboard.append(category_buttons)
-                    category_buttons = []
-
-            # Добавляем кнопки навигации и функций
-            keyboard.append([InlineKeyboardButton("📋 Больше категорий ▶️", callback_data='map_more_categories')])
-            keyboard.append([InlineKeyboardButton("🔍 Поиск по теме", callback_data='map_search_topic')])
-            keyboard.append([InlineKeyboardButton("🎲 Случайные события", callback_data='map_random')])
-            keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
-
-            query.edit_message_text(
-                "🗺️ *Интерактивная карта исторических событий*\n\n"
-                "Выберите категорию исторических событий для отображения на карте, "
-                "воспользуйтесь поиском по конкретной теме или "
-                "посмотрите случайные события из разных периодов истории России.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode='Markdown'
-            )
-            return self.MAP
-
-        elif query_data.startswith('map_category_'):
-            # Обработка выбора категории на карте
-            category = query_data[13:]  # map_category_{category}
-            user_id = query.from_user.id
-            self.logger.info(f"Пользователь {user_id} выбрал категорию карты: {category}")
-
-            # Добавляем клавиатуру для получения карты
-            keyboard = [
-                [InlineKeyboardButton("🗺️ Получить карту", callback_data=f'map_img_{category}')],
-                [InlineKeyboardButton("🔙 Назад к категориям", callback_data='history_map')]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            # Отправляем сообщение с выбором формата карты
-            query.edit_message_text(
-                f"📍 *Категория: {category}*\n\n"
-                f"Вы выбрали категорию исторических событий: *{category}*\n\n"
-                f"Выберите формат карты:",
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
-            return self.MAP
-
-        elif query_data.startswith('map_url_'):
-            category = query_data.replace('map_url_', '')
-
-            # Генерируем и отправляем изображение карты вместо URL
-            status_message = context.bot.send_message(
-                chat_id=user_id,
-                text=f"🔄 Генерация изображения карты для категории «{category}»...",
-                parse_mode='HTML'
-            )
-
-            map_image_path = self.history_map.generate_map_image(category=category)
-
-            if map_image_path and os.path.exists(map_image_path):
-                # Отправляем изображение карты
-                with open(map_image_path, 'rb') as img:
-                    context.bot.send_photo(
-                        chat_id=user_id,
-                        photo=img,
-                        caption=f"🗺️ Карта исторических событий: {category}",
-                        parse_mode='HTML'
-                    )
-            else:
-                context.bot.send_message(
-                    chat_id=user_id,
-                    text="❌ Не удалось сгенерировать карту. Пожалуйста, попробуйте позже.",
-                    parse_mode='HTML'
-                )
-
-            context.bot.delete_message(chat_id=user_id, message_id=status_message.message_id)
-            return self.MAP
-
-        elif query_data.startswith('map_img_'):
-            category = query_data.replace('map_img_', '')
-
-            # Отправляем сообщение о том, что генерируем карту
-            status_message = context.bot.send_message(
-                chat_id=user_id,
-                text=f"🔄 Генерация карты для категории «{category}»...",
-                parse_mode='HTML'
-            )
-
-            try:
-                # Пробуем сначала сгенерировать изображение карты
-                map_path = self.history_map.generate_map_image(category=category)
-
-                if map_path and os.path.exists(map_path):
-                    # Проверяем размер файла карты перед отправкой
-                    valid_file = False
-                    if os.path.exists(map_path):
-                        try:
-                            file_size = os.path.getsize(map_path)
-                            if file_size > 0:
-                                valid_file = True
-                            else:
-                                self.logger.error(f"Файл карты {map_path} существует, но имеет нулевой размер")
-                        except Exception as size_error:
-                            self.logger.error(f"Ошибка при проверке размера файла карты: {size_error}")
-                    else:
-                        self.logger.error(f"Файл карты {map_path} не существует")
-
-                    # Отправляем изображение если файл валидный
-                    if valid_file:
-                        try:
-                            with open(map_path, 'rb') as img_file:
-                                context.bot.send_photo(
-                                    chat_id=user_id,
-                                    photo=img_file,
-                                    caption=f"🗺️ Карта исторических событий категории «{category}»",
-                                    parse_mode='HTML'
-                                )
-                        except Exception as img_error:
-                            self.logger.error(f"Ошибка при отправке изображения карты (Image_process_failed): {img_error}")
-                            context.bot.send_message(
-                                chat_id=user_id,
-                                text=f"❌ Ошибка обработки изображения: Image_process_failed. Пробуем отправить стандартную карту.",
-                                parse_mode='HTML'
-                            )
-                            # Пробуем отправить резервное стандартное изображение
-                            default_map_path = 'static/default_map.png'
-                            if os.path.exists(default_map_path):
-                                try:
-                                    with open(default_map_path, 'rb') as default_img:
-                                        context.bot.send_photo(
-                                            chat_id=user_id,
-                                            photo=default_img,
-                                            caption=f"🗺️ Стандартная карта (не удалось сгенерировать специальную карту для категории «{category}»)",
-                                            parse_mode='HTML'
-                                        )
-                                except Exception as e:
-                                    context.bot.send_message(
-                                        chat_id=user_id,
-                                        text=f"❌ Произошла ошибка при отправке карты: {str(e)}",
-                                        parse_mode='HTML'
-                                    )
-                            else:
-                                context.bot.send_message(
-                                    chat_id=user_id,
-                                    text=f"❌ Не удалось найти стандартную карту {default_map_path}",
-                                    parse_mode='HTML'
-                                )
-                    else:
-                        # Файл карты не найден или поврежден
-                        self.logger.error(f"Файл карты {map_path} поврежден или не существует")
-                        context.bot.send_message(
-                            chat_id=user_id,
-                            text=f"❌ Не удалось сгенерировать карту: Image_process_failed",
-                            parse_mode='HTML'
-                        )
-                        # Map feature has been removed
-                        context.bot.send_message(
-                            chat_id=user_id,
-                            text="❌ Функционал карт был удален из системы",
-                            parse_mode='HTML'
-                        )
-
-                    # Удаляем сообщение о генерации
-                    try:
-                        context.bot.delete_message(
-                            chat_id=user_id,
-                            message_id=status_message.message_id
-                        )
-                    except Exception as delete_error:
-                        self.logger.error(f"Не удалось удалить сообщение о генерации: {delete_error}")
-
-                    # Удаляем файл карты после отправки
-                    try:
-                        if os.path.exists(map_path):
-                            os.remove(map_path)
-                            self.logger.info(f"Файл карты удален: {map_path}")
-                    except Exception as e:
-                        self.logger.warning(f"Не удалось удалить файл карты {map_path}: {e}")
-
-                    self.logger.info(f"Пользователь {user_id} получил карту категории {category}")
-                else:
-                    # Если не удалось сгенерировать карту, отправляем стандартную
-                    default_map_path = 'static/default_map.png'
-                    if os.path.path.exists(default_map_path):
-                        try:
-                            with open(default_map_path, 'rb') as default_img:
-                                context.bot.send_photo(
-                                    chat_id=user_id,
-                                    photo=default_img,
-                                    caption=f"🗺️ Стандартная карта (не удалось сгенерировать специальную карту для категории «{category}»)",
-                                    parse_mode='HTML'
-                                )
-                        except Exception as e:
-                            context.bot.send_message(
-                                chat_id=user_id,
-                                text=f"❌ Не удалось отправить карту: {str(e)}",
-                                parse_mode='HTML'
-                            )
-                    else:
-                        context.bot.send_message(
-                            chat_id=user_id,
-                            text=f"❌ Не удалось сгенерировать карту для категории «{category}». Пожалуйста, попробуйте позже.",
-                            parse_mode='HTML'
-                        )
-
-                    # Удаляем сообщение о генерации
-                    context.bot.delete_message(
-                        chat_id=user_id, 
-                        message_id=status_message.message_id
-                    )
-            except Exception as e:
-                self.logger.error(f"Ошибка при генерации карты: {e}")
-                context.bot.send_message(
-                    chat_id=user_id,
-                    text=f"❌ Произошла ошибка при генерации карты: {str(e)}. Пожалуйста, попробуйте позже.",
-                    parse_mode='HTML'
-                )
-
-                # Удаляем сообщение о генерации
-                try:
-                    context.bot.delete_message(
-                        chat_id=user_id, 
-                        message_id=status_message.message_id
-                    )
-                except:
-                    pass
-
-            # Запускаем очистку старых карт
-            try:
-                self.history_map.clean_old_maps()
-            except Exception as e:
-                self.logger.error(f"Ошибка при очистке старых карт: {e}")
-
-            return self.MAP
-
-        elif query_data == 'map_more_categories':
-            # Показываем дополнительные категории
-            categories = self.history_map.get_categories()
-            keyboard = []
-
-            # Проверяем есть ли дополнительные категории
-            if len(categories) > 10:
-                # Показываем следующие категории
-                remaining_categories = categories[10:]
-
-                # Формируем ряды кнопок (по 2 в ряду)
-                for i in range(0, len(remaining_categories), 2):
-                    row = []
-                    # Добавляем первую кнопку
-                    category = remaining_categories[i]
-                    row.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
-
-                    # Добавляем вторую кнопку, если она есть
-                    if i + 1 < len(remaining_categories):
-                        category = remaining_categories[i + 1]
-                        row.append(InlineKeyboardButton(f"📍 {category}", callback_data=f'map_category_{category}'))
-
-                    keyboard.append(row)
-            else:
-                # Если дополнительных категорий нет, показываем сообщение
-                keyboard.append([InlineKeyboardButton("⚠️ Дополнительных категорий нет", callback_data='history_map')])
-
-            # Добавляем навигационные кнопки
-            keyboard.append([InlineKeyboardButton("◀️ Назад к основным категориям", callback_data='history_map')])
-            keyboard.append([InlineKeyboardButton("🔍 Поиск по теме", callback_data='map_search_topic')])
-            keyboard.append([InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')])
-
-            try:
-                query.edit_message_text(
-                    "🗺️ *Дополнительные категории исторических событий*\n\n"
-                    "Выберите одну из дополнительных категорий для отображения на карте.",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                    parse_mode='Markdown'
-                )
-            except Exception as e:
-                self.logger.error(f"Ошибка при редактировании сообщения с дополнительными категориями: {e}")
-                # Если не удалось отредактировать, отправляем новое сообщение
-                query.message.reply_text(
-                    "🗺️ *Дополнительные категории исторических событий*\n\n"
-                    "Выберите одну из дополнительных категорий для отображения на карте.",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                    parse_mode='Markdown'
-                )
-            return self.MAP
-
-        elif query_data == 'map_search_topic':
-            # Предлагаем пользователю ввести тему для генерации карты с более подробными инструкциями
-            query.edit_message_text(
-                "🔍 *Поиск исторических событий по теме*\n\n"
-                "Введите интересующую вас тему или ключевое слово для поиска исторических событий.\n\n"
-                "Примеры запросов для детализированных карт:\n"
-                "• Конкретные личности: «Петр I», «Екатерина II», «Александр Невский»\n"
-                "• Военные события: «Крымская война», «Отечественная война 1812», «Полтавская битва»\n"
-                "• Исторические процессы: «освоение Сибири», «индустриализация», «реформы»\n"
-                "• География: «основание городов», «Москва», «Северо-Запад России»\n"
-                "• Периоды: «18 век», «советский период», «правление Романовых»\n\n"
-                "Бот найдет соответствующие события и отобразит их на детализированной карте с пояснениями.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад к категориям", callback_data='history_map')]]),
-                parse_mode='Markdown'
-            )
-
-            # Устанавливаем флаг ожидания ввода пользовательской темы
-            context.user_data['waiting_for_map_topic'] = True
-            return self.MAP
-
-        elif query_data == 'map_random':
-            # Получаем больше случайных событий для повышения детализации
-            random_events = self.history_map.get_random_events(8)
-
-            # Отправляем сообщение о генерации
-            status_message = context.bot.send_message(
-                chat_id=user_id,
-                text="🔄 Генерация детализированной карты со случайными событиями...",
-                parse_mode='HTML'
-            )
-
-            # Генерируем изображение карты
-            map_image_path = self.history_map.generate_map_image(events=random_events)
-
-            if map_image_path and os.path.exists(map_image_path):
-                # Отправляем изображение карты
-                with open(map_image_path, 'rb') as img:
-                    context.bot.send_photo(
-                        chat_id=user_id,
-                        photo=img,
-                        caption="🗺️ Детализированная карта случайных исторических событий России\n"
-                               "Номера на карте соответствуют подписям внизу изображения.",
-                        parse_mode='HTML'
-                    )
-
-                # Удаляем сообщение о генерации
-                context.bot.delete_message(
-                    chat_id=user_id,
-                    message_id=status_message.message_id
-                )
-
-                # Удаляем изображение карты после отправки
-                try:
-                    os.remove(map_image_path)
-                except Exception as e:
-                    self.logger.error(f"Не удалось удалить файл карты {map_image_path}: {e}")
-
-                self.logger.info(f"Пользователь {user_id} получил детализированную карту со случайными событиями")
-            else:
-                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
-                context.bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=status_message.message_id,
-                    text="❌ Не удалось сгенерировать изображение карты. Попробуйте позже.",
-                    parse_mode='HTML'
-                )
-                self.logger.error(f"Не удалось сгенерировать изображение карты для пользователя {user_id}")
-
-            return self.MAP
-
-        elif query_data == 'map_image':
-            # Отправляем сообщение о том, что генерируем карту
-            status_message = context.bot.send_message(
-                chat_id=user_id,
-                text="🔄 Генерация изображения карты...",
-                parse_mode='HTML'
-            )
-
-            # Генерируем изображение карты всех событий
-            map_image_path = self.history_map.generate_map_image()
-
-            if map_image_path and os.path.exists(map_image_path):
-                # Отправляем изображение карты
-                with open(map_image_path, 'rb') as img:
-                    context.bot.send_photo(
-                        chat_id=user_id,
-                        photo=img,
-                        caption="🗺️ Интерактивная карта исторических событий России",
-                        parse_mode='HTML'
-                    )
-
-                # Удаляем сообщение о генерации
-                context.bot.delete_message(
-                    chat_id=user_id,
-                    message_id=status_message.message_id
-                )
-
-                # Удаляем изображение карты после отправки
-                os.remove(map_image_path)
-
-                self.logger.info(f"Пользователь {user_id} получил изображение карты с историческими событиями")
-            else:
-                # Если не удалось сгенерировать карту, отправляем сообщение об ошибке
-                context.bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=status_message.message_id,
-                    text="❌ Не удалось сгенерировать изображение карты. Попробуйте позже или воспользуйтесь ссылкой на карту.",
-                    parse_mode='HTML'
-                )
-                self.logger.error(f"Не удалось сгенерировать изображение карты для пользователя {user_id}")
-            return self.MAP
-
         elif query_data == 'conversation':
             # Обработка кнопки беседы о истории России
             query.edit_message_text(
@@ -1071,7 +663,7 @@ class CommandHandlers:
             if query_data == 'end_test':
                 self.logger.info(f"Пользователь {user_id} досрочно завершил тест")
                 query.edit_message_text("Тест завершен досрочно. Возвращаемся в главное меню.")
-                query.message.reply_text("Выберите действие:", reply_markup=self.ui_manager.main_menu())
+query.message.reply_text("Выберите действие:", reply_markup=self.ui_manager.main_menu())
                 return self.TOPIC
             else:
                 self.logger.info(f"Пользователь {user_id} отменил действие")
@@ -1755,8 +1347,7 @@ class CommandHandlers:
                 self.logger.info("Инициализация ConversationService")
                 self.conversation_service = ConversationService(
                     api_client=self.api_client, 
-                    logger=self.logger,
-                    history_map=self.history_map
+                    logger=self.logger
                 )
 
             # Обрабатываем сообщение и получаем результат
@@ -2277,3 +1868,59 @@ class CommandHandlers:
                 parse_mode='Markdown'
             )
             return self.back_to_menu(update, context)
+    def topic_info_handler(self, update, context):
+        """Обработчик для выбора темы из списка и отображения информации"""
+        query = update.callback_query
+        query.answer()
+
+        # Получаем выбранную тему
+        topic_data = query.data.replace("topic_", "")
+
+        # Проверяем, что в контексте есть список тем
+        if not hasattr(context, 'topics_list') or not context.topics_list:
+            query.edit_message_text("⚠️ Произошла ошибка: список тем не найден. Выберите /topics заново.")
+            return ConversationHandler.END
+
+        # Ищем выбранную тему в списке
+        selected_topic = None
+        for topic in context.topics_list:
+            topic_number = topic.split('.')[0]
+            if topic_data == topic_number:
+                selected_topic = topic
+                break
+
+        if not selected_topic:
+            query.edit_message_text("⚠️ Тема не найдена. Выберите /topics заново.")
+            return ConversationHandler.END
+
+        # Получаем номер и текст темы
+        topic_number, topic_text = selected_topic.split('. ', 1)
+
+        # Отправляем сообщение о начале загрузки
+        query.edit_message_text(f"🔍 Проверяю кэш для темы: *{topic_text}*...", 
+                                parse_mode=telegram.constants.ParseMode.MARKDOWN)
+
+        # Функция для обновления сообщения о статусе загрузки
+        def update_status(status_text):
+            try:
+                context.bot.edit_message_text(
+                    text=status_text,
+                    chat_id=query.message.chat_id,
+                    message_id=query.message.message_id,
+                    parse_mode=telegram.constants.ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                self.logger.error(f"Ошибка при обновлении статуса: {e}")
+
+        # Получаем кэш-сервис из контекста бота (он должен быть добавлен при инициализации)
+        text_cache_service = getattr(context.bot_data, 'text_cache_service', None)
+
+        # Получаем информацию о теме (из кэша или генерируем новую)
+        topic_messages = self.topic_service.get_cached_topic_info(
+            topic_text, 
+            update_callback=update_status,
+            text_cache_service=text_cache_service
+        )
+
+        # Отправляем сообщения с информацией по теме
+        self.message_manager.send_topic_messages(update, context, topic_messages)
