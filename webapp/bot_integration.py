@@ -8,7 +8,7 @@ def get_webapp_keyboard():
     keyboard = [
         [InlineKeyboardButton(
             text="Открыть карту истории России", 
-            web_app=WebAppInfo(url="https://REPL_ID.id.repl.co/")  # Replace with your actual Repl URL when deployed
+            web_app=WebAppInfo(url=f"https://{os.environ.get('REPL_SLUG')}.{os.environ.get('REPL_OWNER')}.repl.co")
         )]
     ]
     return InlineKeyboardMarkup(keyboard)
