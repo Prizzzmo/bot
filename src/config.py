@@ -56,7 +56,7 @@ class Config:
 
     def validate(self) -> bool:
         """Проверяет наличие всех необходимых параметров в конфигурации"""
-        return self.telegram_token and self.admin_ids
+        return self.telegram_token and os.path.exists(self.admin_config_file)
 
     def set_task_queue(self, task_queue):
         """Устанавливает очередь задач"""
