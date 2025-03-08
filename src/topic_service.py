@@ -224,7 +224,7 @@ class TopicService(BaseService):
             """
 
             # Получаем общий контекст для темы без использования кэша
-            self.logger.info(f"Запрашиваю общий контекст для темы '{topic}'")
+            self._logger.info(f"Запрашиваю общий контекст для темы '{topic}'")
             topic_context = self.api_client.ask_grok(context_prompt, use_cache=False)
 
             if update_callback:
