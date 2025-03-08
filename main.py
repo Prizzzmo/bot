@@ -109,12 +109,19 @@ def main():
         # Создаем экземпляр бота через фабрику
         logger.info("Создание бота через фабрику")
         bot = BotFactory.create_bot(config)
+        
+        # Проверяем, что бот был успешно создан
+        if not bot:
+            logger.error("Не удалось создать экземпляр бота!")
+            return
 
         # Настраиваем бота
         logger.info("Настройка бота")
         if not bot.setup():
             logger.error("Ошибка при настройке бота!")
             return
+            
+        logger.info("Бот успешно настроен и готов к запуску")
 
         # Проверяем необходимость миграции данных
         data_migration = DataMigration(logger)

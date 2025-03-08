@@ -97,9 +97,15 @@ class Bot:
         self.logger.info("Запуск бота...")
 
         try:
+            # Проверка, что updater был успешно создан
+            if not self.updater:
+                self.logger.error("Ошибка запуска бота: updater не инициализирован")
+                return
+                
             # Оптимизированные настройки для более эффективного сбора обновлений
             # Уменьшен таймаут для более быстрого обнаружения ошибок
             # Явное указание типов обновлений для обработки
+            self.logger.info("Запуск start_polling...")
             self.updater.start_polling(
                 timeout=6,  # Уменьшенный таймаут для более быстрой реакции
                 drop_pending_updates=True,  # Пропуск накопившихся обновлений
@@ -112,16 +118,20 @@ class Bot:
             # Используем собственную реализацию idle
             import time
             try:
-                while True:
+                # Более безопасная реализация idle с проверкой статуса
+                while self.updater.running:
                     time.sleep(1)
             except KeyboardInterrupt:
                 self.logger.info("Бот получил сигнал завершения")
                 self.updater.stop()
         except Exception as e:
-            self.logger.error(f"Ошибка запуска бота: {e}")
+            self.logger.log_error(e, {"context": "bot.run()"})
             # Попытка принудительного завершения updater если он был создан
-            if hasattr(self, 'updater'):
-                self.updater.stop()
+            if hasattr(self, 'updater') and self.updater:
+                try:
+                    self.updater.stop()
+                except Exception as stop_error:
+                    self.logger.error(f"Ошибка при остановке updater: {stop_error}")
 
     def setup_log_rotation(self):
         log_dir = "logs"
