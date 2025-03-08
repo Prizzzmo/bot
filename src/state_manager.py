@@ -194,11 +194,11 @@ class StateManager(BaseService):
             if os.path.exists(self.state_file):
                 with open(self.state_file, 'r', encoding='utf-8') as f:
                     self.states = json.load(f)
-                self.logger.info(f"Загружены состояния для {len(self.states)} пользователей")
+                self._logger.info(f"Загружены состояния для {len(self.states)} пользователей")
             else:
                 self.states = {}
         except Exception as e:
-            self.logger.error(f"Ошибка при загрузке состояний: {e}")
+            self._logger.error(f"Ошибка при загрузке состояний: {e}")
             self.states = {}
 
     def _save_states(self) -> None:
@@ -207,9 +207,9 @@ class StateManager(BaseService):
             with open(self.state_file, 'w', encoding='utf-8') as f:
                 json.dump(self.states, f, ensure_ascii=False, indent=2)
             self.last_save_time = time.time()
-            self.logger.debug(f"Сохранены состояния для {len(self.states)} пользователей")
+            self._logger.debug(f"Сохранены состояния для {len(self.states)} пользователей")
         except Exception as e:
-            self.logger.error(f"Ошибка при сохранении состояний: {e}")
+            self._logger.error(f"Ошибка при сохранении состояний: {e}")
 
     def _start_auto_save(self) -> None:
         """Запускает фоновый поток для автоматического сохранения состояний"""
@@ -220,7 +220,7 @@ class StateManager(BaseService):
                     with self.lock:
                         self._save_states()
                 except Exception as e:
-                    self.logger.error(f"Ошибка в фоновом сохранении состояний: {e}")
+                    self._logger.error(f"Ошибка в фоновом сохранении состояний: {e}")
 
         # Запускаем поток как демон, чтобы он автоматически завершался с основным потоком
         auto_save_thread = threading.Thread(target=auto_save_job, daemon=True)
