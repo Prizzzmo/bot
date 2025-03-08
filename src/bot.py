@@ -6,13 +6,12 @@ import logging.handlers
 import os
 
 from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
-from src.config import MAP #Added import for MAP constant
 
 class Bot:
     """Класс для управления Telegram ботом"""
 
     def __init__(self, config, logger, command_handlers, test_service=None, topic_service=None, 
-              api_client=None, analytics=None, history_map_service=None, text_cache_service=None):
+              api_client=None, analytics=None, text_cache_service=None):
         self.config = config
         self.logger = logger
         self.handlers = command_handlers
@@ -23,7 +22,6 @@ class Bot:
         # Сервисы бота
         self.api_client = api_client
         self.analytics = analytics
-        self.history_map_service = history_map_service
         self.text_cache_service = text_cache_service
 
         # Контейнер сервисов, будет установлен из фабрики
@@ -64,9 +62,6 @@ class Bot:
                     CONVERSATION: [
                         MessageHandler(Filters.text & ~Filters.command, self.handlers.handle_conversation),
                         CallbackQueryHandler(self.handlers.button_handler)  # Обработчик для кнопки возврата в меню
-                    ],
-                    MAP: [
-                        CallbackQueryHandler(self.handlers.button_handler)  # Обработчик для взаимодействия с картой
                     ]
                 },
                 fallbacks=[CommandHandler('start', self.handlers.start)],
@@ -90,7 +85,6 @@ class Bot:
             # Добавляем контекстные данные для бота
             self.updater.dispatcher.bot_data['api_client'] = self.api_client
             self.updater.dispatcher.bot_data['analytics'] = self.analytics
-            self.updater.dispatcher.bot_data['history_map_service'] = self.history_map_service
             self.updater.dispatcher.bot_data['text_cache_service'] = self.text_cache_service
 
             return True

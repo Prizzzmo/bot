@@ -22,20 +22,18 @@ class WebServer(BaseService):
     Предоставляет веб-интерфейс для просмотра логов, статистики и управления ботом.
     """
 
-    def __init__(self, logger: ILogger, analytics_service=None, admin_panel=None, history_map_service=None):
+    def __init__(self, logger: ILogger, analytics_service=None, admin_panel=None):
         """
         Инициализация веб-сервера.
 
         Args:
-            logger (ILogger): Логгер для записи информации
+            logger: Логгер
             analytics_service: Сервис аналитики
             admin_panel: Административная панель
-            history_map_service: Сервис исторических карт
         """
         super().__init__(logger)
         self.analytics_service = analytics_service
         self.admin_panel = admin_panel
-        self.history_map_service = history_map_service
         self.app = Flask(__name__, 
                         template_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates'),
                         static_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static'))
@@ -117,36 +115,6 @@ class WebServer(BaseService):
                 return jsonify(stats)
             return jsonify({"error": "Административная панель недоступна"})
 
-        @self.app.route('/map')
-        def map_page():
-            """Страница с исторической картой"""
-            return render_template('map.html', title="Историческая карта")
-
-        @self.app.route('/api/map/generate', methods=['POST'])
-        def api_generate_map():
-            """API для генерации исторической карты"""
-            if self.history_map_service:
-                data = request.json
-                category = data.get('category')
-                events = data.get('events')
-                timeframe = data.get('timeframe')
-
-                map_path = self.history_map_service.generate_map(category, events, timeframe)
-
-                if map_path:
-                    return jsonify({"status": "success", "map_url": f"/api/map/view?path={map_path}"})
-                return jsonify({"status": "error", "message": "Не удалось сгенерировать карту"})
-            return jsonify({"error": "Сервис исторических карт недоступен"})
-
-        @self.app.route('/api/map/view')
-        def api_view_map():
-            """API для просмотра исторической карты"""
-            map_path = request.args.get('path')
-
-            if not map_path or not os.path.exists(map_path):
-                return jsonify({"error": "Карта не найдена"}), 404
-
-            return send_file(map_path, mimetype='image/png')
 
         @self.app.route('/api/chart/daily_activity')
         def api_chart_daily_activity():

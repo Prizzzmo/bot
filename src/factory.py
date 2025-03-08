@@ -13,7 +13,6 @@ from src.admin_panel import AdminPanel
 from src.handlers import CommandHandlers
 from src.bot import Bot
 from src.analytics import AnalyticsService
-from src.history_map import HistoryMap
 from src.web_server import WebServer
 from src.test_service import TestService
 from src.topic_service import TopicService
@@ -101,10 +100,6 @@ class BotFactory:
         analytics_service = AnalyticsService(logger)
         container.register("analytics_service", analytics_service)
         
-        # Сервис исторических карт
-        history_map_service = HistoryMap(logger)
-        container.register("history_map_service", history_map_service)
-        
         # Админ-панель
         admin_panel = AdminPanel(logger, config)
         
@@ -123,8 +118,7 @@ class BotFactory:
         web_server = WebServer(
             logger=logger,
             analytics_service=analytics_service,
-            admin_panel=admin_panel,
-            history_map_service=history_map_service
+            admin_panel=admin_panel
         )
         container.register("web_server", web_server)
         
@@ -141,7 +135,6 @@ class BotFactory:
             topic_service=topic_service,
             api_client=api_client,
             analytics=analytics_service,
-            history_map_service=history_map_service,
             text_cache_service=text_cache_service
         )
         

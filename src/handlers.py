@@ -637,27 +637,12 @@ class CommandHandlers:
                             text=f"❌ Не удалось сгенерировать карту: Image_process_failed",
                             parse_mode='HTML'
                         )
-                        # Пробуем отправить стандартную карту
-                        default_map_path = 'static/default_map.png'
-                        if os.path.exists(default_map_path):
-                            try:
-                                with open(default_map_path, 'rb') as default_img:
-                                    context.bot.send_photo(
-                                        chat_id=user_id,
-                                        photo=default_img,
-                                        caption=f"🗺️ Стандартная карта (не удалось сгенерировать специальную карту для категории «{category}»)",
-                                        parse_mode='HTML'
-                                    )
-                            except Exception as e:
-                                context.bot.send_message(
-                                    chat_id=user_id,
-                                    text=f"❌ Произошла ошибка при отправке карты: {str(e)}",
-                                    parse_mode='HTML'
-                                )
-                        else:
+                        # Map feature has been removed
                             context.bot.send_message(
                                 chat_id=user_id,
-                                text=f"❌ Не удалось сгенерировать и отправить карту.",
+                                text="❌ Функционал карт был удален из системы",
+                                parse_mode='HTML'
+                            )править карту.",
                                 parse_mode='HTML'
                             )
 
