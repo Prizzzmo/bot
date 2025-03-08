@@ -69,7 +69,7 @@ class ContentService(BaseService):
         try:
             # Проверка типа events_file для предотвращения ошибки
             if not isinstance(self.events_file, str):
-                self.logger.warning(f"events_file должен быть строкой, но получен {type(self.events_file).__name__}")
+                self._logger.warning(f"events_file должен быть строкой, но получен {type(self.events_file).__name__}")
                 return {
                     "events": [],
                     "categories": [],
@@ -77,7 +77,7 @@ class ContentService(BaseService):
                 }
 
             if not os.path.exists(self.events_file):
-                self.logger.warning(f"Файл исторических событий {self.events_file} не найден")
+                self._logger.warning(f"Файл исторических событий {self.events_file} не найден")
                 return {
                     "events": [],
                     "categories": [],
@@ -107,14 +107,14 @@ class ContentService(BaseService):
             return events_data
 
         except json.JSONDecodeError as e:
-            self.logger.error(f"Ошибка в формате JSON файла исторических событий: {e}")
+            self._logger.error(f"Ошибка в формате JSON файла исторических событий: {e}")
             return {
                 "events": [],
                 "categories": [],
                 "periods": []
             }
         except Exception as e:
-            self.logger.error(f"Ошибка при загрузке данных о исторических событиях: {e}")
+            self._logger.error(f"Ошибка при загрузке данных о исторических событиях: {e}")
             return {
                 "events": [],
                 "categories": [],
@@ -257,7 +257,7 @@ class ContentService(BaseService):
                 json.dump(self.events_data, f, ensure_ascii=False, indent=2)
 
         except Exception as e:
-            self.logger.error(f"Ошибка при сохранении информации о теме '{topic}': {e}")
+            self._logger.error(f"Ошибка при сохранении информации о теме '{topic}': {e}")
 
     def get_topic_info(self, topic: str, update_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
@@ -274,11 +274,11 @@ class ContentService(BaseService):
             # Сначала ищем в локальных данных
             local_info = self._get_local_topic_info(topic)
             if local_info:
-                self.logger.info(f"Найдена локальная информация по теме '{topic}'")
+                self._logger.info(f"Найдена локальная информация по теме '{topic}'")
                 return local_info
 
             # Если в локальных данных нет, запрашиваем через API
-            self.logger.info(f"Запрос информации по теме '{topic}' через API")
+            self._logger.info(f"Запрос информации по теме '{topic}' через API")
 
             if update_callback:
                 update_callback("Получение информации...")
@@ -290,7 +290,7 @@ class ContentService(BaseService):
                 self._save_topic_info(topic, api_response["content"])
                 return api_response
             else:
-                self.logger.warning(f"Не удалось получить информацию по теме '{topic}' через API")
+                self._logger.warning(f"Не удалось получить информацию по теме '{topic}' через API")
                 return {
                     "status": "error",
                     "topic": topic,
@@ -298,7 +298,7 @@ class ContentService(BaseService):
                 }
 
         except Exception as e:
-            self.logger.error(f"Ошибка при получении информации по теме '{topic}': {e}")
+            self._logger.error(f"Ошибка при получении информации по теме '{topic}': {e}")
             return {
                 "status": "error",
                 "topic": topic,
@@ -316,13 +316,13 @@ class ContentService(BaseService):
             Dict[str, Any]: Тест с вопросами и ответами
         """
         try:
-            self.logger.info(f"Генерация теста по теме '{topic}'")
+            self._logger.info(f"Генерация теста по теме '{topic}'")
 
             # Проверяем кэш текстов, если он доступен
             if self.text_cache_service:
                 cached_test = self.text_cache_service.get_text(topic, "test")
                 if cached_test:
-                    self.logger.info(f"Найден кэшированный тест по теме '{topic}'")
+                    self._logger.info(f"Найден кэшированный тест по теме '{topic}'")
                     # Предполагаем, что кэшированные данные уже в нужном формате
                     try:
                         test_data = json.loads(cached_test)
@@ -340,7 +340,7 @@ class ContentService(BaseService):
 
             # Проверяем, является ли тема исторической
             if not self.validate_topic(topic):
-                self.logger.warning(f"Попытка генерации теста для неисторической темы '{topic}'")
+                self._logger.warning(f"Попытка генерации теста для неисторической темы '{topic}'")
                 return {
                     "status": "error",
                     "topic": topic,
@@ -351,7 +351,7 @@ class ContentService(BaseService):
             test_response = self.api_client.generate_historical_test(topic)
 
             if test_response and "content" in test_response and test_response["status"] == "success":
-                self.logger.info(f"Успешно сгенерирован тест по теме '{topic}'")
+                self._logger.info(f"Успешно сгенерирован тест по теме '{topic}'")
 
                 # Сохраняем в кэш текстов, если он доступен
                 if self.text_cache_service:
@@ -359,11 +359,11 @@ class ContentService(BaseService):
                     try:
                         self.text_cache_service.save_text(topic, "test", json.dumps(test_response))
                     except Exception as cache_error:
-                        self.logger.error(f"Ошибка сохранения теста в кэш: {cache_error}")
+                        self._logger.error(f"Ошибка сохранения теста в кэш: {cache_error}")
 
                 return test_response
             else:
-                self.logger.warning(f"Не удалось сгенерировать тест по теме '{topic}'")
+                self._logger.warning(f"Не удалось сгенерировать тест по теме '{topic}'")
                 return {
                     "status": "error",
                     "topic": topic,
@@ -371,7 +371,7 @@ class ContentService(BaseService):
                 }
 
         except Exception as e:
-            self.logger.error(f"Ошибка при генерации теста по теме '{topic}': {e}")
+            self._logger.error(f"Ошибка при генерации теста по теме '{topic}': {e}")
             return {
                 "status": "error",
                 "topic": topic,
