@@ -15,7 +15,7 @@ class HistoryMap(BaseService):
     """Класс для работы с картой исторических событий"""
 
     def __init__(self, logger):
-        self.logger = logger
+        super().__init__(logger)
         self.events_file = "historical_events.json"
         self.events_data = self._load_events_data()
         self.map_cache = {}  # Кэш для сгенерированных карт
@@ -26,6 +26,27 @@ class HistoryMap(BaseService):
 
         # Создаем директорию для сохранения карт, если она не существует
         os.makedirs('generated_maps', exist_ok=True)
+        
+    def _do_initialize(self) -> bool:
+        """
+        Выполняет фактическую инициализацию сервиса.
+        
+        Returns:
+            bool: True если инициализация прошла успешно, иначе False
+        """
+        try:
+            # Проверяем доступность файла исторических событий
+            if not self._ensure_events_file_exists():
+                return False
+                
+            # Проверяем доступность директории для карт
+            if not os.path.exists('generated_maps'):
+                os.makedirs('generated_maps', exist_ok=True)
+                
+            return True
+        except Exception as e:
+            self._logger.error(f"Ошибка при инициализации HistoryMap: {e}")
+            return False
 
     def _ensure_events_file_exists(self):
         """Создает файл с историческими событиями, если он не существует"""

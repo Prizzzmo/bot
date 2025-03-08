@@ -3,15 +3,29 @@ import time
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src.telegram_queue import TelegramRequestQueue
+from src.base_service import BaseService
 
-class MessageManager:
-    """Класс для управления сообщениями с оптимизированными запросами к Telegram API"""
+class MessageManager(BaseService):
+    """Класс для управления сообщениями бота"""
 
     def __init__(self, logger):
-        self.logger = logger
+        super().__init__(logger)
         self.active_messages = {}  # Кэш активных сообщений по user_id
         self.message_lock = threading.RLock()  # Блокировка для потокобезопасного доступа
         self.request_queue = TelegramRequestQueue(max_requests_per_second=25, logger=logger)
+
+    def _do_initialize(self) -> bool:
+        """
+        Выполняет фактическую инициализацию сервиса.
+
+        Returns:
+            bool: True если инициализация прошла успешно, иначе False
+        """
+        try:
+            return True
+        except Exception as e:
+            self._logger.error(f"Ошибка при инициализации MessageManager: {e}")
+            return False
 
     def save_message_id(self, update, context, message_id):
         """

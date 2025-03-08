@@ -16,8 +16,9 @@ import google.generativeai as genai
 
 from src.base_client import BaseClient
 from src.interfaces import ILogger, ICache
+from src.base_service import BaseService
 
-class APIClient(BaseClient):
+class APIClient(BaseService):
     """
     Клиент для работы с Google Gemini API.
 
@@ -36,9 +37,32 @@ class APIClient(BaseClient):
             cache (ICache): Компонент для кэширования запросов
             logger (ILogger): Компонент для логирования операций
         """
-        super().__init__(api_key, cache, logger)
+        super().__init__(logger)
+        self.api_key = api_key
+        self.cache = cache
         self.model = None
         self.initialize_model()
+
+    def _do_initialize(self) -> bool:
+        """
+        Выполняет фактическую инициализацию сервиса.
+
+        Returns:
+            bool: True если инициализация прошла успешно, иначе False
+        """
+        try:
+            # Проверяем доступность API ключа
+            if not self.api_key:
+                self._logger.error("API ключ не указан")
+                return False
+            genai.configure(api_key=self.api_key)
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
+            self._logger.info("Gemini API успешно инициализирован (модель: gemini-2.0-flash)")
+            return True
+        except Exception as e:
+            self._logger.error(f"Ошибка при инициализации APIClient: {e}")
+            return False
+
 
     def initialize_model(self) -> None:
         """
@@ -49,13 +73,7 @@ class APIClient(BaseClient):
         - Генерацию структурированных и информативных ответов
         - Проверку фактологической точности контента
         """
-        try:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
-            self.logger.info("Gemini API успешно инициализирован (модель: gemini-2.0-flash)")
-        except Exception as e:
-            self.logger.error(f"Ошибка инициализации Gemini API: {e}")
-            raise
+        #Moved to _do_initialize for better error handling and initialization flow
 
     # Хэш-функция для создания ключа кэша
     def _create_cache_key(self, prompt: str, temperature: float, max_tokens: int, system_prompt: Optional[str]) -> str:

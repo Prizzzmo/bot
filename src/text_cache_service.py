@@ -1,4 +1,3 @@
-
 """Модуль для кэширования текстовых данных"""
 
 import json
@@ -8,23 +7,16 @@ import hashlib
 from typing import Dict, Any, Optional, List
 
 from src.interfaces import ILogger
+from src.base_service import BaseService
 
-class TextCacheService:
+class TextCacheService(BaseService):
     """
     Сервис для кэширования текстовых данных, генерируемых ИИ.
     Хранит кэш в файле и обеспечивает быстрый доступ к ранее сгенерированным текстам.
     """
 
-    def __init__(self, logger: ILogger, cache_file: str = 'texts_cache.json', ttl: int = 604800):
-        """
-        Инициализация сервиса кэширования текстов.
-
-        Args:
-            logger (ILogger): Логгер для записи информации о работе кэша
-            cache_file (str): Путь к файлу для хранения кэша
-            ttl (int): Время жизни кэша в секундах (по умолчанию 7 дней)
-        """
-        self.logger = logger
+    def __init__(self, logger, cache_file='texts_cache.json', ttl=604800):
+        super().__init__(logger)
         self.cache_file = cache_file
         self.ttl = ttl
         self.cache: Dict[str, Dict[str, Any]] = {}
@@ -33,8 +25,21 @@ class TextCacheService:
             "misses": 0,
             "sets": 0,
         }
-        
+
         self._load_cache()
+
+    def _do_initialize(self) -> bool:
+        """
+        Выполняет фактическую инициализацию сервиса.
+
+        Returns:
+            bool: True если инициализация прошла успешно, иначе False
+        """
+        try:
+            return True
+        except Exception as e:
+            self._logger.error(f"Ошибка при инициализации TextCacheService: {e}")
+            return False
 
     def get_text(self, topic: str, text_type: str) -> Optional[str]:
         """
@@ -48,15 +53,15 @@ class TextCacheService:
             Optional[str]: Текст из кэша или None, если не найден или истек
         """
         cache_key = self._generate_key(topic, text_type)
-        
+
         if cache_key not in self.cache:
             self.stats["misses"] += 1
             self.logger.debug(f"Кэш-промах для темы '{topic}' (тип: {text_type})")
             return None
-            
+
         cache_item = self.cache[cache_key]
         current_time = time.time()
-        
+
         # Проверяем, не истек ли элемент
         if current_time > cache_item["created_at"] + self.ttl:
             # Элемент истек, удаляем его
@@ -65,13 +70,13 @@ class TextCacheService:
             self.stats["misses"] += 1
             self.logger.debug(f"Истек кэш для темы '{topic}' (тип: {text_type})")
             return None
-            
+
         # Обновляем время последнего доступа
         cache_item["last_accessed"] = current_time
         self.stats["hits"] += 1
         self.logger.debug(f"Кэш-попадание для темы '{topic}' (тип: {text_type})")
         return cache_item["text"]
-        
+
     def save_text(self, topic: str, text_type: str, text: str) -> None:
         """
         Сохранение текста в кэш.
@@ -83,7 +88,7 @@ class TextCacheService:
         """
         cache_key = self._generate_key(topic, text_type)
         current_time = time.time()
-        
+
         self.cache[cache_key] = {
             "text": text,
             "topic": topic,
@@ -91,11 +96,11 @@ class TextCacheService:
             "created_at": current_time,
             "last_accessed": current_time
         }
-        
+
         self.stats["sets"] += 1
         self._save_cache()
         self.logger.info(f"Текст по теме '{topic}' (тип: {text_type}) сохранен в кэш")
-        
+
     def clear_cache(self, topic_filter: Optional[str] = None) -> int:
         """
         Очистка кэша текстов.
@@ -108,7 +113,7 @@ class TextCacheService:
         """
         count = 0
         keys_to_delete = []
-        
+
         if topic_filter:
             topic_filter = topic_filter.lower()
             for key, cache_item in self.cache.items():
@@ -116,18 +121,18 @@ class TextCacheService:
                     keys_to_delete.append(key)
         else:
             keys_to_delete = list(self.cache.keys())
-            
+
         # Удаляем найденные ключи
         for key in keys_to_delete:
             del self.cache[key]
             count += 1
-            
+
         if count > 0:
             self._save_cache()
             self.logger.info(f"Очищено {count} записей из кэша текстов")
-            
+
         return count
-        
+
     def get_stats(self) -> Dict[str, Any]:
         """
         Получение статистики использования кэша.
@@ -137,18 +142,18 @@ class TextCacheService:
         """
         stats = self.stats.copy()
         stats["size"] = len(self.cache)
-        
+
         # Вычисляем размер кэша в байтах
         try:
             stats["size_bytes"] = os.path.getsize(self.cache_file) if os.path.exists(self.cache_file) else 0
         except:
             stats["size_bytes"] = 0
-            
+
         # Добавляем размер кэша в мегабайтах
         stats["size_mb"] = round(stats["size_bytes"] / (1024 * 1024), 2) if stats["size_bytes"] > 0 else 0
-        
+
         return stats
-        
+
     def _generate_key(self, topic: str, text_type: str) -> str:
         """
         Генерирует ключ кэша для темы и типа текста.
@@ -164,7 +169,7 @@ class TextCacheService:
         key_data = f"{topic.lower().strip()}:{text_type.lower().strip()}"
         # Создаем хеш для использования в качестве ключа
         return hashlib.md5(key_data.encode()).hexdigest()
-        
+
     def _save_cache(self) -> None:
         """Сохраняет кэш в файл"""
         try:
