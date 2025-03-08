@@ -113,13 +113,15 @@ class Bot:
                 poll_interval=0.2  # Уменьшаем интервал опроса для более быстрой реакции на сообщения
             )
             self.logger.info("Бот успешно запущен")
+            self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
 
             # Остаемся в режиме работы до получения Ctrl+C
             # Используем собственную реализацию idle
             import time
             try:
                 # Более безопасная реализация idle с проверкой статуса
-                while self.updater.running:
+                # В Python-telegram-bot свойство называется 'running' у dispatcher, а не у updater
+                while self.updater.dispatcher.running:
                     time.sleep(1)
             except KeyboardInterrupt:
                 self.logger.info("Бот получил сигнал завершения")
