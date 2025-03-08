@@ -100,21 +100,21 @@ class TestService(BaseService):
                             processed_questions.append(sanitized_q)
                         else:
                             # Если есть шаблонные ответы, пропускаем этот вопрос
-                            self.logger.warning(f"Пропуск вопроса с шаблонными ответами: {q[:50]}...")
+                            self._logger.warning(f"Пропуск вопроса с шаблонными ответами: {q[:50]}...")
                             continue
                     else:
                         # Недостаточное количество вариантов, пропускаем
-                        self.logger.warning(f"Пропуск вопроса с недостаточным количеством вариантов: {q[:50]}...")
+                        self._logger.warning(f"Пропуск вопроса с недостаточным количеством вариантов: {q[:50]}...")
                         continue
                 else:
                     # Пропускаем вопросы без вариантов ответов
-                    self.logger.warning(f"Пропуск вопроса без вариантов ответов: {q[:50]}...")
+                    self._logger.warning(f"Пропуск вопроса без вариантов ответов: {q[:50]}...")
                     continue
 
         # Если после обработки осталось менее 10 вопросов, запрашиваем еще вопросы
         attempts = 0
         while len(processed_questions) < 15 and attempts < 3:
-            self.logger.info(f"Недостаточно вопросов ({len(processed_questions)}), запрашиваем еще")
+            self._logger.info(f"Недостаточно вопросов ({len(processed_questions)}), запрашиваем еще")
             attempts += 1
 
             additional_prompt = f"""Создай еще 10 вопросов для тестирования по теме '{topic}'. 
@@ -165,7 +165,7 @@ class TestService(BaseService):
         if len(processed_questions) < 20:
             # Теперь запрашиваем только точное число нужных вопросов
             needed_questions = 20 - len(processed_questions)
-            self.logger.info(f"Генерация еще {needed_questions} вопросов для достижения 20")
+            self._logger.info(f"Генерация еще {needed_questions} вопросов для достижения 20")
 
             final_prompt = f"""Создай ровно {needed_questions} вопросов для тестирования по теме '{topic}'. 
 Это ОЧЕНЬ ВАЖНО - каждый вопрос и ответ должен быть максимально конкретным и содержательным.
@@ -258,7 +258,7 @@ class TestService(BaseService):
         Returns:
             dict: Словарь с основным вопросом и вариантами ответов
         """
-        self.logger.info(f"Форматирование вопроса: {question_text[:50]}...")
+        self._logger.info(f"Форматирование вопроса: {question_text[:50]}...")
 
         # Удаляем строки с правильным ответом из отображаемого текста
         question_text = re.sub(r'Правильный ответ:\s*\d+', '', question_text).strip()
@@ -388,7 +388,7 @@ class TestService(BaseService):
             if not re.match(r'^\d\)', options[i]):
                 options[i] = f"{i+1}) {options[i]}"
 
-        self.logger.info(f"Сформированы варианты: {len(options)} вариантов")
+        self._logger.info(f"Сформированы варианты: {len(options)} вариантов")
 
         return {
             "main_question": main_question,
@@ -458,5 +458,5 @@ class TestService(BaseService):
 
             return similar_topics[:3]  # Возвращаем максимум 3 темы
         except Exception as e:
-            self.logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
+            self._logger.warning(f"Не удалось сгенерировать похожие темы: {e}")
             return []
