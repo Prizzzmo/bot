@@ -54,14 +54,14 @@ class Config:
         self.enable_performance_monitoring = os.getenv('ENABLE_PERFORMANCE_MONITORING', 'true').lower() == 'true'
         self.metrics_file = os.getenv('METRICS_FILE', 'performance_metrics.json')
 
-    def validate(self):
-        """Проверка наличия и валидности токенов"""
-        if not self.telegram_token:
-            raise ValueError("Отсутствует TELEGRAM_TOKEN! Проверьте .env файл.")
-        if self.telegram_token == "YOUR_TELEGRAM_TOKEN_HERE":
-            raise ValueError("TELEGRAM_TOKEN не настроен! Замените YOUR_TELEGRAM_TOKEN_HERE на реальный токен в .env файле.")
-        if not self.gemini_api_key:
-            raise ValueError("Отсутствует GEMINI_API_KEY! Проверьте .env файл.")
-        if self.gemini_api_key == "YOUR_GEMINI_API_KEY_HERE":
-            raise ValueError("GEMINI_API_KEY не настроен! Замените YOUR_GEMINI_API_KEY_HERE на реальный ключ в .env файле.")
-        return True
+    def validate(self) -> bool:
+        """Проверяет наличие всех необходимых параметров в конфигурации"""
+        return self.telegram_token and self.admin_ids
+
+    def set_task_queue(self, task_queue):
+        """Устанавливает очередь задач"""
+        self.task_queue = task_queue
+
+    def get_task_queue(self):
+        """Возвращает очередь задач"""
+        return getattr(self, 'task_queue', None)

@@ -16,8 +16,8 @@ from dotenv import load_dotenv
 
 from src.config import Config
 from src.factory import BotFactory
-# Added for data migration
-from src.data_migration import DataMigration # Placeholder -  needs actual implementation
+from src.data_migration import DataMigration
+from src.task_queue import TaskQueue
 
 def main():
     """
@@ -73,11 +73,19 @@ def main():
             return
 
         # Проверяем необходимость миграции данных
-        data_migration = DataMigration(logger) # Placeholder - needs actual implementation
+        data_migration = DataMigration(logger)
         if data_migration.check_and_migrate():
             logger.info("Миграция данных успешно завершена или не требовалась")
         else:
             logger.warning("Возникли проблемы при миграции данных, проверьте логи")
+
+        # Инициализируем очередь отложенных задач
+        task_queue = TaskQueue(num_workers=2, logger=logger)
+        task_queue.start()
+        logger.info("Инициализирована система отложенных задач")
+
+        # Регистрируем очередь задач в конфигурации для доступа из других модулей
+        config.set_task_queue(task_queue)
 
 
         # Запускаем бота напрямую в основном потоке

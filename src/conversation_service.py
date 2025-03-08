@@ -8,6 +8,7 @@ class ConversationService:
     def __init__(self, api_client, logger):
         self.api_client = api_client
         self.logger = logger
+        # Используется только для логирования и API вызовов, history_map более не используется
 
     def handle_conversation(self, update, context, message_manager):
         """

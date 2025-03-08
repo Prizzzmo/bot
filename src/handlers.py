@@ -17,10 +17,6 @@ class CommandHandlers:
         self.logger = logger
         self.config = config
 
-        # Инициализируем карту исторических событий
-        from src.history_map import HistoryMap
-        self.history_map = HistoryMap(logger)
-
         # Инициализируем сервисы
         from src.test_service import TestService
         from src.topic_service import TopicService

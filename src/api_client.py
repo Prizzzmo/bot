@@ -22,6 +22,24 @@ class APIClient(BaseService):
     """
     Клиент для работы с Google Gemini API.
 
+
+    """
+    Клиент для работы с Google Gemini API.
+
+    Обеспечивает взаимодействие с моделью Gemini Pro для:
+    - Генерации исторического контента
+    - Проверки релевантности запросов
+    - Создания тестовых заданий
+    
+    Версионирование API:
+    - v1: Базовая версия API с основной функциональностью
+    - v2: Добавлены методы для кэширования и повторных попыток
+    - v3: Усовершенствованные промпты и обработка ошибок
+    """
+
+    # Текущая версия API
+    API_VERSION = "3.0.0"
+
     Обеспечивает взаимодействие с моделью Gemini Pro для:
     - Генерации исторического контента
     - Проверки релевантности запросов
@@ -131,18 +149,24 @@ class APIClient(BaseService):
                 start_time = time.time()
                 self._logger.debug(f"Отправка запроса к Gemini API: {prompt[:50]}...")
 
+                # Добавляем информацию о версии API в запрос
+                api_info = f"API Version: {self.API_VERSION}"
+                
                 # Формирование промпта с системной инструкцией если она предоставлена
                 try:
                     if system_prompt:
                         # Для Gemini 2.0 используем обновленный метод формирования чата
+                        # Добавляем информацию о версии API в системный промпт
+                        versioned_system_prompt = f"{system_prompt}\n\n{api_info}"
                         chat = self.model.start_chat(history=[
-                            {"role": "user", "parts": [system_prompt]},
+                            {"role": "user", "parts": [versioned_system_prompt]},
                             {"role": "model", "parts": ["Понял инструкции. Готов к работе."]}
                         ])
                         response = chat.send_message(prompt, generation_config=generation_config)
                     else:
-                        # Стандартный запрос к модели
-                        response = self.model.generate_content(prompt, generation_config=generation_config)
+                        # Стандартный запрос к модели с добавлением версии в метаданные
+                        versioned_prompt = f"{prompt}\n\n{api_info}"
+                        response = self.model.generate_content(versioned_prompt, generation_config=generation_config)
                 except AttributeError:
                     # Альтернативный метод для новой версии API - сразу используем без лишнего логирования
                     response = self.model.generate_content(content=prompt, generation_config=generation_config)
