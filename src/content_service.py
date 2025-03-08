@@ -51,6 +51,15 @@ class ContentService(IContentProvider):
             Dict[str, Any]: Данные о исторических событиях
         """
         try:
+            # Проверка типа events_file для предотвращения ошибки
+            if not isinstance(self.events_file, str):
+                self.logger.warning(f"events_file должен быть строкой, но получен {type(self.events_file).__name__}")
+                return {
+                    "events": [],
+                    "categories": [],
+                    "periods": []
+                }
+                
             if os.path.exists(self.events_file):
                 with open(self.events_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
