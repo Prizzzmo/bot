@@ -42,7 +42,7 @@ class WebServer(BaseService):
         self.server_thread = None
         self._setup_routes()
 
-        self.logger.info("Веб-сервер инициализирован")
+        self._logger.info("Веб-сервер инициализирован")
 
     def _do_initialize(self) -> bool:
         """
@@ -191,16 +191,16 @@ class WebServer(BaseService):
             port (int): Порт для запуска сервера
         """
         if self.server_thread and self.server_thread.is_alive():
-            self.logger.warning("Веб-сервер уже запущен")
+            self._logger.warning("Веб-сервер уже запущен")
             return
 
         def run_server():
-            self.logger.info(f"Запуск веб-сервера на {host}:{port}")
+            self._logger.info(f"Запуск веб-сервера на {host}:{port}")
             self.app.run(host=host, port=port, debug=False, use_reloader=False)
 
         self.server_thread = threading.Thread(target=run_server, daemon=True)
         self.server_thread.start()
-        self.logger.info("Веб-сервер запущен в фоновом режиме")
+        self._logger.info("Веб-сервер запущен в фоновом режиме")
 
     def stop(self):
         """Останавливает веб-сервер"""
@@ -213,6 +213,6 @@ class WebServer(BaseService):
             # но для реального приложения нужен механизм сигналов
             # self.server_thread.join(timeout=5)
 
-            self.logger.info("Веб-сервер остановлен")
+            self._logger.info("Веб-сервер остановлен")
         else:
-            self.logger.warning("Веб-сервер не запущен")
+            self._logger.warning("Веб-сервер не запущен")
