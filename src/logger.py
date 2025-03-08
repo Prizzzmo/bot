@@ -30,12 +30,12 @@ class Logger(ILogger):
     - API для фильтрации и получения логов для административного интерфейса
     """
     
-    def __init__(self, log_level: int = logging.INFO, log_dir: str = 'logs'):
+    def __init__(self, log_level: int = logging.WARNING, log_dir: str = 'logs'):
         """
         Инициализация системы логирования.
         
         Args:
-            log_level (int): Уровень детализации логов (по умолчанию INFO)
+            log_level (int): Уровень детализации логов (по умолчанию WARNING)
             log_dir (str): Директория для хранения файлов логов
         """
         self.log_level = log_level
@@ -60,9 +60,9 @@ class Logger(ILogger):
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         
-        # Создаем и настраиваем обработчик для вывода в консоль
+        # Создаем и настраиваем обработчик для вывода только ошибок в консоль
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(self.log_level)
+        console_handler.setLevel(logging.ERROR)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
         
@@ -70,14 +70,14 @@ class Logger(ILogger):
         self.file_handler = None
         self._setup_file_handler()
 
-        self.info("Система логирования инициализирована")
+        self.warning("Система логирования инициализирована с уровнем WARNING")
     
     def _setup_file_handler(self) -> None:
         """
         Настраивает обработчик для записи логов в файл с учетом текущей даты.
         
         Создает новый файл лога для каждого дня, что обеспечивает автоматическую
-        ротацию логов и упрощает их анализ.
+        ротацию логов и упрощает их анализ. Записывает только ПРЕДУПРЕЖДЕНИЯ и ОШИБКИ.
         """
         with self.lock:
             # Если обработчик для файла уже существует, удаляем его
@@ -95,7 +95,8 @@ class Logger(ILogger):
             )
             
             self.file_handler = logging.FileHandler(log_filename, encoding='utf-8')
-            self.file_handler.setLevel(self.log_level)
+            # Устанавливаем уровень WARNING для записи только предупреждений и ошибок
+            self.file_handler.setLevel(logging.WARNING)
             self.file_handler.setFormatter(formatter)
             self.logger.addHandler(self.file_handler)
     
