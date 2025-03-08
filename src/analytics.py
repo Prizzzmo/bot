@@ -23,7 +23,7 @@ class AnalyticsService(BaseService):
         self.data_file = 'analytics_data.json'
         self.user_data = {}
         self.load_data()
-        self.logger.info("Сервис аналитики инициализирован")
+        self._logger.info("Сервис аналитики инициализирован")
 
     def _do_initialize(self) -> bool:
         """
@@ -46,20 +46,20 @@ class AnalyticsService(BaseService):
             if os.path.exists(self.data_file):
                 with open(self.data_file, 'r', encoding='utf-8') as f:
                     self.user_data = json.load(f)
-                self.logger.info(f"Загружены данные аналитики для {len(self.user_data)} пользователей")
+                self._logger.info(f"Загружены данные аналитики для {len(self.user_data)} пользователей")
             else:
-                self.logger.info("Файл аналитики не найден, создаем новый")
+                self._logger.info("Файл аналитики не найден, создаем новый")
         except Exception as e:
-            self.logger.log_error(e, "Ошибка при загрузке данных аналитики")
+            self._logger.log_error(e, "Ошибка при загрузке данных аналитики")
 
     def save_data(self):
         """Сохраняет данные аналитики в файл"""
         try:
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(self.user_data, f, ensure_ascii=False, indent=2)
-            self.logger.info("Данные аналитики сохранены")
+            self._logger.info("Данные аналитики сохранены")
         except Exception as e:
-            self.logger.log_error(e, "Ошибка при сохранении данных аналитики")
+            self._logger.log_error(e, "Ошибка при сохранении данных аналитики")
 
     def track_user_activity(self, user_id: int, activity_type: str, data: Dict[str, Any] = None):
         """
