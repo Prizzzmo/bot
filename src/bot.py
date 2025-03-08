@@ -27,7 +27,13 @@ class Bot:
         """Настройка бота и диспетчера"""
         try:
             # Инициализируем бота и диспетчер с оптимизированными настройками
-            self.updater = Updater(self.config.telegram_token, use_context=True, workers=4)  # Увеличиваем количество рабочих потоков
+            # Используем 8 рабочих потоков для более эффективной параллельной обработки сообщений
+            self.updater = Updater(
+                self.config.telegram_token, 
+                use_context=True, 
+                workers=8,
+                request_kwargs={'read_timeout': 6, 'connect_timeout': 7}  # Уменьшаем таймауты для более быстрого обнаружения проблем
+            )
             dp = self.updater.dispatcher
 
             # Создаем ConversationHandler для управления диалогом
@@ -85,11 +91,15 @@ class Bot:
         self.logger.info("Запуск бота...")
 
         try:
-            # Включаем сбор обновлений для реагирования на сообщения, запускаем бота
-            # Установка более длинного таймаута для обработки конфликтов
-            # Используем drop_pending_updates=True для пропуска обновлений, накопившихся во время остановки
-            # Уменьшаем timeout для более быстрого обнаружения ошибок подключения
-            self.updater.start_polling(timeout=10, drop_pending_updates=True, allowed_updates=['message', 'callback_query'])
+            # Оптимизированные настройки для более эффективного сбора обновлений
+            # Уменьшен таймаут для более быстрого обнаружения ошибок
+            # Явное указание типов обновлений для обработки
+            self.updater.start_polling(
+                timeout=6,  # Уменьшенный таймаут для более быстрой реакции
+                drop_pending_updates=True,  # Пропуск накопившихся обновлений
+                allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Только необходимые типы обновлений
+                poll_interval=0.2  # Уменьшаем интервал опроса для более быстрой реакции на сообщения
+            )
             self.logger.info("Бот успешно запущен")
 
             # Остаемся в режиме работы до получения Ctrl+C

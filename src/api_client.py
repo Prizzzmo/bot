@@ -57,6 +57,13 @@ class APIClient(BaseClient):
             self.logger.error(f"Ошибка инициализации Gemini API: {e}")
             raise
 
+    # Хэш-функция для создания ключа кэша
+    def _create_cache_key(self, prompt: str, temperature: float, max_tokens: int, system_prompt: Optional[str]) -> str:
+        """Создает ключ для кэша на основе параметров запроса"""
+        import hashlib
+        cache_key_data = f"{prompt}:{temperature}:{max_tokens}:{system_prompt}"
+        return hashlib.md5(cache_key_data.encode()).hexdigest()
+        
     def call_api(self, prompt: str, temperature: float = 0.3, max_tokens: int = 1024, 
                 use_cache: bool = True, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -81,15 +88,21 @@ class APIClient(BaseClient):
         Raises:
             Exception: При ошибке выполнения запроса к API
         """
-        # Создаем ключ кэша на основе параметров запроса
+        # Проверяем кэш, если нужно
         if use_cache:
-            import hashlib
-            cache_key_data = f"{prompt}:{temperature}:{max_tokens}:{system_prompt}"
-            cache_key = hashlib.md5(cache_key_data.encode()).hexdigest()
+            cache_key = self._create_cache_key(prompt, temperature, max_tokens, system_prompt)
             cached_result = self.cache.get(cache_key)
             if cached_result:
                 self.logger.debug(f"Получен ответ из кэша для промпта: {prompt[:50]}...")
                 return cached_result
+
+        # Настройка параметров генерации - вынесена вне цикла для оптимизации
+        generation_config = {
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+            "top_p": 0.95,
+            "top_k": 40,
+        }
 
         # Выполняем запрос с механизмом повторных попыток
         max_retries = 3
@@ -99,14 +112,6 @@ class APIClient(BaseClient):
             try:
                 start_time = time.time()
                 self.logger.debug(f"Отправка запроса к Gemini API: {prompt[:50]}...")
-
-                # Настройка параметров генерации
-                generation_config = {
-                    "temperature": temperature,
-                    "max_output_tokens": max_tokens,
-                    "top_p": 0.95,
-                    "top_k": 40,
-                }
 
                 # Формирование промпта с системной инструкцией если она предоставлена
                 try:
@@ -120,10 +125,8 @@ class APIClient(BaseClient):
                     else:
                         # Стандартный запрос к модели
                         response = self.model.generate_content(prompt, generation_config=generation_config)
-                except AttributeError as ae:
-                    # Обработка возможных изменений в API Gemini 2.0
-                    self.logger.warning(f"Возникла ошибка атрибута при вызове API: {ae}. Пробуем альтернативный метод.")
-                    # Альтернативный метод для новой версии API
+                except AttributeError:
+                    # Альтернативный метод для новой версии API - сразу используем без лишнего логирования
                     response = self.model.generate_content(content=prompt, generation_config=generation_config)
 
                 elapsed_time = time.time() - start_time
@@ -139,6 +142,7 @@ class APIClient(BaseClient):
 
                 # Сохраняем в кэш
                 if use_cache:
+                    cache_key = self._create_cache_key(prompt, temperature, max_tokens, system_prompt)
                     self.cache.set(cache_key, result, ttl=24*60*60)  # TTL 24 часа
 
                 return result
@@ -146,7 +150,8 @@ class APIClient(BaseClient):
             except Exception as e:
                 self.logger.warning(f"Ошибка запроса к Gemini API (попытка {attempt+1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(retry_delay * (attempt + 1))  # Экспоненциальная задержка
+                    # Используем более эффективную задержку
+                    time.sleep(retry_delay * (2 ** attempt))  # Экспоненциальная задержка с base 2
                 else:
                     self.logger.error(f"Не удалось получить ответ от Gemini API после {max_retries} попыток: {e}")
                     raise

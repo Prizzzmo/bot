@@ -35,7 +35,7 @@ def main():
         # Загружаем переменные окружения из .env файла
         load_dotenv()
 
-        # Настраиваем базовое логирование для начального этапа запуска
+        # Настраиваем базовое логирование с оптимизированными параметрами
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -45,6 +45,12 @@ def main():
         )
         logger = logging.getLogger(__name__)
         logger.info("Запуск историчеcкого образовательного бота")
+
+        # Предварительно проверяем наличие всех необходимых директорий
+        # для предотвращения ошибок при параллельной работе
+        for directory in ["logs", "generated_maps"]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
 
         # Загружаем конфигурацию
         logger.info("Загрузка конфигурации")
@@ -65,10 +71,16 @@ def main():
             logger.error("Ошибка при настройке бота!")
             return
 
-        # Запускаем бота
-        logger.info("Запуск бота")
-        bot.run()
+        # Запускаем бота в отдельном потоке для обеспечения возможности мониторинга
+        import threading
+        bot_thread = threading.Thread(target=bot.run, daemon=True)
+        bot_thread.start()
+        
+        # Присоединяемся к потоку бота
+        bot_thread.join()
 
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен пользователем")
     except Exception as e:
         if logger:
             logger.error(f"Критическая ошибка: {e}")

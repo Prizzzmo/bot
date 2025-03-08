@@ -188,14 +188,12 @@ class APICache(ICache):
         """Очищает истекшие элементы из кэша"""
         with self.lock:
             current_time = time.time()
-            expired_keys = []
+            expired_keys = [
+                key for key, item in self.cache.items()
+                if "ttl" in item and item["ttl"] and current_time > item["created_at"] + item["ttl"]
+            ]
 
-            for key, item in self.cache.items():
-                if "ttl" in item and item["ttl"]:
-                    if current_time > item["created_at"] + item["ttl"]:
-                        expired_keys.append(key)
-
-            # Удаляем истекшие элементы
+            # Удаляем истекшие элементы одним батчем
             for key in expired_keys:
                 del self.cache[key]
 

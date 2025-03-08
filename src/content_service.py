@@ -45,7 +45,7 @@ class ContentService(IContentProvider):
 
     def _load_events_data(self) -> Dict[str, Any]:
         """
-        Загружает данные о исторических событиях из файла.
+        Загружает данные о исторических событиях из файла с оптимизацией производительности.
 
         Returns:
             Dict[str, Any]: Данные о исторических событиях
@@ -59,24 +59,44 @@ class ContentService(IContentProvider):
                     "categories": [],
                     "periods": []
                 }
-                
-            if os.path.exists(self.events_file):
-                with open(self.events_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            else:
-                # Создаем базовую структуру, если файл не существует
-                events_data = {
+
+            if not os.path.exists(self.events_file):
+                self.logger.warning(f"Файл исторических событий {self.events_file} не найден")
+                return {
                     "events": [],
                     "categories": [],
                     "periods": []
                 }
 
-                # Сохраняем структуру в файл
-                with open(self.events_file, 'w', encoding='utf-8') as f:
-                    json.dump(events_data, f, ensure_ascii=False, indent=2)
+            # Используем mmap для более эффективного чтения больших файлов
+            file_size = os.path.getsize(self.events_file)
+            if file_size > 1024*1024:  # Если файл больше 1MB
+                import mmap
+                with open(self.events_file, 'r', encoding='utf-8') as f:
+                    try:
+                        # Используем mmap для более эффективного чтения
+                        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+                        json_data = mm.read().decode('utf-8')
+                        mm.close()
+                        events_data = json.loads(json_data)
+                    except Exception:
+                        # Если mmap не сработал, используем обычное чтение
+                        f.seek(0)
+                        events_data = json.load(f)
+            else:
+                # Для маленьких файлов используем обычное чтение
+                with open(self.events_file, 'r', encoding='utf-8') as f:
+                    events_data = json.load(f)
 
-                return events_data
+            return events_data
 
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Ошибка в формате JSON файла исторических событий: {e}")
+            return {
+                "events": [],
+                "categories": [],
+                "periods": []
+            }
         except Exception as e:
             self.logger.error(f"Ошибка при загрузке данных о исторических событиях: {e}")
             return {

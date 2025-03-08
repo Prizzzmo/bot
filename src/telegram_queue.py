@@ -24,45 +24,62 @@ class TelegramRequestQueue:
         """Обрабатывает очередь запросов с учетом ограничений частоты"""
         while self.running:
             try:
-                # Получаем запрос из очереди
-                func, args, kwargs, callback = self.queue.get(block=True, timeout=0.5)
+                # Получаем запрос из очереди с меньшим таймаутом для более быстрой обработки
+                try:
+                    func, args, kwargs, callback = self.queue.get(block=True, timeout=0.2)
+                except queue.Empty:
+                    # Очередь пуста, продолжаем цикл без дополнительных действий
+                    continue
                 
                 # Проверяем интервал между запросами
                 with self.lock:
                     current_time = time.time()
                     time_since_last = current_time - self.last_request_time
                     
+                    # Оптимизированная проверка и ожидание
                     if time_since_last < self.min_interval:
-                        # Ждем до следующего разрешенного момента
-                        time.sleep(self.min_interval - time_since_last)
+                        sleep_time = self.min_interval - time_since_last
+                        # Выходим из блокировки на время ожидания
+                        self.lock.release()
+                        time.sleep(sleep_time)
+                        self.lock.acquire()
                     
                     # Выполняем запрос
                     try:
                         result = func(*args, **kwargs)
-                        if callback:
-                            callback(result, None)
+                        success = True
+                    except telegram.error.RetryAfter as e:
+                        # Оптимизированная обработка RetryAfter
+                        if self.logger:
+                            self.logger.warning(f"Превышен лимит запросов. Ожидание {e.retry_after} секунд")
+                        
+                        # Возвращаем элемент в очередь и ждем
+                        self.queue.put((func, args, kwargs, callback))
+                        self.lock.release()
+                        time.sleep(e.retry_after)
+                        self.lock.acquire()
+                        # Сообщаем о завершении обработки текущего элемента очереди
+                        self.queue.task_done()
+                        continue
                     except Exception as e:
                         if self.logger:
                             self.logger.error(f"Ошибка при выполнении запроса к Telegram API: {e}")
-                        if callback:
-                            callback(None, e)
-                        
-                        # Обработка ошибки превышения лимита запросов
-                        if isinstance(e, telegram.error.RetryAfter):
-                            retry_after = e.retry_after
-                            if self.logger:
-                                self.logger.warning(f"Превышен лимит запросов. Ожидание {retry_after} секунд")
-                            time.sleep(retry_after)
+                        success = False
+                        result = e
                     
                     # Обновляем время последнего запроса
                     self.last_request_time = time.time()
-                    
+                
+                # Вызываем callback вне блокировки для повышения производительности
+                if callback:
+                    if success:
+                        callback(result, None)
+                    else:
+                        callback(None, result)
+                
                 # Сообщаем о завершении обработки элемента очереди
                 self.queue.task_done()
                 
-            except queue.Empty:
-                # Очередь пуста, продолжаем цикл
-                continue
             except Exception as e:
                 if self.logger:
                     self.logger.error(f"Ошибка в обработчике очереди: {e}")
