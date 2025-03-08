@@ -19,16 +19,14 @@ class Bot:
         self.test_service = test_service
         self.topic_service = topic_service
         
-        # Add missing attributes
+        # Сервисы бота
         self.api_client = api_client
         self.analytics = analytics
         self.history_map_service = history_map_service
         self.text_cache_service = text_cache_service
-
-        # Инициализируем админ-панель и привязываем её к обработчику команд
-        from src.admin_panel import AdminPanel
-        admin_panel = AdminPanel(logger, config)
-        self.handlers.admin_panel = admin_panel
+        
+        # Контейнер сервисов, будет установлен из фабрики
+        self.service_container = None
 
     def setup(self):
         """Настройка бота и диспетчера"""

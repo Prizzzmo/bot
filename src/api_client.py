@@ -63,7 +63,7 @@ class APIClient(BaseClient):
         import hashlib
         cache_key_data = f"{prompt}:{temperature}:{max_tokens}:{system_prompt}"
         return hashlib.md5(cache_key_data.encode()).hexdigest()
-        
+
     def call_api(self, prompt: str, temperature: float = 0.3, max_tokens: int = 1024, 
                 use_cache: bool = True, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """

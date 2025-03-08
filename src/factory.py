@@ -54,43 +54,61 @@ class BotFactory:
         logger = Logger()
         logger.info("Инициализация компонентов бота")
 
-        factory = BotFactory(logger) #Added factory instantiation
-
-        # Создаем кэш для API
+        # Создаем фабрику и контейнер сервисов
+        factory = BotFactory(logger)
+        
+        # Импортируем здесь, чтобы избежать циклических импортов
+        from src.service_container import ServiceContainer
+        container = ServiceContainer(logger)
+        
+        # Создаем и регистрируем все сервисы
+        
+        # Кэш для API
         api_cache = factory.create_api_cache()
-
-        # Создаем API-клиент
+        
+        # API-клиент
         api_client = APIClient(config.gemini_api_key, api_cache, logger)
-
-        # Создаем менеджер состояний
+        container.register("api_client", api_client)
+        
+        # Менеджер состояний
         state_manager = StateManager(logger)
-
-        # Создаем менеджер сообщений
+        container.register("state_manager", state_manager)
+        
+        # Менеджер сообщений
         message_manager = MessageManager(logger)
-
-        # Создаем сервисы для тестов и тем
+        container.register("message_manager", message_manager)
+        
+        # Сервис для кэширования текстов
+        text_cache_service = factory.create_text_cache_service()
+        container.register("text_cache_service", text_cache_service)
+        
+        # Сервисы для тестов и тем
         test_service = TestService(api_client, logger)
+        container.register("test_service", test_service)
+        
         topic_service = TopicService(api_client, logger)
-
-        # Создаем UI-менеджер с передачей topic_service
+        container.register("topic_service", topic_service)
+        
+        # UI-менеджер
         ui_manager = UIManager(logger, topic_service)
-
-        # Text cache service
-        text_cache_service = factory.create_text_cache_service() #Using factory method
-
-        # Создаем сервис контента
+        container.register("ui_manager", ui_manager)
+        
+        # Сервис контента
         content_service = ContentService(api_client, logger, 'historical_events.json', text_cache_service)
-
-        # Создаем аналитический сервис
+        container.register("content_service", content_service)
+        
+        # Аналитический сервис
         analytics_service = AnalyticsService(logger)
-
-        # Создаем сервис исторических карт
+        container.register("analytics_service", analytics_service)
+        
+        # Сервис исторических карт
         history_map_service = HistoryMap(logger)
-
-        # Создаем админ-панель
+        container.register("history_map_service", history_map_service)
+        
+        # Админ-панель
         admin_panel = AdminPanel(logger, config)
-
-        # Создаем обработчик команд
+        
+        # Обработчик команд
         command_handlers = CommandHandlers(
             ui_manager=ui_manager,
             api_client=api_client,
@@ -99,18 +117,22 @@ class BotFactory:
             logger=logger,
             config=config
         )
-
-        # Создаем веб-сервер
+        command_handlers.admin_panel = admin_panel
+        
+        # Веб-сервер
         web_server = WebServer(
             logger=logger,
             analytics_service=analytics_service,
             admin_panel=admin_panel,
             history_map_service=history_map_service
         )
-
-        # Сервисы для тестов и тем уже созданы выше
-
-        # Создаем бота с передачей всех необходимых сервисов
+        container.register("web_server", web_server)
+        
+        # Инициализируем все сервисы
+        logger.info("Инициализация всех сервисов...")
+        container.initialize_all()
+        
+        # Создаем бота
         bot = Bot(
             config=config,
             logger=logger,
@@ -122,7 +144,10 @@ class BotFactory:
             history_map_service=history_map_service,
             text_cache_service=text_cache_service
         )
-
+        
+        # Сохраняем ссылку на контейнер сервисов в боте
+        bot.service_container = container
+        
         logger.info("Все компоненты бота инициализированы успешно")
-
+        
         return bot
