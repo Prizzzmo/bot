@@ -10,13 +10,20 @@ from src.config import MAP #Added import for MAP constant
 class Bot:
     """Класс для управления Telegram ботом"""
 
-    def __init__(self, config, logger, command_handlers, test_service=None, topic_service=None):
+    def __init__(self, config, logger, command_handlers, test_service=None, topic_service=None, 
+              api_client=None, analytics=None, history_map_service=None, text_cache_service=None):
         self.config = config
         self.logger = logger
         self.handlers = command_handlers
         self.updater = None
         self.test_service = test_service
         self.topic_service = topic_service
+        
+        # Add missing attributes
+        self.api_client = api_client
+        self.analytics = analytics
+        self.history_map_service = history_map_service
+        self.text_cache_service = text_cache_service
 
         # Инициализируем админ-панель и привязываем её к обработчику команд
         from src.admin_panel import AdminPanel
