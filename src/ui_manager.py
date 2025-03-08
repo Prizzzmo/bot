@@ -1,32 +1,47 @@
 import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src.topic_service import TopicService # Import the new TopicService
+from src.base_service import BaseService
 
-class UIManager:
+class UIManager(BaseService):
     """Класс для управления пользовательским интерфейсом с функциями очистки текста для Telegram"""
 
     def __init__(self, logger, topic_service: TopicService): # Inject TopicService
-        self.logger = logger
+        super().__init__(logger)
         self.topic_service = topic_service
-        
+
+    def _do_initialize(self) -> bool:
+        """
+        Инициализирует UI менеджер
+
+        Returns:
+            bool: True если инициализация успешна
+        """
+        try:
+            # Здесь можно добавить код инициализации, если необходимо
+            return True
+        except Exception as e:
+            self._logger.log_error(e, "Ошибка при инициализации UIManager")
+            return False
+
     def sanitize_markdown(self, text):
         """
         Очищает текст от символов, которые могут вызвать проблемы при отображении Markdown в Telegram.
-        
+
         Args:
             text (str): Исходный текст
-            
+
         Returns:
             str: Очищенный текст
         """
         if not text:
             return ""
-            
+
         # Экранируем специальные символы Markdown
         chars_to_escape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
         for char in chars_to_escape:
             text = text.replace(char, '\\' + char)
-            
+
         return text
 
     def main_menu(self):
@@ -69,10 +84,10 @@ class UIManager:
                 else:
                     # Добавляем номер к теме
                     display_topic = f"{i}. {topic}"
-                
+
                 # Очищаем тему от спецсимволов для безопасного отображения
                 display_topic = self.sanitize_markdown(display_topic)
-                
+
                 # Ограничиваем длину темы в кнопке
                 display_topic = display_topic[:30] + '...' if len(display_topic) > 30 else display_topic
                 keyboard.append([InlineKeyboardButton(display_topic, callback_data=f'topic_{i}')])

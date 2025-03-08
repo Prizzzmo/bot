@@ -6,8 +6,9 @@ import time
 from typing import Dict, Any, Optional, List, Callable
 
 from src.interfaces import IContentProvider, ILogger
+from src.base_service import BaseService
 
-class ContentService(IContentProvider):
+class ContentService(BaseService):
     """
     Имплементация интерфейса поставщика контента.
     Обеспечивает доступ к историческому контенту через API и локальные данные.
@@ -23,8 +24,8 @@ class ContentService(IContentProvider):
             events_file (str): Путь к файлу с историческими событиями
             text_cache_service: Сервис кэширования текстов (опционально)
         """
+        super().__init__(logger)
         self.api_client = api_client
-        self.logger = logger
         self.events_file = events_file
         self.text_cache_service = text_cache_service
         self.events_data = self._load_events_data()
@@ -42,6 +43,21 @@ class ContentService(IContentProvider):
             "Великая Отечественная война",
             "Распад СССР"
         ]
+
+    def _do_initialize(self) -> bool:
+        """
+        Инициализирует сервис контента, загружая темы
+
+        Returns:
+            bool: True если инициализация успешна
+        """
+        try:
+            self.events_data = self._load_events_data()
+            return True
+        except Exception as e:
+            self._logger.log_error(e, "Ошибка при инициализации ContentService")
+            return False
+
 
     def _load_events_data(self) -> Dict[str, Any]:
         """

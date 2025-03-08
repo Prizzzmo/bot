@@ -1,8 +1,9 @@
 import re
 import random
 import textwrap
+from src.base_service import BaseService
 
-class TopicService:
+class TopicService(BaseService):
     """Класс для работы с темами по истории России"""
 
     def __init__(self, api_client, logger):
@@ -13,8 +14,22 @@ class TopicService:
             api_client: Клиент API для получения данных
             logger: Логгер для записи действий
         """
+        super().__init__(logger)
         self.api_client = api_client
-        self.logger = logger
+
+    def _do_initialize(self) -> bool:
+        """
+        Инициализирует сервис тем
+
+        Returns:
+            bool: True если инициализация успешна
+        """
+        try:
+            # Здесь можно добавить код инициализации, если необходимо
+            return True
+        except Exception as e:
+            self._logger.log_error(e, "Ошибка при инициализации TopicService")
+            return False
 
         # Список стандартных глав для каждой темы
         self.standard_chapters = [
@@ -128,19 +143,19 @@ class TopicService:
         """
         if not topic:
             return ["Пожалуйста, укажите тему для получения информации."]
-            
+
         # Проверяем кэш, если сервис кэширования предоставлен
         if text_cache_service:
             cache_key_type = "topic_info"
             cached_content = text_cache_service.get_text(topic, cache_key_type)
-            
+
             if cached_content:
                 # Нашли в кэше - десериализуем и возвращаем
                 if update_callback:
                     update_callback(f"📝 Загружаю информацию по теме: *{topic}* из кэша...")
-                
+
                 self.logger.info(f"Информация по теме '{topic}' загружена из кэша")
-                
+
                 try:
                     # Предполагаем, что в кэше хранится JSON-строка с сообщениями
                     import json
@@ -148,13 +163,13 @@ class TopicService:
                 except Exception as e:
                     self.logger.error(f"Ошибка при десериализации кэшированной темы '{topic}': {e}")
                     # В случае ошибки - сгенерируем заново
-            
+
             if update_callback:
                 update_callback(f"🔄 Не найдено в кэше. Генерирую информацию по теме: *{topic}*...")
-        
+
         # Генерируем новую информацию по теме
         messages = self.get_topic_info(topic, update_callback)
-        
+
         # Сохраняем в кэш, если сервис кэширования предоставлен и данные успешно получены
         if text_cache_service and messages and len(messages) > 1 and not messages[0].startswith("⚠️"):
             try:
@@ -165,7 +180,7 @@ class TopicService:
                 self.logger.info(f"Информация по теме '{topic}' сохранена в кэш")
             except Exception as e:
                 self.logger.error(f"Ошибка при сохранении темы '{topic}' в кэш: {e}")
-        
+
         return messages
 
     def get_topic_info(self, topic, update_callback=None):

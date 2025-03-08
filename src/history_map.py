@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.figure import Figure
 import concurrent.futures
+from src.base_service import BaseService
 
-class HistoryMap:
+class HistoryMap(BaseService):
     """Класс для работы с картой исторических событий"""
 
     def __init__(self, logger):
@@ -315,7 +316,7 @@ class HistoryMap:
             # Создаем уникальное имя файла для изображения с проверкой на доступность
             timestamp = int(time.time())
             map_image_path = f"generated_maps/map_{timestamp}.png"
-            
+
             # Проверяем, что директория существует и доступна для записи
             if not os.access('generated_maps', os.W_OK):
                 self.logger.error("Директория generated_maps недоступна для записи")
@@ -343,7 +344,7 @@ class HistoryMap:
             # Если matplotlib не доступен, сразу переходим к простой версии
             if not matplotlib_available:
                 return self._generate_simple_map(category, events, timeframe)
-                
+
             # Создаем карту с matplotlib с детальной обработкой исключений
             try:
                 # Устанавливаем параметры фигуры с защитой от исключений
@@ -355,9 +356,9 @@ class HistoryMap:
                     self.logger.warning(f"Ошибка при создании фигуры с параметрами {fig_params}: {fig_error}")
                     fig_params = {'figsize': (10, 8), 'dpi': 100}
                     fig = Figure(**fig_params)
-                
+
                 ax = fig.add_subplot(111)
-                
+
                 # Определяем границы карты России с защитой от некорректных данных
                 try:
                     ax.set_xlim(19, 190)  # Долгота от 19 до 190 градусов
@@ -367,7 +368,7 @@ class HistoryMap:
                     # Устанавливаем более стандартные границы
                     ax.set_xlim(0, 200)
                     ax.set_ylim(0, 100)
-                
+
                 # Устанавливаем заголовок с защитой от длинных строк
                 title = "Карта исторических событий России"
                 if category:
@@ -375,7 +376,7 @@ class HistoryMap:
                     if len(category) > 50:
                         category = category[:47] + "..."
                     title += f" - {category}"
-                
+
                 try:
                     ax.set_title(title, fontsize=16, pad=20)
                     ax.set_xlabel('Долгота', fontsize=12)
@@ -433,20 +434,20 @@ class HistoryMap:
 
                     lat = location.get('lat', 0)
                     lon = location.get('lng', 0)
-                    
+
                     # Пропускаем точки с некорректными координатами
                     if not (40 <= lat <= 83 and 19 <= lon <= 190):
                         self.logger.warning(f"Координаты события {event.get('id', '?')} вне допустимого диапазона: lat={lat}, lon={lon}")
                         continue
-                    
+
                     title = event.get('title', 'Неизвестное событие')
                     # Обрезаем слишком длинные заголовки
                     if len(title) > 60:
                         title = title[:57] + "..."
-                        
+
                     category = event.get('category', 'Прочее')
                     date = ""
-                    
+
                     # Безопасное извлечение даты
                     try:
                         date_str = event.get('date', '')
@@ -506,7 +507,7 @@ class HistoryMap:
             # Определяем размер шрифта для сносок в зависимости от их количества
             try:
                 footnote_fontsize = max(6, min(9, int(12 - 0.3 * len(footnotes))))
-                
+
                 # Добавляем сноски внизу изображения с более надежным методом
                 if hasattr(fig, 'text'):
                     fig.text(0.5, 0.01, '\n'.join(footnotes), ha='center', 
@@ -531,12 +532,12 @@ class HistoryMap:
             for attempt, dpi in enumerate([150, 100, 80, 60], 1):
                 if save_success:
                     break
-                    
+
                 try:
                     self.logger.info(f"Попытка {attempt} сохранения карты с DPI={dpi}")
                     # Используем Fig.savefig вместо plt.savefig для большей надежности
                     fig.savefig(map_image_path, bbox_inches='tight', pad_inches=0.5, dpi=dpi, format='png')
-                    
+
                     # Проверяем, что файл был успешно создан и имеет размер > 0
                     if os.path.exists(map_image_path) and os.path.getsize(map_image_path) > 0:
                         # Проверяем валидность PNG файла
@@ -555,7 +556,7 @@ class HistoryMap:
                         self.logger.warning(f"Файл карты не создан или имеет нулевой размер (попытка {attempt})")
                 except Exception as save_error:
                     self.logger.warning(f"Ошибка при сохранении карты (попытка {attempt}): {save_error}")
-            
+
             # Освобождаем ресурсы matplotlib для предотвращения утечек памяти
             try:
                 plt.close(fig)
@@ -635,7 +636,7 @@ class HistoryMap:
                     if os.path.exists(static_map_path):
                         return static_map_path
                     return None
-        
+
         try:
             # Проверяем наличие PIL
             try:
@@ -701,7 +702,7 @@ class HistoryMap:
                     # Пробуем создать изображение с другими параметрами
                     width, height = 640, 480
                     img = Image.new('RGB', (width, height), color=(224, 243, 255))
-                
+
                 draw = ImageDraw.Draw(img)
             except Exception as create_error:
                 self.logger.error(f"Критическая ошибка при создании базового изображения: {create_error}")
@@ -719,7 +720,7 @@ class HistoryMap:
                 # относительно текущих размеров изображения
                 scale_x = width / 800
                 scale_y = height / 600
-                
+
                 # Масштабируем координаты
                 west_russia = [
                     (int(100 * scale_x), int(450 * scale_y)), 
@@ -769,12 +770,12 @@ class HistoryMap:
                 "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf",
                 "/usr/share/fonts/dejavu/DejaVuSans.ttf"
             ]
-            
+
             # Устанавливаем шрифты по умолчанию на случай ошибок
             city_font = None
             title_font = None
             info_font = None
-            
+
             for font_path in font_paths:
                 if os.path.exists(font_path):
                     try:
@@ -785,7 +786,7 @@ class HistoryMap:
                         break
                     except Exception as font_error:
                         self.logger.warning(f"Не удалось загрузить шрифт {font_path}: {font_error}")
-            
+
             # Если не удалось загрузить шрифты, используем стандартный
             if city_font is None:
                 self.logger.warning("Используем стандартный шрифт")
@@ -807,29 +808,29 @@ class HistoryMap:
                     # Проверяем входные данные
                     if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
                         return width // 2, height // 2  # Центр карты по умолчанию
-                        
+
                     # Простое линейное преобразование с защитой от деления на ноль
                     if 190 - 19 == 0:
                         x_ratio = 0
                     else:
                         x_ratio = (lng - 19) / (190 - 19)
-                        
+
                     if 83 - 40 == 0:
                         y_ratio = 0
                     else:
                         y_ratio = (lat - 40) / (83 - 40)
-                        
+
                     # Ограничиваем значения диапазоном 0-1
                     x_ratio = max(0, min(1, x_ratio))
                     y_ratio = max(0, min(1, y_ratio))
-                    
+
                     x = int(x_ratio * width)
                     y = int(height - y_ratio * height)
-                    
+
                     # Проверяем, что координаты находятся в пределах изображения
                     x = max(0, min(width-1, x))
                     y = max(0, min(height-1, y))
-                    
+
                     return x, y
                 except Exception as coord_error:
                     self.logger.warning(f"Ошибка при преобразовании координат ({lat}, {lng}): {coord_error}")
@@ -843,15 +844,15 @@ class HistoryMap:
                     if len(category) > 30:
                         category = category[:27] + "..."
                     title += f" - {category}"
-                
+
                 # Безопасное центрирование текста заголовка
                 title_width = len(title) * 10  # Приблизительная ширина текста
                 title_x = max(10, (width - title_width) // 2)
-                
+
                 # Если расчет центрирования дал некорректное значение
                 if title_x < 0 or title_x > width:
                     title_x = 10
-                    
+
                 draw.text((title_x, 20), title, fill=(0, 0, 0), font=title_font)
             except Exception as title_error:
                 self.logger.warning(f"Ошибка при отрисовке заголовка: {title_error}")
@@ -888,19 +889,19 @@ class HistoryMap:
 
                     lat = location.get('lat', 0)
                     lng = location.get('lng', 0)
-                    
+
                     # Проверяем корректность координат
                     if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
                         self.logger.warning(f"Некорректные координаты события {event.get('id', '?')}: lat={lat}, lng={lng}")
                         continue
-                        
+
                     title = event.get('title', 'Неизвестное событие')
                     # Ограничиваем длину заголовка
                     if len(title) > 50:
                         title = title[:47] + "..."
-                        
+
                     category = event.get('category', 'Прочее')
-                    
+
                     # Безопасное извлечение даты
                     date = ""
                     try:
@@ -965,7 +966,7 @@ class HistoryMap:
                              font=title_font)
                 except Exception:
                     pass
-                
+
                 # Всё равно пытаемся сохранить карту
                 try:
                     img.save(output_path)
@@ -987,25 +988,25 @@ class HistoryMap:
                 # Ограничиваем количество категорий для отображения
                 max_categories = min(len(category_colors), 8)
                 category_items = list(category_colors.items())[:max_categories]
-                
+
                 for category, color in category_items:
                     # Ограничиваем длину названия категории
                     display_category = category
                     if len(display_category) > 25:
                         display_category = display_category[:22] + "..."
-                        
+
                     try:
                         draw.rectangle((20, legend_y, 30, legend_y+10), fill=color, outline=(0, 0, 0))
                         draw.text((35, legend_y), display_category, fill=(0, 0, 0), font=info_font)
                     except Exception as legend_item_error:
                         self.logger.warning(f"Ошибка при отрисовке элемента легенды '{display_category}': {legend_item_error}")
-                    
+
                     legend_y += 15
-                    
+
                     # Проверяем, не вышли ли мы за границы изображения
                     if legend_y > height - 200:
                         break
-                        
+
             except Exception as legend_error:
                 self.logger.warning(f"Ошибка при создании легенды: {legend_error}")
 
@@ -1036,7 +1037,7 @@ class HistoryMap:
                     if i >= lines_per_column * num_columns:
                         # Достигли максимального количества отображаемых сносок
                         break
-                        
+
                     # Определяем, в какую колонку идет сноска
                     column = i // lines_per_column
                     if column >= num_columns:
@@ -1083,7 +1084,7 @@ class HistoryMap:
                         save_success = True
                     except Exception as jpg_error:
                         self.logger.warning(f"Ошибка при сохранении JPEG: {jpg_error}")
-                
+
                 # Проверяем, что файл был успешно создан
                 if save_success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
                     self.logger.info(f"Простая карта успешно создана: {output_path}")
