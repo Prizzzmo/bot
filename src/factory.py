@@ -64,7 +64,7 @@ class BotFactory:
         text_cache_service = TextCacheService(logger)
 
         # Создаем сервис контента
-        content_service = ContentService(api_client, logger, text_cache_service)
+        content_service = ContentService(api_client, logger, 'historical_events.json', text_cache_service)
 
         # Создаем аналитический сервис
         analytics_service = AnalyticsService(logger)
