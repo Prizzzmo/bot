@@ -26,6 +26,19 @@ class BotFactory:
     Реализует паттерн Factory для создания и инициализации компонентов системы.
     """
 
+    def __init__(self, logger):
+        self.logger = logger
+
+    def create_api_cache(self):
+        """Создание кэша для API запросов"""
+        from src.api_cache import APICache
+        return APICache(self.logger, max_size=1000, cache_file='api_cache.json')
+
+    def create_text_cache_service(self):
+        """Создание сервиса кэширования текстов"""
+        from src.text_cache_service import TextCacheService
+        return TextCacheService(self.logger, cache_file='texts_cache.json', ttl=604800)  # TTL = 7 дней
+
     @staticmethod
     def create_bot(config):
         """
@@ -41,8 +54,10 @@ class BotFactory:
         logger = Logger()
         logger.info("Инициализация компонентов бота")
 
+        factory = BotFactory(logger) #Added factory instantiation
+
         # Создаем кэш для API
-        api_cache = APICache(logger, max_size=100, cache_file='api_cache.json')
+        api_cache = factory.create_api_cache()
 
         # Создаем API-клиент
         api_client = APIClient(config.gemini_api_key, api_cache, logger)
@@ -61,7 +76,7 @@ class BotFactory:
         ui_manager = UIManager(logger, topic_service)
 
         # Text cache service
-        text_cache_service = TextCacheService(logger)
+        text_cache_service = factory.create_text_cache_service() #Using factory method
 
         # Создаем сервис контента
         content_service = ContentService(api_client, logger, 'historical_events.json', text_cache_service)

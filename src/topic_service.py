@@ -114,6 +114,60 @@ class TopicService:
 
         return filtered_topics
 
+    def get_cached_topic_info(self, topic, update_callback=None, text_cache_service=None):
+        """
+        Получает информацию по теме из кэша или генерирует новую
+
+        Args:
+            topic (str): Тема для получения информации
+            update_callback (function): Функция обратного вызова для обновления статуса
+            text_cache_service (TextCacheService): Сервис кэширования текстов
+
+        Returns:
+            list: Список сообщений с информацией по теме
+        """
+        if not topic:
+            return ["Пожалуйста, укажите тему для получения информации."]
+            
+        # Проверяем кэш, если сервис кэширования предоставлен
+        if text_cache_service:
+            cache_key_type = "topic_info"
+            cached_content = text_cache_service.get_text(topic, cache_key_type)
+            
+            if cached_content:
+                # Нашли в кэше - десериализуем и возвращаем
+                if update_callback:
+                    update_callback(f"📝 Загружаю информацию по теме: *{topic}* из кэша...")
+                
+                self.logger.info(f"Информация по теме '{topic}' загружена из кэша")
+                
+                try:
+                    # Предполагаем, что в кэше хранится JSON-строка с сообщениями
+                    import json
+                    return json.loads(cached_content)
+                except Exception as e:
+                    self.logger.error(f"Ошибка при десериализации кэшированной темы '{topic}': {e}")
+                    # В случае ошибки - сгенерируем заново
+            
+            if update_callback:
+                update_callback(f"🔄 Не найдено в кэше. Генерирую информацию по теме: *{topic}*...")
+        
+        # Генерируем новую информацию по теме
+        messages = self.get_topic_info(topic, update_callback)
+        
+        # Сохраняем в кэш, если сервис кэширования предоставлен и данные успешно получены
+        if text_cache_service and messages and len(messages) > 1 and not messages[0].startswith("⚠️"):
+            try:
+                # Сериализуем сообщения для хранения в кэше
+                import json
+                serialized_messages = json.dumps(messages, ensure_ascii=False)
+                text_cache_service.save_text(topic, "topic_info", serialized_messages)
+                self.logger.info(f"Информация по теме '{topic}' сохранена в кэш")
+            except Exception as e:
+                self.logger.error(f"Ошибка при сохранении темы '{topic}' в кэш: {e}")
+        
+        return messages
+
     def get_topic_info(self, topic, update_callback=None):
         """
         Получает подробную информацию по теме, разбитую на главы

@@ -74,12 +74,18 @@ class Bot:
 
             # Добавляем обработчик для команды администратора
             dp.add_handler(CommandHandler('admin', self.handlers.admin_command))
-            
+
             # Добавляем обработчик для команды очистки чата
             dp.add_handler(CommandHandler('clear', self.handlers.clear_chat_command))
 
             # Добавляем обработчик для обработки callback запросов администратора
             dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'))
+
+            # Добавляем контекстные данные для бота
+            self.updater.dispatcher.bot_data['api_client'] = self.api_client
+            self.updater.dispatcher.bot_data['analytics'] = self.analytics
+            self.updater.dispatcher.bot_data['history_map_service'] = self.history_map_service
+            self.updater.dispatcher.bot_data['text_cache_service'] = self.text_cache_service
 
             return True
         except Exception as e:
