@@ -26,11 +26,11 @@ class HistoryMap(BaseService):
 
         # Создаем директорию для сохранения карт, если она не существует
         os.makedirs('generated_maps', exist_ok=True)
-        
+
     def _do_initialize(self) -> bool:
         """
         Выполняет фактическую инициализацию сервиса.
-        
+
         Returns:
             bool: True если инициализация прошла успешно, иначе False
         """
@@ -38,11 +38,11 @@ class HistoryMap(BaseService):
             # Проверяем доступность файла исторических событий
             if not self._ensure_events_file_exists():
                 return False
-                
+
             # Проверяем доступность директории для карт
             if not os.path.exists('generated_maps'):
                 os.makedirs('generated_maps', exist_ok=True)
-                
+
             return True
         except Exception as e:
             self._logger.error(f"Ошибка при инициализации HistoryMap: {e}")
@@ -124,7 +124,7 @@ class HistoryMap(BaseService):
             with open(self.events_file, 'w', encoding='utf-8') as f:
                 json.dump(default_events, f, ensure_ascii=False, indent=2)
 
-            self.logger.info(f"Создан файл с историческими событиями: {self.events_file}")
+            self._logger.info(f"Создан файл с историческими событиями: {self.events_file}")
 
     def _load_events_data(self):
         """Загружает данные о исторических событиях"""
@@ -134,7 +134,7 @@ class HistoryMap(BaseService):
                     return json.load(f)
             return {"events": [], "categories": []}
         except Exception as e:
-            self.logger.error(f"Ошибка при загрузке исторических событий: {e}")
+            self._logger.error(f"Ошибка при загрузке исторических событий: {e}")
             return {"events": [], "categories": []}
 
     def get_categories(self):
@@ -193,12 +193,12 @@ class HistoryMap(BaseService):
             with open(self.events_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
-            self.logger.info(f"Добавлено новое историческое событие: {title}")
+            self._logger.info(f"Добавлено новое историческое событие: {title}")
             # Обновляем данные в памяти
             self.events_data = data
             return new_id
         except Exception as e:
-            self.logger.error(f"Ошибка при добавлении события: {e}")
+            self._logger.error(f"Ошибка при добавлении события: {e}")
             return None
 
     def get_random_events(self, count=5):
@@ -211,7 +211,7 @@ class HistoryMap(BaseService):
         try:
             if category and isinstance(category, str):
                 display_events = self.get_events_by_category(category)
-                self.logger.info(f"Получено {len(display_events)} событий для категории {category}")
+                self._logger.info(f"Получено {len(display_events)} событий для категории {category}")
             elif events:
                 if isinstance(events, list):
                     display_events = events
@@ -221,7 +221,7 @@ class HistoryMap(BaseService):
                         display_events = [self.get_event_by_id(id_) for id_ in ids]
                         display_events = [event for event in display_events if event]
                     except Exception as e:
-                        self.logger.error(f"Ошибка при обработке параметра events: {e}")
+                        self._logger.error(f"Ошибка при обработке параметра events: {e}")
                         display_events = self.get_all_events()
             else:
                 display_events = self.get_all_events()
@@ -240,7 +240,7 @@ class HistoryMap(BaseService):
 
             return display_events
         except Exception as e:
-            self.logger.error(f"Ошибка при получении событий: {e}")
+            self._logger.error(f"Ошибка при получении событий: {e}")
             return []
 
     def generate_map_image(self, category=None, events=None, timeframe=None):
@@ -259,9 +259,9 @@ class HistoryMap(BaseService):
         if not os.path.exists('generated_maps'):
             try:
                 os.makedirs('generated_maps', exist_ok=True)
-                self.logger.info("Создана директория для карт: generated_maps")
+                self._logger.info("Создана директория для карт: generated_maps")
             except Exception as e:
-                self.logger.error(f"Ошибка при создании директории для карт: {e}")
+                self._logger.error(f"Ошибка при создании директории для карт: {e}")
                 # Если не удалось создать директорию, сразу возвращаем стандартную карту
                 static_map_path = 'static/default_map.png'
                 if os.path.exists(static_map_path):
@@ -285,12 +285,12 @@ class HistoryMap(BaseService):
                                 header = test_file.read(8)
                                 # Проверка формата PNG (начинается с ‰PNG)
                                 if header.startswith(b'\x89PNG'):
-                                    self.logger.debug(f"Использую кэшированную карту: {cached_path}")
+                                    self._logger.debug(f"Использую кэшированную карту: {cached_path}")
                                     return cached_path
                                 else:
-                                    self.logger.warning(f"Кэшированная карта повреждена: {cached_path}")
+                                    self._logger.warning(f"Кэшированная карта повреждена: {cached_path}")
                     except Exception as e:
-                        self.logger.warning(f"Ошибка при проверке кэшированной карты: {e}")
+                        self._logger.warning(f"Ошибка при проверке кэшированной карты: {e}")
                     # Если карта повреждена, продолжаем генерацию новой
 
         # Ограничиваем количество одновременных генераций карт
@@ -298,13 +298,13 @@ class HistoryMap(BaseService):
             # Устанавливаем таймаут для получения семафора
             acquired = self.map_generation_lock.acquire(timeout=10)
             if not acquired:
-                self.logger.warning("Превышен лимит одновременных генераций карт, используем стандартную карту")
+                self._logger.warning("Превышен лимит одновременных генераций карт, используем стандартную карту")
                 static_map_path = 'static/default_map.png'
                 if os.path.exists(static_map_path):
                     return static_map_path
                 return None
         except Exception as e:
-            self.logger.error(f"Ошибка при ожидании очереди генерации карты: {e}")
+            self._logger.error(f"Ошибка при ожидании очереди генерации карты: {e}")
             static_map_path = 'static/default_map.png'
             if os.path.exists(static_map_path):
                 return static_map_path
@@ -315,20 +315,20 @@ class HistoryMap(BaseService):
             try:
                 display_events = self._get_display_events(category, events, timeframe)
                 if not display_events:
-                    self.logger.warning(f"Не найдено событий для категории: {category}")
+                    self._logger.warning(f"Не найдено событий для категории: {category}")
                     static_map_path = 'static/default_map.png'
                     if os.path.exists(static_map_path):
                         return static_map_path
                     return None
             except Exception as event_error:
-                self.logger.error(f"Ошибка при получении событий: {event_error}")
+                self._logger.error(f"Ошибка при получении событий: {event_error}")
                 # Пытаемся использовать случайные события вместо запрошенных
                 try:
                     display_events = self.get_random_events(8)
                     if not display_events:
                         raise ValueError("Не удалось получить случайные события")
                 except Exception as random_error:
-                    self.logger.error(f"Не удалось получить случайные события: {random_error}")
+                    self._logger.error(f"Не удалось получить случайные события: {random_error}")
                     static_map_path = 'static/default_map.png'
                     if os.path.exists(static_map_path):
                         return static_map_path
@@ -340,13 +340,13 @@ class HistoryMap(BaseService):
 
             # Проверяем, что директория существует и доступна для записи
             if not os.access('generated_maps', os.W_OK):
-                self.logger.error("Директория generated_maps недоступна для записи")
+                self._logger.error("Директория generated_maps недоступна для записи")
                 # Пробуем создать директорию с другим именем
                 try:
                     os.makedirs('temp_maps', exist_ok=True)
                     map_image_path = f"temp_maps/map_{timestamp}.png"
                 except Exception as dir_error:
-                    self.logger.error(f"Ошибка при создании альтернативной директории: {dir_error}")
+                    self._logger.error(f"Ошибка при создании альтернативной директории: {dir_error}")
                     static_map_path = 'static/default_map.png'
                     if os.path.exists(static_map_path):
                         return static_map_path
@@ -359,7 +359,7 @@ class HistoryMap(BaseService):
                 from matplotlib.figure import Figure
                 import matplotlib.colors as mcolors
             except ImportError as imp_error:
-                self.logger.error(f"Не удалось импортировать модули matplotlib: {imp_error}")
+                self._logger.error(f"Не удалось импортировать модули matplotlib: {imp_error}")
                 matplotlib_available = False
 
             # Если matplotlib не доступен, сразу переходим к простой версии
@@ -374,7 +374,7 @@ class HistoryMap(BaseService):
                     fig_params = {'figsize': (12, 10), 'dpi': 150}
                     fig = Figure(**fig_params)
                 except Exception as fig_error:
-                    self.logger.warning(f"Ошибка при создании фигуры с параметрами {fig_params}: {fig_error}")
+                    self._logger.warning(f"Ошибка при создании фигуры с параметрами {fig_params}: {fig_error}")
                     fig_params = {'figsize': (10, 8), 'dpi': 100}
                     fig = Figure(**fig_params)
 
@@ -385,7 +385,7 @@ class HistoryMap(BaseService):
                     ax.set_xlim(19, 190)  # Долгота от 19 до 190 градусов
                     ax.set_ylim(40, 83)   # Широта от 40 до 83 градусов
                 except Exception as e:
-                    self.logger.warning(f"Ошибка при установке границ карты: {e}")
+                    self._logger.warning(f"Ошибка при установке границ карты: {e}")
                     # Устанавливаем более стандартные границы
                     ax.set_xlim(0, 200)
                     ax.set_ylim(0, 100)
@@ -404,12 +404,12 @@ class HistoryMap(BaseService):
                     ax.set_ylabel('Широта', fontsize=12)
                     ax.grid(True, alpha=0.3)
                 except Exception as e:
-                    self.logger.warning(f"Ошибка при настройке осей и заголовка: {e}")
+                    self._logger.warning(f"Ошибка при настройке осей и заголовка: {e}")
                     # Устанавливаем минимальные настройки
                     ax.set_title("Карта исторических событий")
                     ax.grid(True)
             except Exception as e:
-                self.logger.error(f"Критическая ошибка при создании фигуры карты: {e}")
+                self._logger.error(f"Критическая ошибка при создании фигуры карты: {e}")
                 # Пробуем создать фигуру с минимальными параметрами
                 try:
                     fig = Figure(figsize=(8, 6), dpi=80)
@@ -417,7 +417,7 @@ class HistoryMap(BaseService):
                     ax.set_title("Карта исторических событий России")
                     ax.grid(True)
                 except Exception as fallback_error:
-                    self.logger.error(f"Не удалось создать даже упрощенную фигуру: {fallback_error}")
+                    self._logger.error(f"Не удалось создать даже упрощенную фигуру: {fallback_error}")
                     return self._generate_simple_map(category, events, timeframe)
 
             # Словарь для хранения цветов категорий
@@ -428,7 +428,7 @@ class HistoryMap(BaseService):
                 if not colors:
                     raise ValueError("Пустой список цветов")
             except Exception as color_error:
-                self.logger.warning(f"Ошибка при получении цветов: {color_error}")
+                self._logger.warning(f"Ошибка при получении цветов: {color_error}")
                 # Создаем базовые цвета в формате RGB
                 colors = [(1, 0, 0), (0, 0, 1), (0, 1, 0), (1, 0, 1), (1, 1, 0), (0, 1, 1)]
 
@@ -441,7 +441,7 @@ class HistoryMap(BaseService):
             # Ограничиваем количество событий для предотвращения переполнения
             max_events = min(len(display_events), 30)
             if len(display_events) > max_events:
-                self.logger.info(f"Ограничиваем количество событий с {len(display_events)} до {max_events}")
+                self._logger.info(f"Ограничиваем количество событий с {len(display_events)} до {max_events}")
                 display_events = display_events[:max_events]
 
             # Отображаем события на карте с защитой от ошибок координат
@@ -450,7 +450,7 @@ class HistoryMap(BaseService):
                     # Получаем координаты события с проверкой
                     location = event.get('location', {})
                     if not isinstance(location, dict):
-                        self.logger.warning(f"Некорректный формат местоположения для события {event.get('id', '?')}")
+                        self._logger.warning(f"Некорректный формат местоположения для события {event.get('id', '?')}")
                         continue
 
                     lat = location.get('lat', 0)
@@ -458,7 +458,7 @@ class HistoryMap(BaseService):
 
                     # Пропускаем точки с некорректными координатами
                     if not (40 <= lat <= 83 and 19 <= lon <= 190):
-                        self.logger.warning(f"Координаты события {event.get('id', '?')} вне допустимого диапазона: lat={lat}, lon={lon}")
+                        self._logger.warning(f"Координаты события {event.get('id', '?')} вне допустимого диапазона: lat={lat}, lon={lon}")
                         continue
 
                     title = event.get('title', 'Неизвестное событие')
@@ -475,7 +475,7 @@ class HistoryMap(BaseService):
                         if date_str:
                             date = date_str.split('-')[0]  # Берем только год
                     except Exception as date_error:
-                        self.logger.warning(f"Ошибка при обработке даты события {event.get('id', '?')}: {date_error}")
+                        self._logger.warning(f"Ошибка при обработке даты события {event.get('id', '?')}: {date_error}")
                         date = "?"
 
                     # Определяем цвет для категории
@@ -495,7 +495,7 @@ class HistoryMap(BaseService):
                               bbox=dict(facecolor=category_colors[category], alpha=0.8,
                                        boxstyle='round,pad=0.3', edgecolor='white'))
                     except Exception as plot_error:
-                        self.logger.warning(f"Ошибка при отрисовке события {event.get('id', '?')}: {plot_error}")
+                        self._logger.warning(f"Ошибка при отрисовке события {event.get('id', '?')}: {plot_error}")
                         continue
 
                     # Добавляем сноску с информацией о событии
@@ -504,12 +504,12 @@ class HistoryMap(BaseService):
                         footnote_text += f" ({date})"
                     footnotes.append(footnote_text)
                 except Exception as event_plot_error:
-                    self.logger.warning(f"Ошибка при обработке события {i}: {event_plot_error}")
+                    self._logger.warning(f"Ошибка при обработке события {i}: {event_plot_error}")
                     continue
 
             # Проверяем, есть ли успешно обработанные события
             if not footnotes:
-                self.logger.warning("Не удалось обработать ни одно событие")
+                self._logger.warning("Не удалось обработать ни одно событие")
                 return self._generate_simple_map(category, events, timeframe)
 
             # Добавляем легенду с категориями
@@ -523,7 +523,7 @@ class HistoryMap(BaseService):
                     ax.legend(handles=legend_elements, loc='upper left', 
                              title="Категории событий", framealpha=0.7)
                 except Exception as legend_error:
-                    self.logger.warning(f"Ошибка при создании легенды: {legend_error}")
+                    self._logger.warning(f"Ошибка при создании легенды: {legend_error}")
 
             # Определяем размер шрифта для сносок в зависимости от их количества
             try:
@@ -540,13 +540,13 @@ class HistoryMap(BaseService):
                                fontsize=footnote_fontsize,
                                bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
             except Exception as footnote_error:
-                self.logger.warning(f"Ошибка при добавлении сносок: {footnote_error}")
+                self._logger.warning(f"Ошибка при добавлении сносок: {footnote_error}")
 
             # Оптимизируем размеры для лучшего отображения
             try:
                 fig.tight_layout(rect=[0, 0.1, 1, 0.95])
             except Exception as layout_error:
-                self.logger.warning(f"Ошибка при оптимизации размеров: {layout_error}")
+                self._logger.warning(f"Ошибка при оптимизации размеров: {layout_error}")
 
             # Защищенная система сохранения карты с множественными резервными методами
             save_success = False
@@ -555,7 +555,7 @@ class HistoryMap(BaseService):
                     break
 
                 try:
-                    self.logger.info(f"Попытка {attempt} сохранения карты с DPI={dpi}")
+                    self._logger.info(f"Попытка {attempt} сохранения карты с DPI={dpi}")
                     # Используем Fig.savefig вместо plt.savefig для большей надежности
                     fig.savefig(map_image_path, bbox_inches='tight', pad_inches=0.5, dpi=dpi, format='png')
 
@@ -566,27 +566,27 @@ class HistoryMap(BaseService):
                             with open(map_image_path, 'rb') as test_file:
                                 header = test_file.read(8)
                                 if header.startswith(b'\x89PNG'):
-                                    self.logger.info(f"Карта успешно сохранена в {map_image_path} (попытка {attempt})")
+                                    self._logger.info(f"Карта успешно сохранена в {map_image_path} (попытка {attempt})")
                                     save_success = True
                                 else:
-                                    self.logger.warning(f"Созданный файл не является валидным PNG (попытка {attempt})")
+                                    self._logger.warning(f"Созданный файл не является валидным PNG (попытка {attempt})")
                                     os.remove(map_image_path)  # Удаляем поврежденный файл
                         except Exception as validate_error:
-                            self.logger.warning(f"Ошибка при валидации файла карты: {validate_error}")
+                            self._logger.warning(f"Ошибка при валидации файла карты: {validate_error}")
                     else:
-                        self.logger.warning(f"Файл карты не создан или имеет нулевой размер (попытка {attempt})")
+                        self._logger.warning(f"Файл карты не создан или имеет нулевой размер (попытка {attempt})")
                 except Exception as save_error:
-                    self.logger.warning(f"Ошибка при сохранении карты (попытка {attempt}): {save_error}")
+                    self._logger.warning(f"Ошибка при сохранении карты (попытка {attempt}): {save_error}")
 
             # Освобождаем ресурсы matplotlib для предотвращения утечек памяти
             try:
                 plt.close(fig)
             except Exception as close_error:
-                self.logger.warning(f"Ошибка при закрытии фигуры: {close_error}")
+                self._logger.warning(f"Ошибка при закрытии фигуры: {close_error}")
 
             # Если не удалось сохранить, переходим к простой версии
             if not save_success:
-                self.logger.warning("Не удалось сохранить карту используя matplotlib, переходим к резервному методу")
+                self._logger.warning("Не удалось сохранить карту используя matplotlib, переходим к резервному методу")
                 return self._generate_simple_map(category, events, timeframe)
 
             # Сохраняем путь к карте в кэш только если успешно создали файл
@@ -599,22 +599,22 @@ class HistoryMap(BaseService):
 
                     self.map_cache[cache_key] = (map_image_path, time.time())
 
-                self.logger.info(f"Карта успешно сгенерирована и сохранена в кэш: {map_image_path}")
+                self._logger.info(f"Карта успешно сгенерирована и сохранена в кэш: {map_image_path}")
                 return map_image_path
             else:
-                self.logger.error("Не удалось сохранить карту после всех попыток")
+                self._logger.error("Не удалось сохранить карту после всех попыток")
                 static_map_path = 'static/default_map.png'
                 if os.path.exists(static_map_path):
                     return static_map_path
                 return None
 
         except Exception as e:
-            self.logger.error(f"Критическая ошибка при генерации карты: {e}")
+            self._logger.error(f"Критическая ошибка при генерации карты: {e}")
             # В случае ошибки, пробуем создать простую версию карты
             try:
                 return self._generate_simple_map(category, events, timeframe)
             except Exception as alt_error:
-                self.logger.error(f"Ошибка при генерации простой карты: {alt_error}")
+                self._logger.error(f"Ошибка при генерации простой карты: {alt_error}")
                 # Возвращаем стандартную карту, если всё совсем плохо
                 static_map_path = 'static/default_map.png'
                 if os.path.exists(static_map_path):
@@ -625,7 +625,7 @@ class HistoryMap(BaseService):
             try:
                 self.map_generation_lock.release()
             except Exception as release_error:
-                self.logger.error(f"Ошибка при освобождении блокировки: {release_error}")
+                self._logger.error(f"Ошибка при освобождении блокировки: {release_error}")
                 # Критическую ошибку здесь игнорируем, так как это финальная операция
 
     def _generate_simple_map(self, category=None, events=None, timeframe=None):
@@ -645,9 +645,9 @@ class HistoryMap(BaseService):
         if not os.path.exists('generated_maps'):
             try:
                 os.makedirs('generated_maps', exist_ok=True)
-                self.logger.info("Создана директория для карт: generated_maps")
+                self._logger.info("Создана директория для карт: generated_maps")
             except Exception as e:
-                self.logger.error(f"Ошибка при создании директории для карт: {e}")
+                self._logger.error(f"Ошибка при создании директории для карт: {e}")
                 # Пробуем создать альтернативную директорию
                 try:
                     os.makedirs('temp_maps', exist_ok=True)
@@ -663,7 +663,7 @@ class HistoryMap(BaseService):
             try:
                 from PIL import Image, ImageDraw, ImageFont
             except ImportError as imp_error:
-                self.logger.error(f"Не удалось импортировать модули PIL: {imp_error}")
+                self._logger.error(f"Не удалось импортировать модули PIL: {imp_error}")
                 # Если PIL недоступен, возвращаем стандартную карту
                 static_map_path = 'static/default_map.png'
                 if os.path.exists(static_map_path):
@@ -677,13 +677,13 @@ class HistoryMap(BaseService):
                     # Пробуем получить случайные события вместо отсутствующих
                     display_events = self.get_random_events(5)
                     if not display_events:
-                        self.logger.warning("Не удалось получить ни запрошенные, ни случайные события")
+                        self._logger.warning("Не удалось получить ни запрошенные, ни случайные события")
                         static_map_path = 'static/default_map.png'
                         if os.path.exists(static_map_path):
                             return static_map_path
                         return None
             except Exception as events_error:
-                self.logger.error(f"Ошибка при получении событий для простой карты: {events_error}")
+                self._logger.error(f"Ошибка при получении событий для простой карты: {events_error}")
                 # Пробуем получить случайные события
                 try:
                     display_events = self.get_random_events(5)
@@ -707,7 +707,7 @@ class HistoryMap(BaseService):
                     os.makedirs('temp_maps', exist_ok=True)
                     output_path = f"temp_maps/map_{timestamp}_simple.png"
                 except Exception as dir_error:
-                    self.logger.error(f"Невозможно создать директорию для сохранения: {dir_error}")
+                    self._logger.error(f"Невозможно создать директорию для сохранения: {dir_error}")
                     static_map_path = 'static/default_map.png'
                     if os.path.exists(static_map_path):
                         return static_map_path
@@ -719,14 +719,14 @@ class HistoryMap(BaseService):
                 try:
                     img = Image.new('RGB', (width, height), color=(224, 243, 255))
                 except Exception as img_error:
-                    self.logger.warning(f"Ошибка при создании изображения: {img_error}")
+                    self._logger.warning(f"Ошибка при создании изображения: {img_error}")
                     # Пробуем создать изображение с другими параметрами
                     width, height = 640, 480
                     img = Image.new('RGB', (width, height), color=(224, 243, 255))
 
                 draw = ImageDraw.Draw(img)
             except Exception as create_error:
-                self.logger.error(f"Критическая ошибка при создании базового изображения: {create_error}")
+                self._logger.error(f"Критическая ошибка при создании базового изображения: {create_error}")
                 static_map_path = 'static/default_map.png'
                 if os.path.exists(static_map_path):
                     return static_map_path
@@ -768,7 +768,7 @@ class HistoryMap(BaseService):
                 # Рисуем контур суши
                 draw.polygon(west_russia, fill=land_color, outline=(180, 180, 180))
             except Exception as polygon_error:
-                self.logger.warning(f"Ошибка при рисовании контура России: {polygon_error}")
+                self._logger.warning(f"Ошибка при рисовании контура России: {polygon_error}")
                 # В случае ошибки рисуем простой прямоугольник вместо контура
                 try:
                     draw.rectangle([width//4, height//4, width*3//4, height*3//4], 
@@ -803,14 +803,14 @@ class HistoryMap(BaseService):
                         city_font = ImageFont.truetype(font_path, 12)
                         title_font = ImageFont.truetype(font_path, 18)
                         info_font = ImageFont.truetype(font_path, 10)
-                        self.logger.info(f"Успешно загружен шрифт: {font_path}")
+                        self._logger.info(f"Успешно загружен шрифт: {font_path}")
                         break
                     except Exception as font_error:
-                        self.logger.warning(f"Не удалось загрузить шрифт {font_path}: {font_error}")
+                        self._logger.warning(f"Не удалось загрузить шрифт {font_path}: {font_error}")
 
             # Если не удалось загрузить шрифты, используем стандартный
             if city_font is None:
-                self.logger.warning("Используем стандартный шрифт")
+                self._logger.warning("Используем стандартный шрифт")
                 city_font = ImageFont.load_default()
                 title_font = ImageFont.load_default()
                 info_font = ImageFont.load_default()
@@ -820,7 +820,7 @@ class HistoryMap(BaseService):
                 try:
                     draw.text((x, y), city_name, fill=(100, 100, 100), font=city_font)
                 except Exception as city_error:
-                    self.logger.warning(f"Ошибка при отрисовке города {city_name}: {city_error}")
+                    self._logger.warning(f"Ошибка при отрисовке города {city_name}: {city_error}")
 
             # Преобразование географических координат в координаты изображения
             # с защитой от деления на ноль и некорректных входных данных
@@ -854,7 +854,7 @@ class HistoryMap(BaseService):
 
                     return x, y
                 except Exception as coord_error:
-                    self.logger.warning(f"Ошибка при преобразовании координат ({lat}, {lng}): {coord_error}")
+                    self._logger.warning(f"Ошибка при преобразовании координат ({lat}, {lng}): {coord_error}")
                     return width // 2, height // 2  # Центр карты по умолчанию
 
             # Добавляем заголовок с защитой от ошибок
@@ -876,7 +876,7 @@ class HistoryMap(BaseService):
 
                 draw.text((title_x, 20), title, fill=(0, 0, 0), font=title_font)
             except Exception as title_error:
-                self.logger.warning(f"Ошибка при отрисовке заголовка: {title_error}")
+                self._logger.warning(f"Ошибка при отрисовке заголовка: {title_error}")
                 # Пробуем отрисовать упрощенный заголовок
                 try:
                     draw.text((10, 10), "Карта исторических событий", fill=(0, 0, 0), font=title_font)
@@ -896,7 +896,7 @@ class HistoryMap(BaseService):
             # Ограничиваем количество событий для предотвращения переполнения
             max_events = min(len(display_events), 30)
             if len(display_events) > max_events:
-                self.logger.info(f"Ограничиваем количество событий с {len(display_events)} до {max_events}")
+                self._logger.info(f"Ограничиваем количество событий с {len(display_events)} до {max_events}")
                 display_events = display_events[:max_events]
 
             # Отображаем события на карте с защитой от ошибок
@@ -905,7 +905,7 @@ class HistoryMap(BaseService):
                     # Извлекаем и проверяем данные события
                     location = event.get('location', {})
                     if not isinstance(location, dict):
-                        self.logger.warning(f"Некорректный формат местоположения для события {event.get('id', '?')}")
+                        self._logger.warning(f"Некорректный формат местоположения для события {event.get('id', '?')}")
                         continue
 
                     lat = location.get('lat', 0)
@@ -913,7 +913,7 @@ class HistoryMap(BaseService):
 
                     # Проверяем корректность координат
                     if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
-                        self.logger.warning(f"Некорректные координаты события {event.get('id', '?')}: lat={lat}, lng={lng}")
+                        self._logger.warning(f"Некорректные координаты события {event.get('id', '?')}: lat={lat}, lng={lng}")
                         continue
 
                     title = event.get('title', 'Неизвестное событие')
@@ -933,7 +933,7 @@ class HistoryMap(BaseService):
                             else:
                                 date = date_str
                     except Exception as date_error:
-                        self.logger.warning(f"Ошибка при обработке даты события {event.get('id', '?')}: {date_error}")
+                        self._logger.warning(f"Ошибка при обработке даты события {event.get('id', '?')}: {date_error}")
                         date = "?"
 
                     # Определяем цвет для категории
@@ -952,7 +952,7 @@ class HistoryMap(BaseService):
                         draw.ellipse((x-dot_radius, y-dot_radius, x+dot_radius, y+dot_radius), 
                                     fill=color, outline=(255, 255, 255))
                     except Exception as ellipse_error:
-                        self.logger.warning(f"Ошибка при рисовании точки для события {event.get('id', '?')}: {ellipse_error}")
+                        self._logger.warning(f"Ошибка при рисовании точки для события {event.get('id', '?')}: {ellipse_error}")
                         # Пробуем нарисовать прямоугольник вместо эллипса
                         try:
                             draw.rectangle((x-dot_radius, y-dot_radius, x+dot_radius, y+dot_radius), 
@@ -964,7 +964,7 @@ class HistoryMap(BaseService):
                     try:
                         draw.text((x, y-15), str(i+1), fill=(0, 0, 0), font=info_font)
                     except Exception as text_error:
-                        self.logger.warning(f"Ошибка при добавлении номера события: {text_error}")
+                        self._logger.warning(f"Ошибка при добавлении номера события: {text_error}")
 
                     # Формируем текст сноски
                     footnote_text = f"{i+1}. {title}"
@@ -973,12 +973,12 @@ class HistoryMap(BaseService):
                     footnotes.append(footnote_text)
 
                 except Exception as event_error:
-                    self.logger.warning(f"Ошибка при обработке события {i}: {event_error}")
+                    self._logger.warning(f"Ошибка при обработке события {i}: {event_error}")
                     continue
 
             # Проверяем, обработали ли мы какие-либо события
             if not footnotes:
-                self.logger.warning("Не удалось обработать ни одно событие")
+                self._logger.warning("Не удалось обработать ни одно событие")
                 # Создаем сообщение об ошибке
                 try:
                     draw.text((width//2-100, height//2), 
@@ -991,10 +991,10 @@ class HistoryMap(BaseService):
                 # Всё равно пытаемся сохранить карту
                 try:
                     img.save(output_path)
-                    self.logger.info(f"Создана пустая карта: {output_path}")
+                    self._logger.info(f"Создана пустая карта: {output_path}")
                     return output_path
                 except Exception as save_error:
-                    self.logger.error(f"Ошибка при сохранении пустой карты: {save_error}")
+                    self._logger.error(f"Ошибка при сохранении пустой карты: {save_error}")
                     static_map_path = 'static/default_map.png'
                     if os.path.exists(static_map_path):
                         return static_map_path
@@ -1020,7 +1020,7 @@ class HistoryMap(BaseService):
                         draw.rectangle((20, legend_y, 30, legend_y+10), fill=color, outline=(0, 0, 0))
                         draw.text((35, legend_y), display_category, fill=(0, 0, 0), font=info_font)
                     except Exception as legend_item_error:
-                        self.logger.warning(f"Ошибка при отрисовке элемента легенды '{display_category}': {legend_item_error}")
+                        self._logger.warning(f"Ошибка при отрисовке элемента легенды '{display_category}': {legend_item_error}")
 
                     legend_y += 15
 
@@ -1029,7 +1029,7 @@ class HistoryMap(BaseService):
                         break
 
             except Exception as legend_error:
-                self.logger.warning(f"Ошибка при создании легенды: {legend_error}")
+                self._logger.warning(f"Ошибка при создании легенды: {legend_error}")
 
             # Добавляем сноски
             try:
@@ -1040,7 +1040,7 @@ class HistoryMap(BaseService):
                     draw.rectangle((10, footnote_y-10, width-10, height-10), 
                                  fill=(255, 255, 255, 220), outline=(0, 0, 0))
                 except Exception as bg_error:
-                    self.logger.warning(f"Ошибка при создании фона для сносок: {bg_error}")
+                    self._logger.warning(f"Ошибка при создании фона для сносок: {bg_error}")
 
                 # Определяем количество колонок в зависимости от числа сносок
                 num_columns = 1
@@ -1076,9 +1076,9 @@ class HistoryMap(BaseService):
                     try:
                         draw.text((note_x, note_y), footnote, fill=(0, 0, 0), font=info_font)
                     except Exception as footnote_error:
-                        self.logger.warning(f"Ошибка при добавлении сноски {i}: {footnote_error}")
+                        self._logger.warning(f"Ошибка при добавлении сноски {i}: {footnote_error}")
             except Exception as footnotes_error:
-                self.logger.warning(f"Ошибка при обработке сносок: {footnotes_error}")
+                self._logger.warning(f"Ошибка при обработке сносок: {footnotes_error}")
 
             # Добавляем информацию о времени создания
             try:
@@ -1086,7 +1086,7 @@ class HistoryMap(BaseService):
                 draw.text((10, height-25), f"Сгенерировано: {timestamp_str}", 
                          fill=(100, 100, 100), font=info_font)
             except Exception as timestamp_error:
-                self.logger.warning(f"Ошибка при добавлении временной метки: {timestamp_error}")
+                self._logger.warning(f"Ошибка при добавлении временной метки: {timestamp_error}")
 
             # Сохраняем изображение с защитой от ошибок
             save_success = False
@@ -1096,7 +1096,7 @@ class HistoryMap(BaseService):
                     img.save(output_path, format='PNG')
                     save_success = True
                 except Exception as png_error:
-                    self.logger.warning(f"Ошибка при сохранении PNG: {png_error}")
+                    self._logger.warning(f"Ошибка при сохранении PNG: {png_error}")
                     # Пробуем JPEG
                     try:
                         jpeg_path = output_path.replace('.png', '.jpg')
@@ -1104,23 +1104,23 @@ class HistoryMap(BaseService):
                         output_path = jpeg_path
                         save_success = True
                     except Exception as jpg_error:
-                        self.logger.warning(f"Ошибка при сохранении JPEG: {jpg_error}")
+                        self._logger.warning(f"Ошибка при сохранении JPEG: {jpg_error}")
 
                 # Проверяем, что файл был успешно создан
                 if save_success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                    self.logger.info(f"Простая карта успешно создана: {output_path}")
+                    self._logger.info(f"Простая карта успешно создана: {output_path}")
                     return output_path
                 else:
                     raise IOError("Файл карты не создан или имеет нулевой размер")
             except Exception as e:
-                self.logger.error(f"Не удалось сохранить простую карту: {e}")
+                self._logger.error(f"Не удалось сохранить простую карту: {e}")
                 static_map_path = 'static/default_map.png'
                 if os.path.exists(static_map_path):
                     return static_map_path
                 return None
 
         except Exception as e:
-            self.logger.error(f"Критическая ошибка при создании простой карты: {e}")
+            self._logger.error(f"Критическая ошибка при создании простой карты: {e}")
             # В случае полного провала возвращаем стандартную карту
             static_map_path = 'static/default_map.png'
             if os.path.exists(static_map_path):
@@ -1138,12 +1138,12 @@ class HistoryMap(BaseService):
             str: Путь к сгенерированному изображению карты или None в случае ошибки
         """
         try:
-            self.logger.info(f"Генерация карты по запросу: {topic}")
+            self._logger.info(f"Генерация карты по запросу: {topic}")
 
             # Получаем все события
             all_events = self.get_all_events()
             if not all_events:
-                self.logger.warning("Нет доступных событий для фильтрации")
+                self._logger.warning("Нет доступных событий для фильтрации")
                 return None
 
             # Преобразуем тему в нижний регистр для поиска
@@ -1234,11 +1234,11 @@ class HistoryMap(BaseService):
                 display_events.extend(random_events)
 
             # Генерируем карту
-            self.logger.info(f"Найдено {len(display_events)} событий по запросу '{topic}'")
+            self._logger.info(f"Найдено {len(display_events)} событий по запросу '{topic}'")
             return self.generate_map_image(events=display_events)
 
         except Exception as e:
-            self.logger.error(f"Ошибка при генерации карты по теме {topic}: {e}")
+            self._logger.error(f"Ошибка при генерации карты по теме {topic}: {e}")
             return None
 
     def clean_old_maps(self, max_age_hours=24):
@@ -1278,9 +1278,9 @@ class HistoryMap(BaseService):
                         os.remove(file_path)
                         deleted_count += 1
                     except Exception as e:
-                        self.logger.debug(f"Не удалось удалить файл {file_path}: {e}")
+                        self._logger.debug(f"Не удалось удалить файл {file_path}: {e}")
 
             if deleted_count > 0:
-                self.logger.info(f"Очищено {deleted_count} старых карт")
+                self._logger.info(f"Очищено {deleted_count} старых карт")
         except Exception as e:
-            self.logger.error(f"Ошибка при очистке старых карт: {e}")
+            self._logger.error(f"Ошибка при очистке старых карт: {e}")
