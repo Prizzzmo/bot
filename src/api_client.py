@@ -111,7 +111,7 @@ class APIClient(BaseService):
             cache_key = self._create_cache_key(prompt, temperature, max_tokens, system_prompt)
             cached_result = self.cache.get(cache_key)
             if cached_result:
-                self.logger.debug(f"Получен ответ из кэша для промпта: {prompt[:50]}...")
+                self._logger.debug(f"Получен ответ из кэша для промпта: {prompt[:50]}...")
                 return cached_result
 
         # Настройка параметров генерации - вынесена вне цикла для оптимизации
@@ -129,7 +129,7 @@ class APIClient(BaseService):
         for attempt in range(max_retries):
             try:
                 start_time = time.time()
-                self.logger.debug(f"Отправка запроса к Gemini API: {prompt[:50]}...")
+                self._logger.debug(f"Отправка запроса к Gemini API: {prompt[:50]}...")
 
                 # Формирование промпта с системной инструкцией если она предоставлена
                 try:
@@ -148,7 +148,7 @@ class APIClient(BaseService):
                     response = self.model.generate_content(content=prompt, generation_config=generation_config)
 
                 elapsed_time = time.time() - start_time
-                self.logger.debug(f"Ответ получен за {elapsed_time:.2f}с")
+                self._logger.debug(f"Ответ получен за {elapsed_time:.2f}с")
 
                 # Обработка ответа
                 result = {
@@ -166,12 +166,12 @@ class APIClient(BaseService):
                 return result
 
             except Exception as e:
-                self.logger.warning(f"Ошибка запроса к Gemini API (попытка {attempt+1}/{max_retries}): {e}")
+                self._logger.warning(f"Ошибка запроса к Gemini API (попытка {attempt+1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     # Используем более эффективную задержку
                     time.sleep(retry_delay * (2 ** attempt))  # Экспоненциальная задержка с base 2
                 else:
-                    self.logger.error(f"Не удалось получить ответ от Gemini API после {max_retries} попыток: {e}")
+                    self._logger.error(f"Не удалось получить ответ от Gemini API после {max_retries} попыток: {e}")
                     raise
 
     def validate_historical_topic(self, topic: str) -> bool:
@@ -206,11 +206,11 @@ class APIClient(BaseService):
             response_text = result.get("text", "").strip().lower()
             is_historical = "да" in response_text
 
-            self.logger.debug(f"Проверка темы '{topic}': {is_historical}")
+            self._logger.debug(f"Проверка темы '{topic}': {is_historical}")
             return is_historical
 
         except Exception as e:
-            self.logger.error(f"Ошибка при проверке исторической темы: {e}")
+            self._logger.error(f"Ошибка при проверке исторической темы: {e}")
             # В случае ошибки считаем, что тема может быть исторической
             return True
 
@@ -257,7 +257,7 @@ class APIClient(BaseService):
             }
 
         except Exception as e:
-            self.logger.error(f"Ошибка при получении исторической информации: {e}")
+            self._logger.error(f"Ошибка при получении исторической информации: {e}")
             return {
                 "status": "error",
                 "topic": topic,
@@ -286,14 +286,14 @@ class APIClient(BaseService):
             )
             return result.get("text", "")
         except Exception as e:
-            self.logger.error(f"Ошибка в методе ask_grok: {e}")
+            self._logger.error(f"Ошибка в методе ask_grok: {e}")
             # Попробуем запасной метод для Gemini 2.0
             try:
-                self.logger.info("Пробуем альтернативный метод вызова API...")
+                self._logger.info("Пробуем альтернативный метод вызова API...")
                 response = self.model.generate_content(content=prompt)
                 return response.text
             except Exception as e2:
-                self.logger.error(f"Вторая ошибка в методе ask_grok: {e2}")
+                self._logger.error(f"Вторая ошибка в методе ask_grok: {e2}")
                 return f"Произошла ошибка при обработке запроса: {str(e)}. Повторная попытка также не удалась: {str(e2)}"
 
     def generate_historical_test(self, topic: str) -> Dict[str, Any]:
@@ -353,13 +353,13 @@ class APIClient(BaseService):
 
             # Проверяем наличие вопросов в ответе
             if not response_text or len(response_text) < 100:
-                self.logger.warning(f"Слишком короткий ответ от API при генерации теста: {response_text[:50]}...")
+                self._logger.warning(f"Слишком короткий ответ от API при генерации теста: {response_text[:50]}...")
                 raise ValueError("Получен слишком короткий ответ от API")
 
             # Проверяем наличие правильных ответов в тексте
             import re
             if not re.search(r"Правильный ответ:\s*[1-4]", response_text):
-                self.logger.warning("В ответе API нет указаний на правильные ответы")
+                self._logger.warning("В ответе API нет указаний на правильные ответы")
                 # Пробуем альтернативный формат
                 if re.search(r"Ответ:\s*[1-4]", response_text):
                     response_text = response_text.replace("Ответ:", "Правильный ответ:")
@@ -379,7 +379,7 @@ class APIClient(BaseService):
 
             # Проверяем, есть ли вопросы
             if not questions:
-                self.logger.warning(f"Не удалось разбить ответ на вопросы: {response_text[:100]}...")
+                self._logger.warning(f"Не удалось разбить ответ на вопросы: {response_text[:100]}...")
                 # Используем весь текст как один вопрос
                 questions = [response_text]
 
@@ -393,7 +393,7 @@ class APIClient(BaseService):
             }
 
         except Exception as e:
-            self.logger.error(f"Ошибка при генерации теста по теме '{topic}': {e}")
+            self._logger.error(f"Ошибка при генерации теста по теме '{topic}': {e}")
 
             # Создаем базовый тест в аварийном режиме
             try:
@@ -411,7 +411,7 @@ class APIClient(BaseService):
                         "display_questions": [emergency_text]
                     }
             except Exception as e2:
-                self.logger.error(f"Не удалось создать аварийный тест: {e2}")
+                self._logger.error(f"Не удалось создать аварийный тест: {e2}")
 
             # Если и аварийный вариант не сработал
             return {
@@ -432,8 +432,8 @@ class APIClient(BaseService):
         """
         try:
             count = self.cache.clear_cache(topic_filter) # Assuming cache object has clear_cache method.
-            self.logger.info(f"Очищено {count} записей из кэша API запросов")
+            self._logger.info(f"Очищено {count} записей из кэша API запросов")
             return count
         except Exception as e:
-            self.logger.error(f"Ошибка при очистке кэша API запросов: {e}")
+            self._logger.error(f"Ошибка при очистке кэша API запросов: {e}")
             return 0
