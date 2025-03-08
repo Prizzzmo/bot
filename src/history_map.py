@@ -37,24 +37,24 @@ class HistoryMap(BaseService):
         try:
             # Проверяем доступность файла исторических событий и создаем его, если необходимо
             self._ensure_events_file_exists()
-            
+
             # Проверяем, что данные событий загружены
             if not self.events_data or not self.events_data.get("events"):
                 self.events_data = self._load_events_data()
                 if not self.events_data or not self.events_data.get("events"):
                     self._logger.warning("Не удалось загрузить данные о исторических событиях")
                     # Продолжаем работу, т.к. метод _ensure_events_file_exists создаст файл с дефолтными данными
-            
+
             # Проверяем доступность директории для карт
             if not os.path.exists('generated_maps'):
                 os.makedirs('generated_maps', exist_ok=True)
                 self._logger.info("Создана директория для карт: generated_maps")
-            
+
             # Создаем директорию для статических ресурсов, если она не существует
             if not os.path.exists('static'):
                 os.makedirs('static', exist_ok=True)
                 self._logger.info("Создана директория для статических ресурсов: static")
-            
+
             return True
         except Exception as e:
             self._logger.error(f"Ошибка при инициализации HistoryMap: {e}")
@@ -694,18 +694,6 @@ class HistoryMap(BaseService):
                         if os.path.exists(static_map_path):
                             return static_map_path
                         return None
-            except Exception as events_error:
-                self._logger.error(f"Ошибка при получении событий для простой карты: {events_error}")
-                # Пробуем получить случайные события
-                try:
-                    display_events = self.get_random_events(5)
-                    if not display_events:
-                        raise ValueError("Не удалось получить случайные события")
-                except Exception:
-                    static_map_path = 'static/default_map.png'
-                    if os.path.exists(static_map_path):
-                        return static_map_path
-                    return None
 
             # Создаем уникальное имя файла с проверкой доступности директории
             timestamp = int(time.time())
