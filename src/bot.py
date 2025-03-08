@@ -102,23 +102,43 @@ class Bot:
                 self.logger.error("Ошибка запуска бота: updater не инициализирован")
                 return
                 
+            # Проверка валидности токена
+            import telegram
+            try:
+                self.logger.info("Проверка соединения с Telegram API...")
+                telegram_bot = self.updater.bot
+                bot_info = telegram_bot.get_me()
+                self.logger.info(f"Соединение успешно, бот: @{bot_info.username}")
+            except telegram.error.TelegramError as e:
+                self.logger.error(f"Ошибка соединения с Telegram API: {e}")
+                self.logger.error("Проверьте корректность TELEGRAM_TOKEN в .env файле")
+                return
+                
             # Оптимизированные настройки для более эффективного сбора обновлений
             # Уменьшен таймаут для более быстрого обнаружения ошибок
             # Явное указание типов обновлений для обработки
             self.logger.info("Запуск start_polling...")
-            self.updater.start_polling(
-                timeout=6,  # Уменьшенный таймаут для более быстрой реакции
-                drop_pending_updates=True,  # Пропуск накопившихся обновлений
-                allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Только необходимые типы обновлений
-                poll_interval=0.2  # Уменьшаем интервал опроса для более быстрой реакции на сообщения
-            )
-            self.logger.info("Бот успешно запущен")
-            self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
+            try:
+                self.updater.start_polling(
+                    timeout=10,  # Увеличиваем таймаут для более стабильной работы
+                    drop_pending_updates=True,  # Пропуск накопившихся обновлений
+                    allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Только необходимые типы обновлений
+                    poll_interval=0.5  # Увеличиваем интервал опроса для снижения нагрузки
+                )
+                self.logger.info("Бот успешно запущен")
+                self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
+            except Exception as e:
+                self.logger.error(f"Ошибка при запуске polling: {e}")
+                return
 
             # Вместо собственной реализации используем встроенный метод idle
             # который более надежно обрабатывает сигналы и блокировку
-            self.updater.idle()
-            
+            try:
+                self.logger.info("Входим в режим idle...")
+                self.updater.idle()
+            except Exception as e:
+                self.logger.error(f"Ошибка в idle режиме: {e}")
+                
             # Если idle вернул управление, значит бот завершает работу
             self.logger.info("Бот завершил работу")
         except Exception as e:
