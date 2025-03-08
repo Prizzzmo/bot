@@ -2122,7 +2122,7 @@ class CommandHandlers:
 
             # Отправляем кнопки для навигации и взаимодействия
             buttons = [
-                [InlineKeyboardButton("📝 Пройти тест по теме", callback_data=f"start_test_{topic")],
+                [InlineKeyboardButton("📝 Пройти тест по теме", callback_data=f"start_test_{topic}")],
                 [InlineKeyboardButton("📊 Сохранить в изученные", callback_data=f"mark_as_learned_{topic}")],
                 [InlineKeyboardButton("🏠 Вернуться в меню", callback_data="back_to_menu")]
             ]
