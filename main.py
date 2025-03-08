@@ -12,6 +12,7 @@ import logging
 import os
 import traceback
 import sys
+import atexit
 from dotenv import load_dotenv
 
 from src.config import Config
@@ -19,20 +20,63 @@ from src.factory import BotFactory
 from src.data_migration import DataMigration
 from src.task_queue import TaskQueue
 
+def check_running_bot():
+    """
+    Проверяет, не запущен ли уже экземпляр бота.
+    Создает и проверяет lock-файл.
+    
+    Returns:
+        bool: True если можно запускать бота, False если уже запущен
+    """
+    import os
+    import sys
+    
+    lock_file = "bot.lock"
+    
+    # Проверяем существование lock-файла
+    if os.path.exists(lock_file):
+        try:
+            # Читаем PID из lock-файла
+            with open(lock_file, 'r') as f:
+                pid = int(f.read().strip())
+            
+            # Проверяем, существует ли процесс с таким PID
+            # Для Linux
+            if os.path.exists(f"/proc/{pid}"):
+                return False
+            
+            # Если процесс не существует, удаляем устаревший lock-файл
+            os.remove(lock_file)
+        except (IOError, ValueError):
+            # Если файл поврежден или не содержит PID, удаляем его
+            os.remove(lock_file)
+    
+    # Создаем новый lock-файл с текущим PID
+    with open(lock_file, 'w') as f:
+        f.write(str(os.getpid()))
+    
+    return True
+
 def main():
     """
     Главная функция для инициализации и запуска бота.
 
     Выполняет следующие шаги:
-    1. Загружает переменные окружения
-    2. Настраивает базовое логирование
-    3. Инициализирует конфигурацию
-    4. Создает экземпляр бота с помощью фабрики
-    5. Настраивает и запускает бота
+    1. Проверяет, не запущен ли уже бот
+    2. Загружает переменные окружения
+    3. Настраивает базовое логирование
+    4. Инициализирует конфигурацию
+    5. Создает экземпляр бота с помощью фабрики
+    6. Настраивает и запускает бота
     """
     logger = None
 
     try:
+        # Проверяем, не запущен ли уже бот
+        if not check_running_bot():
+            print("Бот уже запущен в другом процессе. Завершение работы.")
+            sys.exit(1)
+            
         # Загружаем переменные окружения из .env файла
         load_dotenv()
 
@@ -92,7 +136,11 @@ def main():
         bot.run()
 
     except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем")
+        if logger:
+            logger.info("Бот остановлен пользователем")
+        # Удаляем lock-файл при завершении работы
+        if os.path.exists("bot.lock"):
+            os.remove("bot.lock")
     except Exception as e:
         if logger:
             logger.error(f"Критическая ошибка: {e}")
@@ -100,9 +148,17 @@ def main():
         else:
             print(f"Критическая ошибка: {e}")
             print(traceback.format_exc())
+            
+        # Удаляем lock-файл при завершении работы с ошибкой
+        if os.path.exists("bot.lock"):
+            os.remove("bot.lock")
 
         # Завершаем процесс с кодом ошибки
         sys.exit(1)
+    finally:
+        # Гарантированное удаление lock-файла в любом случае
+        if os.path.exists("bot.lock"):
+            os.remove("bot.lock")
 
 if __name__ == "__main__":
     main()
