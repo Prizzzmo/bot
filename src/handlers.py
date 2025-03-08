@@ -664,7 +664,7 @@ class CommandHandlers:
                 self.logger.info(f"Пользователь {user_id} досрочно завершил тест")
                 query.edit_message_text("Тест завершен досрочно. Возвращаемся в главное меню.")
                 query.message.reply_text("Выберите действие:", reply_markup=self.ui_manager.main_menu())
-            return self.TOPIC
+                return self.TOPIC
             else:
                 self.logger.info(f"Пользователь {user_id} отменил действие")
                 query.edit_message_text("Действие отменено. Нажми /start, чтобы начать заново.")
@@ -1362,12 +1362,7 @@ class CommandHandlers:
             self.logger.debug(f"Передача сообщения в ConversationService для пользователя {user_id}")
             self.conversation_service.handle_conversation(update, context, self.message_manager)
 
-            # Если ожидаем тему для карты, возвращаем состояние MAP
-            if context.user_data.get('waiting_for_map_topic', False):
-                self.logger.info(f"Переход в режим карты для пользователя {user_id}")
-                return self.MAP
-
-            # В остальных случаях остаемся в режиме беседы
+            # Остаемся в режиме беседы
             return self.CONVERSATION
 
         except Exception as e:

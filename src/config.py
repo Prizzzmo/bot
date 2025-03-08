@@ -7,7 +7,6 @@ load_dotenv()
 
 # Константы для состояний ConversationHandler
 TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION = range(5)
-MAP = 5  # Состояние для работы с картой
 
 # Словарь с описаниями ошибок для расширенного логирования
 ERROR_DESCRIPTIONS = {
