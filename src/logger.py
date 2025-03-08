@@ -17,6 +17,7 @@ import threading
 import json
 import time
 from logging.handlers import RotatingFileHandler
+from src.interfaces import ILogger
 
 class BufferedLogger:
     """Буферизированный логгер для снижения I/O операций"""
