@@ -10,8 +10,23 @@ from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
 
-# Создаем директорию для скрипта если она не существует
-os.makedirs("history_db_generator", exist_ok=True)
+def ensure_directories():
+    """Создает все необходимые директории для работы скрипта"""
+    # Основная директория для скрипта
+    os.makedirs("history_db_generator", exist_ok=True)
+    
+    # Директория для временных файлов
+    temp_dir = "history_db_generator/temp"
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Директория для бэкапов
+    backups_dir = "history_db_generator/backups"
+    os.makedirs(backups_dir, exist_ok=True)
+    
+    print(f"Директории подготовлены: history_db_generator, {temp_dir}, {backups_dir}")
+
+# Создаем все необходимые директории
+ensure_directories()
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()
@@ -27,7 +42,7 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 # Путь к файлу базы данных
 DB_FILE = "history_db_generator/russian_history_database.json"
 TEMP_FOLDER = "history_db_generator/temp"
-os.makedirs(TEMP_FOLDER, exist_ok=True)
+BACKUPS_FOLDER = "history_db_generator/backups"
 
 # Словарь с основными категориями событий
 EVENT_CATEGORIES = [
@@ -51,7 +66,7 @@ def hash_string(text):
     """Создает хеш строки для использования в идентификаторах."""
     return hashlib.md5(text.encode()).hexdigest()[:8]
 
-def call_gemini_api(prompt, temperature=0.3, max_output_tokens=1024, retry_count=3, retry_delay=5):
+def call_gemini_api(prompt, temperature=0.3, max_output_tokens=1024, retry_count=5, retry_delay=10):
     """
     Отправляет запрос к API Gemini с механизмом повторных попыток.
     
@@ -74,16 +89,35 @@ def call_gemini_api(prompt, temperature=0.3, max_output_tokens=1024, retry_count
     
     for attempt in range(retry_count):
         try:
+            # Добавляем базовую задержку между запросами для соблюдения rate limits
+            if attempt > 0:
+                time.sleep(2)
+                
             response = model.generate_content(prompt, generation_config=generation_config)
             return response.text
         except Exception as e:
+            error_str = str(e).lower()
             print(f"Ошибка при запросе к API (попытка {attempt+1}/{retry_count}): {e}")
+            
             if attempt < retry_count - 1:
-                delay = retry_delay * (2 ** attempt)  # Экспоненциальная задержка
-                print(f"Повторная попытка через {delay} секунд...")
+                # Используем разные стратегии задержки в зависимости от типа ошибки
+                if "quota" in error_str or "exhausted" in error_str or "rate" in error_str:
+                    # Для ошибок квоты делаем более длительную задержку
+                    delay = retry_delay * (3 ** attempt)  # Более агрессивная экспоненциальная задержка
+                    print(f"Превышен лимит запросов. Повторная попытка через {delay} секунд...")
+                else:
+                    # Для других ошибок - стандартная задержка
+                    delay = retry_delay * (2 ** attempt)
+                    print(f"Повторная попытка через {delay} секунд...")
+                    
                 time.sleep(delay)
             else:
                 print(f"Не удалось получить ответ после {retry_count} попыток.")
+                
+                # Если это ошибка квоты, рекомендуем более длительную паузу
+                if "quota" in error_str or "exhausted" in error_str:
+                    print("Рекомендуется сделать паузу на несколько часов из-за исчерпания лимита API.")
+                    
                 return ""
 
 def save_json(data, filename):
@@ -661,16 +695,41 @@ def generate_database():
     # Получаем максимально полный список исторических тем России
     topics = generate_historical_topics()
     
+    # Определяем, с какой темы начать (продолжаем с места остановки)
+    start_index = 0
+    # Проверка наличия информации о последней обработанной теме
+    progress_file = f"{TEMP_FOLDER}/generation_progress.json"
+    progress_data = load_json(progress_file)
+    
+    if progress_data and "last_topic_index" in progress_data:
+        start_index = progress_data["last_topic_index"] + 1
+        print(f"Продолжаем с темы {start_index+1} (предыдущая сессия завершилась на теме {start_index})")
+    
     # Обрабатываем каждую тему
-    total_events = 0
-    for i, topic in enumerate(topics):
+    total_events = len(database.get("events", []))
+    print(f"В базе уже имеется {total_events} событий")
+    
+    # Устанавливаем частоту сохранения прогресса
+    save_interval = 2  # Сохраняем каждые N тем
+    
+    for i, topic in enumerate(topics[start_index:], start=start_index):
         try:
             print(f"Обработка темы {i+1}/{len(topics)}: {topic}")
+            
+            # Сохраняем прогресс перед обработкой каждой темы
+            save_json({"last_topic_index": i-1, "total_topics": len(topics)}, progress_file)
+            
+            # Добавляем задержку между обработкой тем, чтобы избежать превышения лимитов API
+            if i > start_index:
+                delay = 3  # 3 секунды между темами
+                print(f"Пауза {delay} секунд перед следующей темой...")
+                time.sleep(delay)
             
             # Получаем события для текущей темы
             events = get_events_for_topic(topic)
             
             # Добавляем уникальный идентификатор каждому событию
+            events_added = 0
             for event in events:
                 # Пропускаем события без названия или даты
                 if not event.get("title") or not event.get("date"):
@@ -689,21 +748,42 @@ def generate_database():
                 # Если это не дубликат, добавляем событие
                 if not is_duplicate:
                     event["id"] = event_id
+                    event["topic"] = topic  # Добавляем информацию об источнике
                     database["events"].append(event)
                     total_events += 1
+                    events_added += 1
             
-            # Сохраняем промежуточные результаты
-            if i % 5 == 0 or i == len(topics) - 1:
+            print(f"Добавлено {events_added} новых событий для темы '{topic}'")
+            
+            # Сохраняем промежуточные результаты чаще
+            if i % save_interval == 0 or i == len(topics) - 1:
                 print(f"Промежуточное сохранение базы данных: {total_events} событий.")
                 save_json(database, DB_FILE)
+                
+                # Обновляем прогресс
+                save_json({"last_topic_index": i, "total_topics": len(topics)}, progress_file)
             
         except Exception as e:
             print(f"Ошибка при обработке темы '{topic}': {e}")
             # Сохраняем то, что успели собрать
             save_json(database, DB_FILE)
+            
+            # Сохраняем прогресс для возможности продолжить с этой темы
+            save_json({"last_topic_index": i, "total_topics": len(topics)}, progress_file)
+            
+            # Если это ошибка квоты, делаем большую паузу
+            if "quota" in str(e).lower() or "exhausted" in str(e).lower():
+                print("Превышена квота API. Рекомендуется перезапустить скрипт позже.")
+                print(f"При перезапуске генерация продолжится с темы {i+1}")
+                
+                # Создаем дополнительную резервную копию на случай проблем
+                backup_file = f"{TEMP_FOLDER}/emergency_backup_{int(time.time())}.json"
+                save_json(database, backup_file)
+                print(f"Создана экстренная резервная копия: {backup_file}")
+                break  # Прерываем выполнение
     
     # Финальное сохранение
-    print(f"Генерация базы данных завершена. Всего добавлено {total_events} событий.")
+    print(f"Генерация базы данных завершена. Всего в базе {total_events} событий.")
     save_json(database, DB_FILE)
     
     # Создаем резервную копию
