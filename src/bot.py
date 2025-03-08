@@ -115,17 +115,12 @@ class Bot:
             self.logger.info("Бот успешно запущен")
             self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
 
-            # Остаемся в режиме работы до получения Ctrl+C
-            # Используем собственную реализацию idle
-            import time
-            try:
-                # Более безопасная реализация idle с проверкой статуса
-                # В Python-telegram-bot свойство называется 'running' у dispatcher, а не у updater
-                while self.updater.dispatcher.running:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                self.logger.info("Бот получил сигнал завершения")
-                self.updater.stop()
+            # Вместо собственной реализации используем встроенный метод idle
+            # который более надежно обрабатывает сигналы и блокировку
+            self.updater.idle()
+            
+            # Если idle вернул управление, значит бот завершает работу
+            self.logger.info("Бот завершил работу")
         except Exception as e:
             self.logger.log_error(e, {"context": "bot.run()"})
             # Попытка принудительного завершения updater если он был создан
