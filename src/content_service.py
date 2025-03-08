@@ -185,7 +185,7 @@ class ContentService(BaseService):
             return events
 
         except Exception as e:
-            self.logger.error(f"Ошибка при получении исторических событий: {e}")
+            self._logger.error(f"Ошибка при получении исторических событий: {e}")
             return []
 
     def _get_local_topic_info(self, topic: str) -> Optional[Dict[str, Any]]:
