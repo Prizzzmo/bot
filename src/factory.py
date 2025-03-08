@@ -110,13 +110,17 @@ class BotFactory:
 
         # Сервисы для тестов и тем уже созданы выше
 
-        # Создаем бота
+        # Создаем бота с передачей всех необходимых сервисов
         bot = Bot(
             config=config,
             logger=logger,
             command_handlers=command_handlers,
             test_service=test_service,
-            topic_service=topic_service
+            topic_service=topic_service,
+            api_client=api_client,
+            analytics=analytics_service,
+            history_map_service=history_map_service,
+            text_cache_service=text_cache_service
         )
 
         logger.info("Все компоненты бота инициализированы успешно")
