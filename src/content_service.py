@@ -13,7 +13,7 @@ class ContentService(IContentProvider):
     Обеспечивает доступ к историческому контенту через API и локальные данные.
     """
 
-    def __init__(self, api_client, logger: ILogger, events_file: str = 'historical_events.json'):
+    def __init__(self, api_client, logger: ILogger, events_file: str = 'historical_events.json', text_cache_service=None):
         """
         Инициализация сервиса контента.
 
@@ -21,11 +21,13 @@ class ContentService(IContentProvider):
             api_client: Клиент для работы с внешним API
             logger (ILogger): Логгер для записи информации
             events_file (str): Путь к файлу с историческими событиями
+            text_cache_service: Сервис кэширования текстов (опционально)
         """
         self.api_client = api_client
         self.logger = logger
         self.events_file = events_file
         self.events_data = self._load_events_data()
+        self.text_cache_service = text_cache_service
 
         # Стандартный набор исторических тем
         self.default_topics = [
@@ -211,7 +213,7 @@ class ContentService(IContentProvider):
 
         except Exception as e:
             self.logger.error(f"Ошибка при сохранении информации о теме '{topic}': {e}")
-            
+
     def get_topic_info(self, topic: str, update_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
         Получение информации по исторической теме.
@@ -232,12 +234,12 @@ class ContentService(IContentProvider):
 
             # Если в локальных данных нет, запрашиваем через API
             self.logger.info(f"Запрос информации по теме '{topic}' через API")
-            
+
             if update_callback:
                 update_callback("Получение информации...")
-                
+
             api_response = self.api_client.get_historical_info(topic)
-            
+
             if api_response and "content" in api_response and api_response["status"] == "success":
                 # Сохраняем полученную информацию локально
                 self._save_topic_info(topic, api_response["content"])
@@ -249,7 +251,7 @@ class ContentService(IContentProvider):
                     "topic": topic,
                     "error": "Не удалось получить информацию по данной исторической теме"
                 }
-                
+
         except Exception as e:
             self.logger.error(f"Ошибка при получении информации по теме '{topic}': {e}")
             return {
@@ -257,7 +259,7 @@ class ContentService(IContentProvider):
                 "topic": topic,
                 "error": f"Произошла ошибка: {str(e)}"
             }
-            
+
     def generate_test(self, topic: str) -> Dict[str, Any]:
         """
         Генерация теста по исторической теме.
@@ -270,7 +272,27 @@ class ContentService(IContentProvider):
         """
         try:
             self.logger.info(f"Генерация теста по теме '{topic}'")
-            
+
+            # Проверяем кэш текстов, если он доступен
+            if self.text_cache_service:
+                cached_test = self.text_cache_service.get_text(topic, "test")
+                if cached_test:
+                    self.logger.info(f"Найден кэшированный тест по теме '{topic}'")
+                    # Предполагаем, что кэшированные данные уже в нужном формате
+                    try:
+                        test_data = json.loads(cached_test)
+                        return test_data
+                    except:
+                        # Если это не JSON, а просто текст
+                        return {
+                            "status": "success",
+                            "topic": topic,
+                            "content": [cached_test],
+                            "original_questions": [cached_test],
+                            "display_questions": [cached_test],
+                            "source": "text_cache"
+                        }
+
             # Проверяем, является ли тема исторической
             if not self.validate_topic(topic):
                 self.logger.warning(f"Попытка генерации теста для неисторической темы '{topic}'")
@@ -279,12 +301,21 @@ class ContentService(IContentProvider):
                     "topic": topic,
                     "error": "Указанная тема не является исторической"
                 }
-            
+
             # Получаем тест через API
             test_response = self.api_client.generate_historical_test(topic)
-            
-            if test_response and "questions" in test_response and test_response["status"] == "success":
-                self.logger.info(f"Успешно сгенерирован тест по теме '{topic}' ({len(test_response['questions'])} вопросов)")
+
+            if test_response and "content" in test_response and test_response["status"] == "success":
+                self.logger.info(f"Успешно сгенерирован тест по теме '{topic}'")
+
+                # Сохраняем в кэш текстов, если он доступен
+                if self.text_cache_service:
+                    # Сохраняем как JSON для сохранения структуры
+                    try:
+                        self.text_cache_service.save_text(topic, "test", json.dumps(test_response))
+                    except Exception as cache_error:
+                        self.logger.error(f"Ошибка сохранения теста в кэш: {cache_error}")
+
                 return test_response
             else:
                 self.logger.warning(f"Не удалось сгенерировать тест по теме '{topic}'")
@@ -293,7 +324,7 @@ class ContentService(IContentProvider):
                     "topic": topic,
                     "error": "Не удалось сгенерировать тест по данной теме"
                 }
-                
+
         except Exception as e:
             self.logger.error(f"Ошибка при генерации теста по теме '{topic}': {e}")
             return {

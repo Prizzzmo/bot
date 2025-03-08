@@ -18,7 +18,7 @@ from src.web_server import WebServer
 from src.test_service import TestService
 from src.topic_service import TopicService
 from src.conversation_service import ConversationService #Added import
-
+from src.text_cache_service import TextCacheService
 
 class BotFactory:
     """
@@ -60,8 +60,11 @@ class BotFactory:
         # Создаем UI-менеджер с передачей topic_service
         ui_manager = UIManager(logger, topic_service)
 
+        # Text cache service
+        text_cache_service = TextCacheService(logger)
+
         # Создаем сервис контента
-        content_service = ContentService(api_client, logger)
+        content_service = ContentService(api_client, logger, text_cache_service)
 
         # Создаем аналитический сервис
         analytics_service = AnalyticsService(logger)
