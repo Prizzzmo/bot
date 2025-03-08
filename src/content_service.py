@@ -26,8 +26,8 @@ class ContentService(IContentProvider):
         self.api_client = api_client
         self.logger = logger
         self.events_file = events_file
-        self.events_data = self._load_events_data()
         self.text_cache_service = text_cache_service
+        self.events_data = self._load_events_data()
 
         # Стандартный набор исторических тем
         self.default_topics = [
