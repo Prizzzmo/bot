@@ -680,9 +680,8 @@ class CommandHandlers:
 
                     self.logger.info(f"Пользователь {user_id} получил карту категории {category}")
                 else:
-                                        #                    # Если не удалось сгенерировать карту, отправляем стандартную
+                    # Если не удалось сгенерировать карту, отправляем стандартную
                     default_map_path = 'static/default_map.png'
-                    if os.path.exists(<truncated>)
                     if os.path.exists(default_map_path):
                         try:
                             with open(default_map_path, 'rb') as default_img:
