@@ -9,14 +9,13 @@ def get_webapp_keyboard():
     Returns:
         InlineKeyboardMarkup: Клавиатура с кнопкой веб-приложения
     """
-    # Определяем URL веб-приложения
-    # При необходимости этот URL можно получать из переменных окружения
-    webapp_url = "https://teach-hisbot.repl.co/webapp"
+    # Определяем прямую ссылку на карту в Telegram
+    telegram_map_url = "http://t.me/teach_hisbot/hismap"
     
-    # Создаем кнопку с веб-приложением
-    webapp_button = InlineKeyboardButton(
+    # Создаем кнопку с URL
+    map_button = InlineKeyboardButton(
         text="🗺️ Открыть интерактивную карту",
-        web_app=WebAppInfo(url=webapp_url)
+        url=telegram_map_url
     )
     
     # Добавляем кнопку возврата в меню
@@ -24,7 +23,7 @@ def get_webapp_keyboard():
     
     # Формируем клавиатуру с кнопками
     keyboard = [
-        [webapp_button],
+        [map_button],
         [back_button]
     ]
     
