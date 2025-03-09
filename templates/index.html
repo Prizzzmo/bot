@@ -86,7 +86,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
+            background-color: rgba(0, 0, 0, 0.8);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -94,6 +94,7 @@
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.5s, visibility 0.5s;
+            backdrop-filter: blur(3px);
         }
         .modal-overlay.visible {
             opacity: 1;
@@ -101,43 +102,63 @@
         }
         .welcome-banner {
             background: linear-gradient(135deg, #4a76a8, #3a5a78);
+            background-image: url('https://img.freepik.com/free-vector/russia-abstract-map-with-flag_23-2148391584.jpg?w=1380&t=st=1711559566~exp=1711560166~hmac=1cee53ed9fee7d6e59ae1e41b1b82e3d26ee8d10d7a5e26b9bee0d8f7e49fe0e');
+            background-size: cover;
+            background-blend-mode: overlay;
             color: white;
-            padding: 30px;
+            padding: 40px;
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-            max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            max-width: 650px;
             width: 90%;
             position: relative;
             opacity: 0;
             transform: translateY(-30px);
             animation: modalFadeIn 0.7s forwards;
             animation-delay: 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
         }
         @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.95);
+            }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
         .stats {
-            background-color: rgba(255,255,255,0.2);
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-top: 15px;
+            background-color: rgba(255,255,255,0.15);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-top: 20px;
             display: inline-block;
             font-weight: bold;
+            border-left: 4px solid #D52B1E;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            backdrop-filter: blur(5px);
         }
         .stats span {
             color: #fff7cc;
+            font-size: 110%;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }
         .welcome-title {
-            font-size: 24px;
-            margin-bottom: 15px;
+            font-size: 28px;
+            margin-bottom: 20px;
             border-bottom: 2px solid rgba(255,255,255,0.3);
-            padding-bottom: 10px;
+            padding-bottom: 15px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            font-weight: bold;
         }
         .welcome-text {
-            line-height: 1.6;
+            line-height: 1.8;
+            font-size: 16px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            background-color: rgba(0,0,0,0.2);
+            padding: 20px;
+            border-radius: 8px;
         }
         @keyframes fadeIn {
             to {
@@ -165,7 +186,8 @@
                 <div class="stats">
                     Статистика базы данных: <span id="eventsCount">{{events_count}}</span> исторических событий в <span id="categoriesCount">{{categories_count}}</span> категориях
                 </div>
-                <button id="closeWelcomeBtn" style="position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 16px;">✕</button>
+                <button id="closeWelcomeBtn" style="position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease;">✕</button>
+                <div class="tricolor-badge" style="position: absolute; top: 15px; left: 15px; width: 40px; height: 40px; background: linear-gradient(to bottom, #fff 33.3%, #0039A6 33.3%, #0039A6 66.6%, #D52B1E 66.6%); border-radius: 50%; box-shadow: 0 3px 10px rgba(0,0,0,0.3);"></div>
             </div>
         </div>
         
@@ -174,8 +196,9 @@
         <div class="filters">
             <label for="categoryFilter">Категория:</label>
             <select id="categoryFilter">
-                <option value="">Выберите категорию</option>
+                <option value="">Загрузка категорий...</option>
             </select>
+            <div id="categoryLoading" style="display: inline-block; margin-left: 5px; font-size: 12px; color: #666;">загрузка...</div>
 
             <label for="centuryFilter">Век:</label>
             <select id="centuryFilter">
@@ -251,18 +274,11 @@
         let markers = L.layerGroup().addTo(map);
         const loadingDiv = document.getElementById('loading');
 
-        // Загрузка исторических данных
-        fetch('/api/historical-events')
+        // Загружаем категории напрямую через отдельный API-endpoint
+        fetch('/api/categories')
             .then(response => response.json())
-            .then(data => {
-                console.log('Загружено событий из API:', data.length);
-                allEvents = data;
-
-                // Заполняем выпадающий список категорий
-                const categories = [...new Set(allEvents
-                    .filter(event => event.category)
-                    .map(event => event.category))];
-                console.log('Уникальные категории:', categories);
+            .then(categories => {
+                console.log('Загружено категорий из API:', categories.length);
                 
                 const categorySelect = document.getElementById('categoryFilter');
                 
@@ -272,13 +288,31 @@
                 }
 
                 // Добавляем отсортированные категории
-                categories.sort().forEach(category => {
+                // Очищаем первую опцию
+                categorySelect.options[0].text = "Выберите категорию";
+                
+                categories.forEach(category => {
                     const option = document.createElement('option');
                     option.value = category;
                     option.textContent = category;
                     categorySelect.appendChild(option);
                     console.log('Добавлена категория:', category);
                 });
+                
+                // Скрываем индикатор загрузки
+                document.getElementById('categoryLoading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Ошибка загрузки категорий:', error);
+                alert('Произошла ошибка при загрузке категорий. Пожалуйста, обновите страницу.');
+            });
+            
+        // Загрузка исторических данных 
+        fetch('/api/historical-events')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Загружено событий из API:', data.length);
+                allEvents = data;
             })
             .catch(error => {
                 console.error('Ошибка загрузки исторических данных:', error);
