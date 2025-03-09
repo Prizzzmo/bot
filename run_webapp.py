@@ -1,12 +1,13 @@
 
+"""
+Скрипт для запуска веб-сервера с картой исторических событий
+"""
+
 import os
 import sys
+from webapp.server import run_server
 
-# Add the webapp directory to the Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Run the Flask server
-from webapp.server import app
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+if __name__ == "__main__":
+    print("Запуск веб-сервера с картой исторических событий...")
+    # Запускаем веб-сервер на порту 8080
+    run_server(host='0.0.0.0', port=8080)

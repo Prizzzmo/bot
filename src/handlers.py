@@ -673,11 +673,15 @@ class CommandHandlers:
             query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
             return self.CHOOSE_TOPIC
         elif query_data == 'history_map':
-            # Функциональность исторических карт была удалена
-            query.answer("Функция исторических карт временно недоступна")
+            # Импортируем функцию для получения клавиатуры с веб-приложением
+            import sys
+            sys.path.append('webapp')
+            from bot_integration import get_webapp_keyboard
+            
+            # Отправляем сообщение с кнопкой для открытия веб-приложения
             query.edit_message_text(
-                "⚠️ Функциональность исторических карт была удалена из проекта.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                "Нажмите на кнопку ниже, чтобы открыть интерактивную карту исторических событий России:",
+                reply_markup=get_webapp_keyboard()
             )
             return self.TOPIC
 
@@ -1392,6 +1396,41 @@ class CommandHandlers:
         """
         # Используем сервис тестирования для получения рекомендаций
         return self.test_service.recommend_similar_topics(current_topic, self.api_client)
+
+    def map_command(self, update, context):
+        """
+        Обрабатывает команду /map или /карта для отображения интерактивной карты истории России.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        try:
+            user_id = update.message.from_user.id
+            self.logger.info(f"Пользователь {user_id} запросил карту исторических событий")
+            
+            # Импортируем функцию для получения клавиатуры с веб-приложением
+            import sys
+            sys.path.append('webapp')
+            from bot_integration import get_webapp_keyboard
+            
+            # Отправляем сообщение с кнопкой для открытия веб-приложения
+            sent_msg = update.message.reply_text(
+                "Нажмите на кнопку ниже, чтобы открыть интерактивную карту исторических событий России:",
+                reply_markup=get_webapp_keyboard()
+            )
+            
+            # Сохраняем ID сообщения
+            self.message_manager.save_message_id(update, context, sent_msg.message_id)
+            
+            return self.TOPIC
+        except Exception as e:
+            self.logger.log_error(e, "Ошибка при открытии карты")
+            update.message.reply_text(
+                "Произошла ошибка при открытии карты. Пожалуйста, попробуйте позже.",
+                reply_markup=self.ui_manager.main_menu()
+            )
+            return self.TOPIC
 
     def admin_command(self, update, context):
         """

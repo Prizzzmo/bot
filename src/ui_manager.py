@@ -46,17 +46,17 @@ class UIManager(BaseService):
 
     def main_menu(self):
         """
-        Создает главное меню в виде кнопок.
+        Возвращает клавиатуру главного меню.
 
         Returns:
-            InlineKeyboardMarkup: Клавиатура с кнопками меню
+            InlineKeyboardMarkup: Клавиатура главного меню
         """
         keyboard = [
-            [InlineKeyboardButton("🔍 Выбрать тему", callback_data='topic')],
-            [InlineKeyboardButton("✅ Пройти тест", callback_data='test')],
-            [InlineKeyboardButton("💬 Беседа о истории России", callback_data='conversation')],
-            [InlineKeyboardButton("ℹ️ Информация о проекте", callback_data='project_info')],
-            [InlineKeyboardButton("❌ Завершить", callback_data='cancel')]
+            [InlineKeyboardButton("📚 Выбрать тему", callback_data='topic')],
+            [InlineKeyboardButton("🧠 Тест по текущей теме", callback_data='test')],
+            [InlineKeyboardButton("🗣️ Беседа о истории России", callback_data='conversation')],
+            [InlineKeyboardButton("🗺️ Карта истории России", callback_data='history_map')],
+            [InlineKeyboardButton("📋 О проекте", callback_data='project_info')],
         ]
         return InlineKeyboardMarkup(keyboard)
 

@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 echo "=== Запуск исторического образовательного проекта ==="
@@ -8,7 +7,7 @@ echo "------------------------------------------------------"
 # Проверка и установка зависимостей Python
 check_and_install_dependencies() {
   echo "Проверка Python зависимостей..."
-  
+
   if [ -f "requirements.txt" ]; then
     python3 -m pip install -r requirements.txt
     if [ $? -ne 0 ]; then
@@ -25,7 +24,7 @@ check_and_install_dependencies() {
 # Проверка наличия API ключей
 check_api_keys() {
   echo "Проверка API ключей..."
-  
+
   # Проверка наличия .env файла
   if [ ! -f ".env" ]; then
     echo "⚠️ Файл .env не найден. Создание примера файла..."
@@ -34,10 +33,10 @@ check_api_keys() {
     echo "" >> .env
     echo "# API ключ Google Gemini (получите на https://ai.google.dev/)" >> .env
     echo "GEMINI_API_KEY=замените_на_ваш_ключ" >> .env
-    
+
     echo "⚠️ Пожалуйста, отредактируйте файл .env и добавьте ваши токены"
   fi
-  
+
   # Проверка наличия gemini_api_keys.py
   if [ ! -f "gemini_api_keys.py" ]; then
     echo "⚠️ Файл gemini_api_keys.py не найден. Создание примера файла..."
@@ -46,7 +45,7 @@ check_api_keys() {
     echo "    'API_KEY_1'," >> gemini_api_keys.py
     echo "    # Добавьте дополнительные ключи по необходимости" >> gemini_api_keys.py
     echo "]" >> gemini_api_keys.py
-    
+
     echo "⚠️ Пожалуйста, отредактируйте файл gemini_api_keys.py и добавьте ваши ключи Gemini API"
   fi
 }
@@ -54,21 +53,21 @@ check_api_keys() {
 # Проверка наличия необходимых директорий
 check_directories() {
   echo "Проверка необходимых директорий..."
-  
+
   # Создание директорий, если они не существуют
   mkdir -p logs
   mkdir -p generated_maps
   mkdir -p backups
   mkdir -p history_db_generator/backups
   mkdir -p history_db_generator/temp
-  
+
   echo "✅ Все необходимые директории созданы"
 }
 
 # Чистка временных файлов и кэша
 cleanup_cache() {
   echo "Очистка временных файлов и кэша..."
-  
+
   if [ -f "cleanup.py" ]; then
     python3 cleanup.py --temp --cache
     if [ $? -eq 0 ]; then
@@ -81,11 +80,15 @@ cleanup_cache() {
 run_application() {
   echo "------------------------------------------------------"
   echo "Запуск приложения..."
-  
+
   # Проверяем наличие файла run_webapp.py для запуска веб-сервера
   if [ -f "run_webapp.py" ]; then
     echo "Запуск веб-сервера..."
-    python3 run_webapp.py
+    # Запускаем веб-сервер для карты в фоновом режиме
+    python3 run_webapp.py &
+
+    # Запускаем основного бота
+    python3 main.py
   # Если есть файл main.py, запускаем его (телеграм бот)
   elif [ -f "main.py" ]; then
     echo "Запуск основного приложения (Telegram бот)..."

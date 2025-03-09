@@ -399,7 +399,7 @@ def generate_report():
         logger.error(f"Ошибка при обработке запроса на генерацию реферата: {e}")
         return jsonify({'error': str(e)}), 500
 
-def run_server(host='0.0.0.0', port=5000):
+def run_server(host='0.0.0.0', port=8080):
     """Запуск веб-сервера"""
     logger.info(f"Запуск веб-сервера на {host}:{port}")
     app.run(host=host, port=port, debug=False)
