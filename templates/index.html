@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>История России на карте</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <style>
         body, html {
             margin: 0;
@@ -101,14 +102,14 @@
             visibility: visible;
         }
         .welcome-banner {
-            background: linear-gradient(135deg, #4a76a8, #3a5a78);
-            background-image: url('https://img.freepik.com/free-vector/russia-abstract-map-with-flag_23-2148391584.jpg?w=1380&t=st=1711559566~exp=1711560166~hmac=1cee53ed9fee7d6e59ae1e41b1b82e3d26ee8d10d7a5e26b9bee0d8f7e49fe0e');
+            background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
+                        url('https://images.unsplash.com/photo-1574428094005-84b54c92dc1d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80');
             background-size: cover;
-            background-blend-mode: overlay;
-            color: white;
+            background-position: center;
+            color: #e6d9c4;
             padding: 40px;
             border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
             max-width: 650px;
             width: 90%;
             position: relative;
@@ -116,7 +117,8 @@
             transform: translateY(-30px);
             animation: modalFadeIn 0.7s forwards;
             animation-delay: 0.3s;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 2px solid #b39964;
+            font-family: 'Times New Roman', Times, serif;
         }
         @keyframes modalFadeIn {
             from {
@@ -236,6 +238,51 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        .historical-parchment {
+            background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), 
+                        url('https://images.unsplash.com/photo-1519120944692-1a8d8cfc107f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80');
+            background-size: cover;
+            color: #e6d9c4;
+            font-family: 'Times New Roman', Times, serif;
+        }
+        
+        .download-report-btn {
+            background-color: #8B4513;
+            color: #e6d9c4;
+            padding: 10px 20px;
+            border: 1px solid #b39964;
+            border-radius: 4px;
+            margin-top: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-family: 'Times New Roman', Times, serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .download-report-btn:hover {
+            background-color: #6b3100;
+        }
+        
+        .download-report-btn i {
+            margin-right: 8px;
+        }
+        
+        .period-marker {
+            font-weight: bold;
+            color: #d4af37;
+            border-bottom: 1px solid #b39964;
+            padding-bottom: 5px;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .event-highlight {
+            font-style: italic;
+            color: #b39964;
+        }
     </style>
 </head>
 <body>
@@ -302,12 +349,15 @@
         
         <!-- Модальное окно для подробной информации -->
         <div id="detailModal" class="modal-overlay">
-            <div class="welcome-banner detail-modal">
+            <div class="welcome-banner detail-modal historical-parchment">
                 <div class="welcome-title" id="detailTitle">Подробная информация</div>
                 <div class="welcome-text" id="detailContent">
                     <div id="detailLoading" class="loading-spinner">Загрузка подробной информации...</div>
                     <div id="detailText"></div>
                 </div>
+                <button id="downloadReportBtn" class="download-report-btn">
+                    <i class="fa-solid fa-file-download"></i> Скачать подробный реферат
+                </button>
                 <button id="closeDetailBtn" class="close-button">✕</button>
             </div>
         </div>
@@ -584,14 +634,15 @@
         }
         
         // Функция для запроса дополнительной информации через API
-        async function getDetailedInfo(event) {
+        async function getDetailedInfo(event, isBrief = true) {
             try {
                 // Формируем запрос с информацией о событии
                 const query = {
                     title: event.title,
                     date: event.date,
                     category: event.category,
-                    location: event.location?.name || ''
+                    location: event.location?.name || '',
+                    isBrief: isBrief
                 };
                 
                 // Отправляем запрос на API
@@ -610,8 +661,8 @@
                 const data = await response.json();
                 return data.content;
             } catch (error) {
-                console.error('Ошибка при получении подробной информации:', error);
-                return 'Извините, не удалось получить подробную информацию об этом событии. Пожалуйста, попробуйте позже.';
+                console.error('Ошибка при получении информации:', error);
+                return 'Извините, не удалось получить информацию об этом событии. Пожалуйста, попробуйте позже.';
             }
         }
         
@@ -624,22 +675,70 @@
             const title = document.getElementById('detailTitle');
             const loading = document.getElementById('detailLoading');
             const content = document.getElementById('detailText');
+            const downloadBtn = document.getElementById('downloadReportBtn');
             
             // Устанавливаем заголовок
-            title.textContent = currentEvent.title || 'Подробная информация';
+            title.textContent = currentEvent.title || 'Краткая информация';
             
             // Показываем модальное окно и индикатор загрузки
             modal.classList.add('visible');
             loading.style.display = 'block';
             content.style.display = 'none';
             
-            // Запрашиваем подробную информацию
-            const detailedInfo = await getDetailedInfo(currentEvent);
+            // Запрашиваем краткую информацию
+            const briefInfo = await getDetailedInfo(currentEvent, true);
             
             // Скрываем индикатор загрузки и показываем информацию
             loading.style.display = 'none';
             content.style.display = 'block';
-            content.innerHTML = formatDescription(detailedInfo);
+            content.innerHTML = formatDescription(briefInfo);
+            
+            // Добавляем обработчик для кнопки скачивания
+            downloadBtn.onclick = async function() {
+                downloadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Создание реферата...';
+                downloadBtn.disabled = true;
+                
+                try {
+                    const response = await fetch('/api/generate-report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: currentEvent.title,
+                            date: currentEvent.date,
+                            category: currentEvent.category,
+                            location: currentEvent.location?.name || ''
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Ошибка при генерации реферата');
+                    }
+                    
+                    // Получаем blob с документом
+                    const blob = await response.blob();
+                    
+                    // Создаем ссылку для скачивания
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `${currentEvent.title.replace(/[^\w\sа-яА-Я]/g, '_')}_реферат.docx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Очищаем ресурсы
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    
+                    downloadBtn.innerHTML = '<i class="fa-solid fa-file-download"></i> Скачать подробный реферат';
+                    downloadBtn.disabled = false;
+                } catch (error) {
+                    console.error('Ошибка при скачивании реферата:', error);
+                    alert('Произошла ошибка при создании реферата. Пожалуйста, попробуйте позже.');
+                    downloadBtn.innerHTML = '<i class="fa-solid fa-file-download"></i> Скачать подробный реферат';
+                    downloadBtn.disabled = false;
+                }
+            };
         }
         
         // Функция для форматирования описания (поддержка маркированных списков, жирного текста)
