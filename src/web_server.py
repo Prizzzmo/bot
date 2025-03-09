@@ -1,9 +1,11 @@
+
 """Веб-сервер для мониторинга и администрирования"""
 
 import json
 import os
 import threading
-from typing import Dict, Any, Optional
+import re
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from flask import Flask, render_template, jsonify, request, send_file
@@ -42,6 +44,7 @@ class WebServer(BaseService):
                         template_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates'),
                         static_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static'))
         self.server_thread = None
+        self.events_data = None
         self._setup_routes()
 
         self._logger.info("Веб-сервер инициализирован")
@@ -54,11 +57,100 @@ class WebServer(BaseService):
             bool: True если инициализация успешна
         """
         try:
-            # Здесь можно добавить код инициализации, если необходимо
+            # Загружаем исторические данные при инициализации
+            self._preload_historical_data()
             return True
         except Exception as e:
             self._logger.log_error(e, "Ошибка при инициализации WebServer")
             return False
+    
+    def _preload_historical_data(self):
+        """Предварительная загрузка исторических данных для кэширования"""
+        try:
+            if os.path.exists(HISTORY_DB_PATH):
+                with open(HISTORY_DB_PATH, 'r', encoding='utf-8') as f:
+                    self.events_data = json.load(f)
+                self._logger.info(f"Загружено {len(self.events_data.get('events', []))} исторических событий")
+            else:
+                self._logger.warning(f"Файл базы данных не найден: {HISTORY_DB_PATH}")
+                self.events_data = {"events": []}
+        except Exception as e:
+            self._logger.log_error(e, "Ошибка при предварительной загрузке исторических данных")
+            self.events_data = {"events": []}
+
+    def _clean_event_data(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Очищает и форматирует данные событий для API
+        
+        Args:
+            events: Список событий
+            
+        Returns:
+            List[Dict[str, Any]]: Очищенный список событий
+        """
+        cleaned_events = []
+        
+        for event in events:
+            # Пропускаем события без заголовка или даты
+            if not event.get('title') or not event.get('date'):
+                continue
+                
+            # Пропускаем события без местоположения, если нет координат
+            if 'location' not in event or not event.get('location', {}).get('lat') or not event.get('location', {}).get('lng'):
+                continue
+            
+            # Проверяем и очищаем описание
+            description = event.get('description', '')
+            if description:
+                # Удаляем лишние пробелы и переносы строк
+                description = re.sub(r'\s+', ' ', description).strip()
+                # Удаляем лишние звездочки, которые не являются частью маркированного списка или жирного текста
+                description = re.sub(r'(?<!\*)\*(?!\s|\*)', '', description)
+            
+            # Создаем очищенный объект события
+            clean_event = {
+                'id': event.get('id', ''),
+                'title': event.get('title', '').strip(),
+                'date': event.get('date', '').strip(),
+                'description': description,
+                'location': event.get('location', {}),
+                'category': event.get('category', '').strip(),
+                'topic': event.get('topic', '').strip(),
+                'century': self._extract_century(event.get('date', ''))
+            }
+            
+            cleaned_events.append(clean_event)
+        
+        return cleaned_events
+    
+    def _extract_century(self, date_str: str) -> int:
+        """
+        Извлекает век из строки даты
+        
+        Args:
+            date_str: Строка с датой
+            
+        Returns:
+            int: Номер века или 0, если не удалось извлечь
+        """
+        if not date_str:
+            return 0
+            
+        # Ищем 4-значный год
+        year_match = re.search(r'\b(\d{4})\b', date_str)
+        if year_match:
+            year = int(year_match.group(1))
+            return (year // 100) + 1
+            
+        # Ищем любое число, которое может быть годом
+        year_match = re.search(r'\b(\d+)\b', date_str)
+        if year_match:
+            year = int(year_match.group(1))
+            # Проверяем, что это может быть год (от 800 до текущего года + 100)
+            if 800 <= year <= datetime.now().year + 100:
+                return (year // 100) + 1
+                
+        return 0
 
     def _setup_routes(self):
         """Настраивает маршруты для веб-сервера"""
@@ -66,39 +158,54 @@ class WebServer(BaseService):
         @self.app.route('/')
         def index():
             """Главная страница мониторинга"""
-            return render_template('index.html', title="Мониторинг бота")
+            return render_template('index.html', title="История России на карте")
             
         @self.app.route('/api/historical-events')
         def get_historical_events():
             """API для получения исторических данных из базы Gemini"""
             try:
-                with open(HISTORY_DB_PATH, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    
-                # Получаем события из базы данных
-                events = data.get('events', [])
+                # Если данные еще не загружены, загружаем их
+                if self.events_data is None:
+                    self._preload_historical_data()
                 
-                # Фильтруем события, у которых есть координаты местоположения
-                filtered_events = []
-                for event in events:
-                    # Пропускаем события без местоположения
-                    if 'location' not in event:
-                        continue
-                        
-                    filtered_event = {
-                        'id': event.get('id', ''),
-                        'title': event.get('title', ''),
-                        'date': event.get('date', ''),
-                        'description': event.get('description', ''),
-                        'location': event.get('location', ''),
-                        'category': event.get('category', ''),
-                        'topic': event.get('topic', '')
-                    }
-                    filtered_events.append(filtered_event)
-                    
+                # Получаем события из базы данных
+                events = self.events_data.get('events', [])
+                
+                # Очищаем и форматируем данные
+                filtered_events = self._clean_event_data(events)
+                
+                # Фильтрация по параметрам запроса (если они есть)
+                category = request.args.get('category')
+                century = request.args.get('century')
+                
+                if category:
+                    filtered_events = [e for e in filtered_events if e.get('category') == category]
+                
+                if century:
+                    try:
+                        century_int = int(century)
+                        filtered_events = [e for e in filtered_events if e.get('century') == century_int]
+                    except ValueError:
+                        pass
+                
                 return jsonify(filtered_events)
             except Exception as e:
                 self._logger.log_error(str(e), "Ошибка при получении исторических данных")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/categories')
+        def get_categories():
+            """API для получения списка категорий событий"""
+            try:
+                if self.events_data is None:
+                    self._preload_historical_data()
+                
+                events = self.events_data.get('events', [])
+                categories = sorted(list(set(e.get('category') for e in events if e.get('category'))))
+                
+                return jsonify(categories)
+            except Exception as e:
+                self._logger.log_error(str(e), "Ошибка при получении категорий")
                 return jsonify({'error': str(e)}), 500
 
         @self.app.route('/logs')

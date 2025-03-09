@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -30,11 +31,23 @@
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
+            align-items: center;
         }
         select {
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ccc;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4a76a8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3a5a78;
         }
         .event-info {
             margin-top: 20px;
@@ -44,6 +57,29 @@
             background-color: #f9f9f9;
             display: none;
         }
+        .event-image {
+            max-width: 100%;
+            max-height: 300px;
+            margin-top: 10px;
+            display: block;
+        }
+        .event-info h3 {
+            color: #4a76a8;
+            margin-top: 0;
+        }
+        .event-topic {
+            font-style: italic;
+            color: #666;
+        }
+        .event-description {
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -51,29 +87,45 @@
         <h1>История России на карте</h1>
 
         <div class="filters">
+            <label for="categoryFilter">Категория:</label>
             <select id="categoryFilter">
-                <option value="">Все категории</option>
+                <option value="">Выберите категорию</option>
             </select>
 
-            <select id="periodFilter">
-                <option value="">Все периоды</option>
-                <option value="ancient">Древняя Русь (до 1237)</option>
-                <option value="mongol">Монгольское иго (1237-1480)</option>
-                <option value="tsardom">Московское царство (1480-1721)</option>
-                <option value="empire">Российская империя (1721-1917)</option>
-                <option value="soviet">Советский период (1917-1991)</option>
-                <option value="modern">Современная Россия (с 1991)</option>
+            <label for="centuryFilter">Век:</label>
+            <select id="centuryFilter">
+                <option value="">Выберите век</option>
+                <option value="10">X век</option>
+                <option value="11">XI век</option>
+                <option value="12">XII век</option>
+                <option value="13">XIII век</option>
+                <option value="14">XIV век</option>
+                <option value="15">XV век</option>
+                <option value="16">XVI век</option>
+                <option value="17">XVII век</option>
+                <option value="18">XVIII век</option>
+                <option value="19">XIX век</option>
+                <option value="20">XX век</option>
+                <option value="21">XXI век</option>
             </select>
+
+            <button id="applyFilters">Показать события</button>
+            <button id="resetFilters">Сбросить фильтры</button>
         </div>
 
+        <div id="loading" class="loading">Загрузка событий...</div>
         <div id="map"></div>
 
         <div id="eventInfo" class="event-info">
             <h3 id="eventTitle"></h3>
+            <p class="event-topic" id="eventTopic"></p>
             <p><strong>Дата:</strong> <span id="eventDate"></span></p>
             <p><strong>Место:</strong> <span id="eventLocation"></span></p>
             <p><strong>Категория:</strong> <span id="eventCategory"></span></p>
-            <p><strong>Описание:</strong> <span id="eventDescription"></span></p>
+            <div class="event-description">
+                <strong>Описание:</strong> 
+                <div id="eventDescription"></div>
+            </div>
         </div>
     </div>
 
@@ -87,72 +139,67 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        let events = [];
+        let allEvents = [];
         let markers = L.layerGroup().addTo(map);
+        const loadingDiv = document.getElementById('loading');
 
         // Загрузка исторических данных
         fetch('/api/historical-events')
             .then(response => response.json())
             .then(data => {
-                events = data;
+                allEvents = data;
 
                 // Заполняем выпадающий список категорий
-                const categories = [...new Set(events.map(event => event.category))];
+                const categories = [...new Set(allEvents
+                    .filter(event => event.category)
+                    .map(event => event.category))];
                 const categorySelect = document.getElementById('categoryFilter');
 
-                categories.forEach(category => {
+                categories.sort().forEach(category => {
                     const option = document.createElement('option');
                     option.value = category;
                     option.textContent = category;
                     categorySelect.appendChild(option);
                 });
-
-                // Отображаем события на карте
-                renderEvents();
             })
             .catch(error => {
-                console.error('Error loading historical data:', error);
+                console.error('Ошибка загрузки исторических данных:', error);
             });
 
         // Функция для фильтрации и отображения событий на карте
         function renderEvents() {
+            // Показываем индикатор загрузки
+            loadingDiv.style.display = 'block';
+            
             // Очищаем текущие маркеры
             markers.clearLayers();
 
             // Получаем выбранные фильтры
             const categoryFilter = document.getElementById('categoryFilter').value;
-            const periodFilter = document.getElementById('periodFilter').value;
+            const centuryFilter = document.getElementById('centuryFilter').value;
+
+            // Скрываем информацию о событии при смене фильтров
+            document.getElementById('eventInfo').style.display = 'none';
+
+            // Если не выбрана категория или век, не показываем события
+            if (!categoryFilter || !centuryFilter) {
+                loadingDiv.style.display = 'none';
+                return;
+            }
 
             // Фильтруем события
-            const filteredEvents = events.filter(event => {
-                // Фильтрация по категории
-                if (categoryFilter && event.category !== categoryFilter) {
+            const filteredEvents = allEvents.filter(event => {
+                // Требуются и категория, и век для отображения
+                if (!event.category || event.category !== categoryFilter) {
                     return false;
                 }
 
-                // Фильтрация по периоду (упрощенная версия)
-                if (periodFilter) {
-                    const year = parseEventYear(event.date);
-
-                    switch (periodFilter) {
-                        case 'ancient':
-                            return year < 1237;
-                        case 'mongol':
-                            return year >= 1237 && year <= 1480;
-                        case 'tsardom':
-                            return year > 1480 && year <= 1721;
-                        case 'empire':
-                            return year > 1721 && year <= 1917;
-                        case 'soviet':
-                            return year > 1917 && year <= 1991;
-                        case 'modern':
-                            return year > 1991;
-                        default:
-                            return true;
-                    }
-                }
-
-                return true;
+                // Фильтрация по веку
+                const year = parseEventYear(event.date);
+                if (year === 0) return false;
+                
+                const century = Math.ceil(year / 100);
+                return century.toString() === centuryFilter;
             });
 
             // Добавляем маркеры для отфильтрованных событий
@@ -163,15 +210,57 @@
                         .addTo(markers);
 
                     marker.on('click', () => {
-                        document.getElementById('eventTitle').textContent = event.title;
-                        document.getElementById('eventDate').textContent = event.date;
-                        document.getElementById('eventLocation').textContent = event.location.name || '';
-                        document.getElementById('eventCategory').textContent = event.category;
-                        document.getElementById('eventDescription').textContent = event.description;
-                        document.getElementById('eventInfo').style.display = 'block';
+                        showEventDetails(event);
                     });
                 }
             });
+
+            // Скрываем индикатор загрузки
+            loadingDiv.style.display = 'none';
+            
+            // Если событий нет, показываем сообщение
+            if (filteredEvents.length === 0) {
+                alert('События не найдены для выбранных фильтров');
+            }
+        }
+
+        // Функция для отображения подробной информации о событии
+        function showEventDetails(event) {
+            document.getElementById('eventTitle').textContent = event.title || 'Название неизвестно';
+            document.getElementById('eventDate').textContent = event.date || 'Дата неизвестна';
+            document.getElementById('eventLocation').textContent = event.location?.name || 'Местоположение неизвестно';
+            document.getElementById('eventCategory').textContent = event.category || 'Категория не указана';
+            document.getElementById('eventTopic').textContent = event.topic || '';
+            
+            // Обработка форматирования описания
+            const description = event.description || 'Описание отсутствует';
+            document.getElementById('eventDescription').innerHTML = formatDescription(description);
+            
+            document.getElementById('eventInfo').style.display = 'block';
+            
+            // Плавная прокрутка к информации о событии
+            document.getElementById('eventInfo').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Функция для форматирования описания (поддержка маркированных списков, жирного текста)
+        function formatDescription(text) {
+            // Заменяем маркеры списка
+            text = text.replace(/\*\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
+            
+            // Оборачиваем списки
+            if (text.includes('<li>')) {
+                text = '<ul>' + text + '</ul>';
+                // Исправляем вложенные списки
+                text = text.replace(/<\/ul>\s*<ul>/g, '');
+            }
+            
+            // Обрабатываем жирный текст
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Обрабатываем переносы строк
+            text = text.replace(/\n/g, '<br>');
+            
+            return text;
         }
 
         // Вспомогательная функция для извлечения года из строки даты
@@ -193,9 +282,16 @@
             return 0;
         }
 
-        // Обработчики изменения фильтров
-        document.getElementById('categoryFilter').addEventListener('change', renderEvents);
-        document.getElementById('periodFilter').addEventListener('change', renderEvents);
+        // Обработчик нажатия кнопки применения фильтров
+        document.getElementById('applyFilters').addEventListener('click', renderEvents);
+        
+        // Обработчик нажатия кнопки сброса фильтров
+        document.getElementById('resetFilters').addEventListener('click', () => {
+            document.getElementById('categoryFilter').value = '';
+            document.getElementById('centuryFilter').value = '';
+            markers.clearLayers();
+            document.getElementById('eventInfo').style.display = 'none';
+        });
     </script>
 </body>
 </html>
