@@ -44,7 +44,21 @@ historical_data = load_historical_data()
 @app.route('/')
 def index():
     """Главная страница"""
-    return render_template('index.html')
+    # Получаем статистику для приветственного баннера
+    events_count = len(historical_data.get('events', [])) if historical_data else 0
+    
+    # Получаем уникальные категории
+    categories = set()
+    if historical_data and 'events' in historical_data:
+        for event in historical_data['events']:
+            if event.get('category'):
+                categories.add(event.get('category'))
+    
+    categories_count = len(categories)
+    
+    return render_template('index.html', 
+                          events_count=events_count,
+                          categories_count=categories_count)
 
 @app.route('/api/historical-events')
 def get_historical_events():

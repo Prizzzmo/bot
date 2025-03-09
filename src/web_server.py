@@ -158,7 +158,22 @@ class WebServer(BaseService):
         @self.app.route('/')
         def index():
             """Главная страница мониторинга"""
-            return render_template('index.html', title="История России на карте")
+            # Получаем статистику для приветственного баннера
+            events_count = len(self.events_data.get('events', [])) if self.events_data else 0
+            
+            # Получаем уникальные категории
+            categories = set()
+            if self.events_data and 'events' in self.events_data:
+                for event in self.events_data['events']:
+                    if event.get('category'):
+                        categories.add(event.get('category'))
+            
+            categories_count = len(categories)
+            
+            return render_template('index.html', 
+                                  title="История России на карте",
+                                  events_count=events_count,
+                                  categories_count=categories_count)
             
         @self.app.route('/api/historical-events')
         def get_historical_events():
