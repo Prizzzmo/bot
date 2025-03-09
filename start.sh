@@ -10,7 +10,7 @@ check_and_install_dependencies() {
   echo "Проверка Python зависимостей..."
   
   if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
+    python3 -m pip install -r requirements.txt
     if [ $? -ne 0 ]; then
       echo "ОШИБКА: Не удалось установить зависимости из requirements.txt"
       exit 1
@@ -70,7 +70,7 @@ cleanup_cache() {
   echo "Очистка временных файлов и кэша..."
   
   if [ -f "cleanup.py" ]; then
-    python cleanup.py --temp --cache
+    python3 cleanup.py --temp --cache
     if [ $? -eq 0 ]; then
       echo "✅ Кэш и временные файлы очищены"
     fi
