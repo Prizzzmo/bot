@@ -79,8 +79,9 @@ class Bot:
             # Добавляем обработчик для команды очистки чата
             dp.add_handler(CommandHandler('clear', self.handlers.clear_chat_command))
             
-            # Добавляем обработчик для команды карты
-            dp.add_handler(CommandHandler(['map', 'карта'], self.handlers.map_command))
+            # Добавляем обработчики для команд карты (отдельно для каждой команды)
+            dp.add_handler(CommandHandler('map', self.handlers.map_command))
+            dp.add_handler(CommandHandler('карта', self.handlers.map_command))
 
             # Добавляем обработчик для обработки callback запросов администратора
             dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'))
