@@ -6,11 +6,8 @@
 
 # Список API ключей для модели gemini-2.0-flash
 GEMINI_API_KEYS = [
-    "AIzaSyAn8tRZAvIJs4AtebL-mpyG59MdWY8wdTI",
-    "AIzaSyAKTERtnOzlR190iITtdT23gN9-vGR9dRU", 
-    "AIzaSyC5VMpv-4UffQRkVI1E7nvzDzrhj7JKiFc",
-    "AIzaSyDR2MuMWLBzRPiDPg7O8sZuke77CWmzI1U",
-    "AIzaSyAuAktN3PCP1EOXHvA4D-4SPvddXSOKNuU"
+    "AIzaSyAuAktN3PCP1EOXHvA4D-4SPvddXSOKNuU",
+    "AIzaSyCvJVQnn7jAEpynQ5mToQUtYWbu_X7TUkU"
 ]
 
 def get_random_key():
