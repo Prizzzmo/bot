@@ -14,6 +14,7 @@ import traceback
 import sys
 import atexit
 from dotenv import load_dotenv
+import threading
 
 from src.config import Config
 from src.factory import BotFactory
@@ -24,51 +25,50 @@ def check_running_bot():
     """
     Проверяет, не запущен ли уже экземпляр бота.
     Создает и проверяет lock-файл.
-    
+
     Returns:
         bool: True если можно запускать бота, False если уже запущен
     """
     import os
     import sys
-    
+
     lock_file = "bot.lock"
-    
+
     # Проверяем существование lock-файла
     if os.path.exists(lock_file):
         try:
             # Читаем PID из lock-файла
             with open(lock_file, 'r') as f:
                 pid = int(f.read().strip())
-            
+
             # Проверяем, существует ли процесс с таким PID
             # Для Linux
             if os.path.exists(f"/proc/{pid}"):
                 return False
-            
+
             # Если процесс не существует, удаляем устаревший lock-файл
             os.remove(lock_file)
         except (IOError, ValueError):
             # Если файл поврежден или не содержит PID, удаляем его
             os.remove(lock_file)
-    
+
     # Создаем новый lock-файл с текущим PID
     with open(lock_file, 'w') as f:
         f.write(str(os.getpid()))
-    
+
     return True
 
 def main():
     """
-    Главная функция для инициализации и запуска бота.
-
-    Выполняет следующие шаги:
-    1. Проверяет, не запущен ли уже бот
-    2. Загружает переменные окружения
-    3. Настраивает базовое логирование
-    4. Инициализирует конфигурацию
-    5. Создает экземпляр бота с помощью фабрики
-    6. Настраивает и запускает бота
+    Основная функция для запуска бота и веб-сервера
     """
+    # Запуск веб-сервера в отдельном потоке
+    import threading
+    from webapp.server import run_server # Placeholder - needs actual implementation
+    webapp_thread = threading.Thread(target=run_server, args=('0.0.0.0', 8080), daemon=True)
+    webapp_thread.start()
+    print("Веб-сервер запущен на порту 8080")
+
     logger = None
 
     try:
@@ -76,7 +76,7 @@ def main():
         if not check_running_bot():
             print("Бот уже запущен в другом процессе. Завершение работы.")
             sys.exit(1)
-            
+
         # Загружаем переменные окружения из .env файла
         load_dotenv()
 
@@ -109,7 +109,7 @@ def main():
         # Создаем экземпляр бота через фабрику
         logger.info("Создание бота через фабрику")
         bot = BotFactory.create_bot(config)
-        
+
         # Проверяем, что бот был успешно создан
         if not bot:
             logger.error("Не удалось создать экземпляр бота!")
@@ -120,7 +120,7 @@ def main():
         if not bot.setup():
             logger.error("Ошибка при настройке бота!")
             return
-            
+
         logger.info("Бот успешно настроен и готов к запуску")
 
         # Проверяем необходимость миграции данных
@@ -155,7 +155,7 @@ def main():
         else:
             print(f"Критическая ошибка: {e}")
             print(traceback.format_exc())
-            
+
         # Удаляем lock-файл при завершении работы с ошибкой
         if os.path.exists("bot.lock"):
             os.remove("bot.lock")
