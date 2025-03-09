@@ -1,3 +1,4 @@
+
 python-telegram-bot==13.15
 requests==2.31.0
 python-dotenv==1.0.0
@@ -9,17 +10,10 @@ folium
 selenium
 webdriver-manager
 pillow
-python-telegram-bot==13.7
-requests
 docx
-pillow
 jinja2
 basemap
-matplotlib
 pandas
-pandas
-matplotlib
 numpy
-pillow
 redis
 pymemcache

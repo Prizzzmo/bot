@@ -85,11 +85,11 @@ run_application() {
   # Проверяем наличие файла run_webapp.py для запуска веб-сервера
   if [ -f "run_webapp.py" ]; then
     echo "Запуск веб-сервера..."
-    python run_webapp.py
+    python3 run_webapp.py
   # Если есть файл main.py, запускаем его (телеграм бот)
   elif [ -f "main.py" ]; then
     echo "Запуск основного приложения (Telegram бот)..."
-    python main.py
+    python3 main.py
   else
     echo "ОШИБКА: Не найдены файлы запуска (run_webapp.py или main.py)"
     exit 1
