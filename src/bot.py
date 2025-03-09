@@ -79,9 +79,12 @@ class Bot:
             # Добавляем обработчик для команды очистки чата
             dp.add_handler(CommandHandler('clear', self.handlers.clear_chat_command))
             
-            # Добавляем обработчики для команд карты (отдельно для каждой команды)
+            # Добавляем обработчик только для латинской команды карты
+            # Кириллические команды не поддерживаются Telegram API
             dp.add_handler(CommandHandler('map', self.handlers.map_command))
-            dp.add_handler(CommandHandler('карта', self.handlers.map_command))
+            
+            # Добавляем обработчик текстовых сообщений, который будет проверять текст "/карта"
+            dp.add_handler(MessageHandler(Filters.regex(r'^/карта$'), self.handlers.map_command))
 
             # Добавляем обработчик для обработки callback запросов администратора
             dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'))
