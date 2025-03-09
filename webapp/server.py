@@ -113,6 +113,101 @@ def get_categories():
         logger.error(f"Ошибка при получении категорий: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/event-details', methods=['POST'])
+def get_event_details():
+    """API для получения подробной информации о событии через Gemini API"""
+    try:
+        # Получаем данные из запроса
+        data = request.json
+        
+        if not data or not data.get('title'):
+            return jsonify({'error': 'Недостаточно данных о событии'}), 400
+        
+        # Формируем запрос к Gemini API
+        # Импортируем здесь для избежания циклических импортов
+        import sys
+        import os
+        # Добавляем корневую директорию проекта в путь для импорта
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if root_dir not in sys.path:
+            sys.path.append(root_dir)
+            
+        from src.api_client import APIClient
+        from src.api_cache import APICache
+        from src.logger import Logger
+        
+        # Получаем API ключ
+        api_key = None
+        try:
+            from gemini_api_keys import GEMINI_API_KEYS
+            if GEMINI_API_KEYS:
+                api_key = GEMINI_API_KEYS[0]
+        except ImportError:
+            logger.error("Не удалось импортировать GEMINI_API_KEYS")
+        
+        if not api_key:
+            try:
+                import os
+                api_key = os.environ.get('GEMINI_API_KEY')
+            except:
+                pass
+        
+        if not api_key:
+            return jsonify({
+                'content': 'Не удалось получить доступ к API Gemini. Пожалуйста, проверьте настройки API ключей.'
+            }), 200
+        
+        # Создаем объекты для работы с API
+        api_cache = APICache(logger)
+        api_client = APIClient(api_key, api_cache, logger)
+        
+        # Формируем промпт для Gemini
+        event_title = data.get('title', '')
+        event_date = data.get('date', '')
+        event_category = data.get('category', '')
+        event_location = data.get('location', '')
+        
+        prompt = f"""
+        Предоставь подробную историческую информацию о следующем событии из истории России:
+        
+        Название: {event_title}
+        Дата: {event_date}
+        Категория: {event_category}
+        Место: {event_location}
+        
+        Пожалуйста, структурируй ответ следующим образом:
+        1. Исторический контекст (что происходило в России в это время)
+        2. Подробное описание события
+        3. Ключевые участники
+        4. Причины и предпосылки
+        5. Последствия и историческое значение
+        
+        Используй только проверенные исторические факты. Ответ должен быть информативным, подробным, но лаконичным.
+        """
+        
+        try:
+            # Инициализация API клиента если нужно
+            if not api_client.is_initialized():
+                api_client.initialize()
+                
+            # Запрос к Gemini API
+            response = api_client.ask_grok(prompt, use_cache=True)
+            
+            return jsonify({
+                'content': response
+            })
+        except Exception as api_error:
+            logger.error(f"Ошибка при запросе к Gemini API: {api_error}")
+            return jsonify({
+                'content': f"Произошла ошибка при получении информации: {str(api_error)}"
+            }), 200
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обработке запроса о деталях события: {e}")
+        return jsonify({
+            'content': 'Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже.'
+        }), 200
+
 def run_server(host='0.0.0.0', port=5000):
     """Запуск веб-сервера"""
     logger.info(f"Запуск веб-сервера на {host}:{port}")

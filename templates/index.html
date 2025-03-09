@@ -173,6 +173,69 @@
             border-radius: 3px;
             margin: 0 5px;
         }
+        
+        .detail-button {
+            display: block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4a76a8;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .detail-button:hover {
+            background-color: #3a5a78;
+        }
+        
+        .detail-modal {
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .close-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 18px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+            position: relative;
+        }
+        
+        .loading-spinner::after {
+            content: "";
+            display: block;
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            border-radius: 50%;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -234,30 +297,66 @@
                 <strong>Описание:</strong> 
                 <div id="eventDescription"></div>
             </div>
+            <button id="moreInfoButton" class="detail-button">Подробнее</button>
+        </div>
+        
+        <!-- Модальное окно для подробной информации -->
+        <div id="detailModal" class="modal-overlay">
+            <div class="welcome-banner detail-modal">
+                <div class="welcome-title" id="detailTitle">Подробная информация</div>
+                <div class="welcome-text" id="detailContent">
+                    <div id="detailLoading" class="loading-spinner">Загрузка подробной информации...</div>
+                    <div id="detailText"></div>
+                </div>
+                <button id="closeDetailBtn" class="close-button">✕</button>
+            </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        // Обработка модального окна приветствия
+        // Обработка модальных окон и событий
         document.addEventListener('DOMContentLoaded', function() {
+            // Элементы приветственного модального окна
             const welcomeModal = document.getElementById('welcomeModal');
             const closeWelcomeBtn = document.getElementById('closeWelcomeBtn');
             
-            // Показываем модальное окно при загрузке страницы
+            // Элементы модального окна с подробной информацией
+            const detailModal = document.getElementById('detailModal');
+            const closeDetailBtn = document.getElementById('closeDetailBtn');
+            const moreInfoButton = document.getElementById('moreInfoButton');
+            
+            // Показываем приветственное модальное окно при загрузке страницы
             setTimeout(function() {
                 welcomeModal.classList.add('visible');
             }, 500);
             
-            // Закрываем модальное окно при нажатии на кнопку
+            // Закрываем приветственное модальное окно при нажатии на кнопку
             closeWelcomeBtn.addEventListener('click', function() {
                 welcomeModal.classList.remove('visible');
             });
             
-            // Закрываем модальное окно при нажатии вне его области
+            // Закрываем приветственное модальное окно при нажатии вне его области
             welcomeModal.addEventListener('click', function(e) {
                 if (e.target === welcomeModal) {
                     welcomeModal.classList.remove('visible');
+                }
+            });
+            
+            // Обработчик кнопки "Подробнее"
+            moreInfoButton.addEventListener('click', function() {
+                showDetailedInfo();
+            });
+            
+            // Закрываем модальное окно с подробной информацией при нажатии на кнопку
+            closeDetailBtn.addEventListener('click', function() {
+                detailModal.classList.remove('visible');
+            });
+            
+            // Закрываем модальное окно с подробной информацией при нажатии вне его области
+            detailModal.addEventListener('click', function(e) {
+                if (e.target === detailModal) {
+                    detailModal.classList.remove('visible');
                 }
             });
         });
@@ -460,8 +559,14 @@
             }
         }
 
+        // Глобальная переменная для хранения текущего события
+        let currentEvent = null;
+        
         // Функция для отображения подробной информации о событии
         function showEventDetails(event) {
+            // Сохраняем текущее событие в глобальной переменной
+            currentEvent = event;
+            
             document.getElementById('eventTitle').textContent = event.title || 'Название неизвестно';
             document.getElementById('eventDate').textContent = event.date || 'Дата неизвестна';
             document.getElementById('eventLocation').textContent = event.location?.name || 'Местоположение неизвестно';
@@ -476,6 +581,65 @@
             
             // Плавная прокрутка к информации о событии
             document.getElementById('eventInfo').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Функция для запроса дополнительной информации через API
+        async function getDetailedInfo(event) {
+            try {
+                // Формируем запрос с информацией о событии
+                const query = {
+                    title: event.title,
+                    date: event.date,
+                    category: event.category,
+                    location: event.location?.name || ''
+                };
+                
+                // Отправляем запрос на API
+                const response = await fetch('/api/event-details', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(query)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ошибка! Статус: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data.content;
+            } catch (error) {
+                console.error('Ошибка при получении подробной информации:', error);
+                return 'Извините, не удалось получить подробную информацию об этом событии. Пожалуйста, попробуйте позже.';
+            }
+        }
+        
+        // Функция для отображения модального окна с подробной информацией
+        async function showDetailedInfo() {
+            if (!currentEvent) return;
+            
+            // Получаем DOM элементы
+            const modal = document.getElementById('detailModal');
+            const title = document.getElementById('detailTitle');
+            const loading = document.getElementById('detailLoading');
+            const content = document.getElementById('detailText');
+            
+            // Устанавливаем заголовок
+            title.textContent = currentEvent.title || 'Подробная информация';
+            
+            // Показываем модальное окно и индикатор загрузки
+            modal.classList.add('visible');
+            loading.style.display = 'block';
+            content.style.display = 'none';
+            
+            // Запрашиваем подробную информацию
+            const detailedInfo = await getDetailedInfo(currentEvent);
+            
+            // Скрываем индикатор загрузки и показываем информацию
+            loading.style.display = 'none';
+            content.style.display = 'block';
+            content.innerHTML = formatDescription(detailedInfo);
         }
         
         // Функция для форматирования описания (поддержка маркированных списков, жирного текста)
