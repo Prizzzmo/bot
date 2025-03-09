@@ -9,7 +9,8 @@ GEMINI_API_KEYS = [
     "AIzaSyAn8tRZAvIJs4AtebL-mpyG59MdWY8wdTI",
     "AIzaSyAKTERtnOzlR190iITtdT23gN9-vGR9dRU", 
     "AIzaSyC5VMpv-4UffQRkVI1E7nvzDzrhj7JKiFc",
-    "AIzaSyDR2MuMWLBzRPiDPg7O8sZuke77CWmzI1U"
+    "AIzaSyDR2MuMWLBzRPiDPg7O8sZuke77CWmzI1U",
+    "AIzaSyAuAktN3PCP1EOXHvA4D-4SPvddXSOKNuU"
 ]
 
 def get_random_key():
