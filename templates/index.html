@@ -309,14 +309,25 @@
             
         // Загрузка исторических данных 
         fetch('/api/historical-events')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ошибка! Статус: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
-                console.log('Загружено событий из API:', data.length);
-                allEvents = data;
+                if (!data) {
+                    console.error('API вернул пустые данные');
+                    allEvents = [];
+                } else {
+                    console.log('Загружено событий из API:', data.length);
+                    allEvents = data;
+                }
             })
             .catch(error => {
                 console.error('Ошибка загрузки исторических данных:', error);
                 alert('Произошла ошибка при загрузке данных. Пожалуйста, обновите страницу.');
+                allEvents = [];
             });
 
         // Функция для фильтрации и отображения событий на карте
@@ -343,11 +354,13 @@
             }
 
             console.log('Выбранные фильтры:', { категория: categoryFilter, век: centuryFilter });
+            console.log('Всего доступно событий:', allEvents.length);
 
             // Фильтруем события
             const filteredEvents = allEvents.filter(event => {
                 // Проверяем категорию
                 if (!event.category) {
+                    console.log('Событие без категории:', event.title);
                     return false;
                 }
                 
@@ -361,7 +374,10 @@
 
                 // Фильтрация по веку
                 const year = parseEventYear(event.date);
-                if (year === 0) return false;
+                if (year === 0) {
+                    console.log('Неверный формат даты:', event.date, 'для события', event.title);
+                    return false;
+                }
                 
                 const century = Math.ceil(year / 100);
                 return century.toString() === centuryFilter;
@@ -379,15 +395,68 @@
                     marker.on('click', () => {
                         showEventDetails(event);
                     });
+                } else {
+                    console.log('Событие без координат:', event.title);
                 }
             });
 
             // Скрываем индикатор загрузки
             loadingDiv.style.display = 'none';
             
-            // Если событий нет, показываем сообщение
+            // Если событий нет, показываем стилизованное сообщение
             if (filteredEvents.length === 0) {
-                alert('События не найдены для выбранных фильтров');
+                // Создаем модальное окно с информацией
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay visible';
+                
+                const modalContent = document.createElement('div');
+                modalContent.className = 'welcome-banner';
+                modalContent.style.maxWidth = '500px';
+                
+                const title = document.createElement('div');
+                title.className = 'welcome-title';
+                title.textContent = 'Информация отсутствует';
+                
+                const message = document.createElement('div');
+                message.className = 'welcome-text';
+                message.textContent = 'Извините, но в данный момент в нашей базе нет информации о подобных событиях в данный промежуток времени.';
+                
+                const closeBtn = document.createElement('button');
+                closeBtn.style.position = 'absolute';
+                closeBtn.style.top = '15px';
+                closeBtn.style.right = '15px';
+                closeBtn.style.background = 'rgba(255,255,255,0.2)';
+                closeBtn.style.color = 'white';
+                closeBtn.style.border = 'none';
+                closeBtn.style.borderRadius = '50%';
+                closeBtn.style.width = '36px';
+                closeBtn.style.height = '36px';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.style.fontSize = '18px';
+                closeBtn.textContent = '✕';
+                
+                modalContent.appendChild(title);
+                modalContent.appendChild(message);
+                modalContent.appendChild(closeBtn);
+                modal.appendChild(modalContent);
+                
+                document.body.appendChild(modal);
+                
+                closeBtn.addEventListener('click', () => {
+                    modal.classList.remove('visible');
+                    setTimeout(() => {
+                        modal.remove();
+                    }, 500);
+                });
+                
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('visible');
+                        setTimeout(() => {
+                            modal.remove();
+                        }, 500);
+                    }
+                });
             }
         }
 

@@ -64,14 +64,24 @@ def index():
 def get_historical_events():
     """API для получения исторических данных"""
     try:
+        # Проверяем, загружены ли данные
+        global historical_data
+        if not historical_data:
+            historical_data = load_historical_data()
+        
         # Получаем события из базы данных
         events = historical_data.get('events', [])
+        logger.info(f"Всего событий в базе: {len(events)}")
         
         # Фильтруем события, у которых есть координаты местоположения
         filtered_events = []
         for event in events:
-            # Пропускаем события без местоположения или без координат
-            if 'location' not in event or not event.get('location', {}).get('lat') or not event.get('location', {}).get('lng'):
+            # Проверка на наличие координат
+            has_coords = False
+            if isinstance(event.get('location'), dict):
+                has_coords = event.get('location', {}).get('lat') and event.get('location', {}).get('lng')
+            
+            if not has_coords:
                 continue
                 
             filtered_event = {
@@ -84,11 +94,12 @@ def get_historical_events():
                 'topic': event.get('topic', '')
             }
             filtered_events.append(filtered_event)
-            
+        
+        logger.info(f"Отправляется {len(filtered_events)} событий с координатами")
         return jsonify(filtered_events)
     except Exception as e:
         logger.error(f"Ошибка при получении исторических данных: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify([]), 200  # Возвращаем пустой массив вместо ошибки
 
 @app.route('/api/categories')
 def get_categories():
