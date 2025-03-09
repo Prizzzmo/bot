@@ -16,6 +16,10 @@ import io
 from src.interfaces import ILogger
 from src.base_service import BaseService
 
+# Путь к файлу с историческими данными, сгенерированными Gemini
+HISTORY_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                              "history_db_generator/russian_history_database.json")
+
 class WebServer(BaseService):
     """
     Веб-сервер для мониторинга и администрирования бота.
@@ -63,6 +67,39 @@ class WebServer(BaseService):
         def index():
             """Главная страница мониторинга"""
             return render_template('index.html', title="Мониторинг бота")
+            
+        @self.app.route('/api/historical-events')
+        def get_historical_events():
+            """API для получения исторических данных из базы Gemini"""
+            try:
+                with open(HISTORY_DB_PATH, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                # Получаем события из базы данных
+                events = data.get('events', [])
+                
+                # Фильтруем события, у которых есть координаты местоположения
+                filtered_events = []
+                for event in events:
+                    # Пропускаем события без местоположения
+                    if 'location' not in event:
+                        continue
+                        
+                    filtered_event = {
+                        'id': event.get('id', ''),
+                        'title': event.get('title', ''),
+                        'date': event.get('date', ''),
+                        'description': event.get('description', ''),
+                        'location': event.get('location', ''),
+                        'category': event.get('category', ''),
+                        'topic': event.get('topic', '')
+                    }
+                    filtered_events.append(filtered_event)
+                    
+                return jsonify(filtered_events)
+            except Exception as e:
+                self._logger.log_error(str(e), "Ошибка при получении исторических данных")
+                return jsonify({'error': str(e)}), 500
 
         @self.app.route('/logs')
         def logs():

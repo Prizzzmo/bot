@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 # Path to historical data JSON file
 HISTORY_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                              "history_db_generator/russian_history_database_mistral.json")
+                              "history_db_generator/russian_history_database.json")
 
 @app.route('/')
 def index():

@@ -1,266 +1,201 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>История России на карте</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
-        body {
-            padding-top: 20px;
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
         }
-        .dashboard-card {
+        #map {
+            height: 80vh;
+            width: 100%;
+        }
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .filters {
             margin-bottom: 20px;
-            transition: transform 0.3s;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
         }
-        .dashboard-card:hover {
-            transform: translateY(-5px);
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
         }
-        .stats-value {
-            font-size: 2.5rem;
-            font-weight: bold;
-        }
-        .stats-label {
-            font-size: 1rem;
-            color: #6c757d;
-        }
-        .chart-container {
-            height: 300px;
-            margin-bottom: 20px;
+        .event-info {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header class="mb-4">
-            <h1 class="display-4">Мониторинг исторического бота</h1>
-            <p class="lead">Система мониторинга и управления образовательным ботом по истории России</p>
-            <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                <div class="container-fluid">
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse" id="navbarNav">
-                        <ul class="navbar-nav">
-                            <li class="nav-item">
-                                <a class="nav-link active" href="/">Главная</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/logs">Логи</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/statistics">Статистика</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/admin">Администрирование</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/map">Историческая карта</a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </nav>
-        </header>
+        <h1>История России на карте</h1>
 
-        <div class="row" id="stats-overview">
-            <div class="col-md-3">
-                <div class="card dashboard-card">
-                    <div class="card-body text-center">
-                        <div class="stats-value" id="total-users">-</div>
-                        <div class="stats-label">Всего пользователей</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card dashboard-card">
-                    <div class="card-body text-center">
-                        <div class="stats-value" id="active-users">-</div>
-                        <div class="stats-label">Активных за сутки</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card dashboard-card">
-                    <div class="card-body text-center">
-                        <div class="stats-value" id="total-requests">-</div>
-                        <div class="stats-label">Всего запросов</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card dashboard-card">
-                    <div class="card-body text-center">
-                        <div class="stats-value" id="total-topics">-</div>
-                        <div class="stats-label">Изученных тем</div>
-                    </div>
-                </div>
-            </div>
+        <div class="filters">
+            <select id="categoryFilter">
+                <option value="">Все категории</option>
+            </select>
+
+            <select id="periodFilter">
+                <option value="">Все периоды</option>
+                <option value="ancient">Древняя Русь (до 1237)</option>
+                <option value="mongol">Монгольское иго (1237-1480)</option>
+                <option value="tsardom">Московское царство (1480-1721)</option>
+                <option value="empire">Российская империя (1721-1917)</option>
+                <option value="soviet">Советский период (1917-1991)</option>
+                <option value="modern">Современная Россия (с 1991)</option>
+            </select>
         </div>
 
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Активность пользователей</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <img src="/api/chart/daily_activity" class="img-fluid" alt="График активности" id="activity-chart">
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Популярные темы</h5>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-group" id="popular-topics">
-                            <li class="list-group-item">Загрузка...</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div id="map"></div>
 
-        <div class="row mt-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Последние логи</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Время</th>
-                                        <th>Уровень</th>
-                                        <th>Сообщение</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recent-logs">
-                                    <tr>
-                                        <td colspan="3" class="text-center">Загрузка...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <div class="text-center">
-                                <a href="/logs" class="btn btn-primary">Все логи</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div id="eventInfo" class="event-info">
+            <h3 id="eventTitle"></h3>
+            <p><strong>Дата:</strong> <span id="eventDate"></span></p>
+            <p><strong>Место:</strong> <span id="eventLocation"></span></p>
+            <p><strong>Категория:</strong> <span id="eventCategory"></span></p>
+            <p><strong>Описание:</strong> <span id="eventDescription"></span></p>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        // Функция для загрузки общей статистики
-        function loadStatistics() {
-            fetch('/api/statistics')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('total-users').textContent = data.total_users || '0';
-                    document.getElementById('active-users').textContent = data.active_users ? data.active_users.daily : '0';
-                    document.getElementById('total-requests').textContent = data.total_requests || '0';
-                    document.getElementById('total-topics').textContent = data.total_topics || '0';
-                    
-                    // Обновляем список популярных тем
-                    const topicsList = document.getElementById('popular-topics');
-                    topicsList.innerHTML = '';
-                    
-                    if (data.popular_topics && data.popular_topics.length > 0) {
-                        data.popular_topics.forEach(topic => {
-                            const li = document.createElement('li');
-                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                            li.innerHTML = `
-                                ${topic.name}
-                                <span class="badge bg-primary rounded-pill">${topic.count}</span>
-                            `;
-                            topicsList.appendChild(li);
-                        });
-                    } else {
-                        topicsList.innerHTML = '<li class="list-group-item">Нет данных</li>';
-                    }
-                    
-                    // Обновляем график активности
-                    const activityChart = document.getElementById('activity-chart');
-                    activityChart.src = `/api/chart/daily_activity?t=${new Date().getTime()}`;
-                })
-                .catch(error => {
-                    console.error('Ошибка при загрузке статистики:', error);
+        // Инициализация карты
+        const map = L.map('map').setView([55.75, 37.62], 4);
+
+        // Добавление слоя OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let events = [];
+        let markers = L.layerGroup().addTo(map);
+
+        // Загрузка исторических данных
+        fetch('/api/historical-events')
+            .then(response => response.json())
+            .then(data => {
+                events = data;
+
+                // Заполняем выпадающий список категорий
+                const categories = [...new Set(events.map(event => event.category))];
+                const categorySelect = document.getElementById('categoryFilter');
+
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    categorySelect.appendChild(option);
                 });
-        }
-        
-        // Функция для загрузки последних логов
-        function loadRecentLogs() {
-            fetch('/api/logs?limit=5')
-                .then(response => response.json())
-                .then(data => {
-                    const logsTable = document.getElementById('recent-logs');
-                    logsTable.innerHTML = '';
-                    
-                    if (data && data.length > 0) {
-                        data.forEach(log => {
-                            const tr = document.createElement('tr');
-                            
-                            // Определяем класс строки в зависимости от уровня лога
-                            if (log.level === 'ERROR') {
-                                tr.className = 'table-danger';
-                            } else if (log.level === 'WARNING') {
-                                tr.className = 'table-warning';
-                            }
-                            
-                            tr.innerHTML = `
-                                <td>${log.timestamp}</td>
-                                <td><span class="badge ${getBadgeClass(log.level)}">${log.level}</span></td>
-                                <td>${log.message}</td>
-                            `;
-                            logsTable.appendChild(tr);
-                        });
-                    } else {
-                        logsTable.innerHTML = '<tr><td colspan="3" class="text-center">Нет доступных логов</td></tr>';
+
+                // Отображаем события на карте
+                renderEvents();
+            })
+            .catch(error => {
+                console.error('Error loading historical data:', error);
+            });
+
+        // Функция для фильтрации и отображения событий на карте
+        function renderEvents() {
+            // Очищаем текущие маркеры
+            markers.clearLayers();
+
+            // Получаем выбранные фильтры
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const periodFilter = document.getElementById('periodFilter').value;
+
+            // Фильтруем события
+            const filteredEvents = events.filter(event => {
+                // Фильтрация по категории
+                if (categoryFilter && event.category !== categoryFilter) {
+                    return false;
+                }
+
+                // Фильтрация по периоду (упрощенная версия)
+                if (periodFilter) {
+                    const year = parseEventYear(event.date);
+
+                    switch (periodFilter) {
+                        case 'ancient':
+                            return year < 1237;
+                        case 'mongol':
+                            return year >= 1237 && year <= 1480;
+                        case 'tsardom':
+                            return year > 1480 && year <= 1721;
+                        case 'empire':
+                            return year > 1721 && year <= 1917;
+                        case 'soviet':
+                            return year > 1917 && year <= 1991;
+                        case 'modern':
+                            return year > 1991;
+                        default:
+                            return true;
                     }
-                })
-                .catch(error => {
-                    console.error('Ошибка при загрузке логов:', error);
-                });
+                }
+
+                return true;
+            });
+
+            // Добавляем маркеры для отфильтрованных событий
+            filteredEvents.forEach(event => {
+                if (event.location && event.location.lat && event.location.lng) {
+                    const marker = L.marker([event.location.lat, event.location.lng])
+                        .bindPopup(`<b>${event.title}</b><br>${event.date}`)
+                        .addTo(markers);
+
+                    marker.on('click', () => {
+                        document.getElementById('eventTitle').textContent = event.title;
+                        document.getElementById('eventDate').textContent = event.date;
+                        document.getElementById('eventLocation').textContent = event.location.name || '';
+                        document.getElementById('eventCategory').textContent = event.category;
+                        document.getElementById('eventDescription').textContent = event.description;
+                        document.getElementById('eventInfo').style.display = 'block';
+                    });
+                }
+            });
         }
-        
-        // Получение класса для значка уровня лога
-        function getBadgeClass(level) {
-            switch (level) {
-                case 'ERROR':
-                    return 'bg-danger';
-                case 'WARNING':
-                    return 'bg-warning text-dark';
-                case 'INFO':
-                    return 'bg-info text-dark';
-                case 'DEBUG':
-                    return 'bg-secondary';
-                default:
-                    return 'bg-primary';
+
+        // Вспомогательная функция для извлечения года из строки даты
+        function parseEventYear(dateStr) {
+            if (!dateStr) return 0;
+
+            // Попытка извлечь 4-значное число из строки
+            const yearMatch = dateStr.match(/\b\d{4}\b/);
+            if (yearMatch) {
+                return parseInt(yearMatch[0], 10);
             }
+
+            // Если не нашли 4-значное число, ищем любое число
+            const numberMatch = dateStr.match(/\d+/);
+            if (numberMatch) {
+                return parseInt(numberMatch[0], 10);
+            }
+
+            return 0;
         }
-        
-        // Автоматическое обновление данных каждые 30 секунд
-        function startAutoRefresh() {
-            loadStatistics();
-            loadRecentLogs();
-            
-            setInterval(() => {
-                loadStatistics();
-                loadRecentLogs();
-            }, 30000);
-        }
-        
-        // Запускаем автообновление при загрузке страницы
-        document.addEventListener('DOMContentLoaded', startAutoRefresh);
+
+        // Обработчики изменения фильтров
+        document.getElementById('categoryFilter').addEventListener('change', renderEvents);
+        document.getElementById('periodFilter').addEventListener('change', renderEvents);
     </script>
 </body>
 </html>
