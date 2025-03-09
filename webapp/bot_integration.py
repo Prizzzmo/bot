@@ -6,21 +6,29 @@ def get_webapp_keyboard():
     """
     Creates an inline keyboard with a button to open the webapp
     """
-    # Получаем URL для веб-приложения
-    repl_id = os.environ.get('REPL_ID', '')
-    repl_slug = os.environ.get('REPL_SLUG', '')
-    repl_owner = os.environ.get('REPL_OWNER', '')
-    
-    # Берем URL из переменной окружения, если она задана
+    # Пытаемся определить URL для веб-приложения несколькими способами
+    # Приоритет отдается явно указанному URL в переменных окружения
     webapp_url = os.environ.get('WEBAPP_URL', '')
     
-    # Если URL не задан явно, попробуем сформировать его на основе информации о repl
+    # Если URL не задан в переменных окружения, строим его из данных о развертывании
     if not webapp_url:
-        if repl_slug and repl_owner:
+        deployment_id = os.environ.get('REPL_DEPLOYMENT_ID', '')
+        repl_id = os.environ.get('REPL_ID', '')
+        repl_slug = os.environ.get('REPL_SLUG', '')
+        repl_owner = os.environ.get('REPL_OWNER', '')
+        
+        # Проверяем, есть ли информация о развертывании (deployment)
+        if deployment_id:
+            webapp_url = f"https://{deployment_id}.deployment.repl.co"
+        # Если нет информации о развертывании, используем данные о repl
+        elif repl_slug and repl_owner:
             webapp_url = f"https://{repl_slug}.{repl_owner}.repl.co"
-        else:
-            # Fallback на использование REPL_ID, который всегда доступен
+        # Если другие данные недоступны, используем REPL_ID
+        elif repl_id:
             webapp_url = f"https://{repl_id}.id.repl.co"
+        # Если совсем ничего не доступно, используем захардкоженный URL
+        else:
+            webapp_url = "https://workspace.never.repl.co"
     
     # Логирование URL для отладки
     print(f"Сформирован URL для веб-приложения: {webapp_url}")
