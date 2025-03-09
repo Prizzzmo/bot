@@ -673,16 +673,27 @@ class CommandHandlers:
             query.edit_message_text("Напиши тему по истории России, которую ты хочешь изучить:")
             return self.CHOOSE_TOPIC
         elif query_data == 'history_map':
-            # Импортируем функцию для получения клавиатуры с веб-приложением
+            # Импортируем функции для взаимодействия с веб-приложением
             import sys
             sys.path.append('webapp')
-            from bot_integration import get_webapp_keyboard
+            from bot_integration import get_webapp_keyboard, get_map_description
             
-            # Отправляем сообщение с кнопкой для открытия веб-приложения
+            # Получаем описание и клавиатуру
+            description = get_map_description()
+            keyboard = get_webapp_keyboard()
+            
+            # Обновляем сообщение с информативным описанием и кнопкой для открытия веб-приложения
             query.edit_message_text(
-                "Нажмите на кнопку ниже, чтобы открыть интерактивную карту исторических событий России:",
-                reply_markup=get_webapp_keyboard()
+                description,
+                parse_mode='Markdown',
+                reply_markup=keyboard,
+                disable_web_page_preview=True
             )
+            
+            # Показываем пользователю, что карта загружается
+            context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
+            
+            self.logger.info(f"Пользователь {user_id} открыл карту через меню")
             return self.TOPIC
 
     def choose_topic(self, update, context):
@@ -1409,20 +1420,30 @@ class CommandHandlers:
             user_id = update.message.from_user.id
             self.logger.info(f"Пользователь {user_id} запросил карту исторических событий")
             
-            # Импортируем функцию для получения клавиатуры с веб-приложением
+            # Импортируем функции для взаимодействия с веб-приложением
             import sys
             sys.path.append('webapp')
-            from bot_integration import get_webapp_keyboard
+            from bot_integration import get_webapp_keyboard, get_map_description
             
-            # Отправляем сообщение с кнопкой для открытия веб-приложения
+            # Получаем описание и клавиатуру
+            description = get_map_description()
+            keyboard = get_webapp_keyboard()
+            
+            # Отправляем сообщение с информативным описанием и кнопкой для открытия веб-приложения
             sent_msg = update.message.reply_text(
-                "Нажмите на кнопку ниже, чтобы открыть интерактивную карту исторических событий России:",
-                reply_markup=get_webapp_keyboard()
+                description,
+                parse_mode='Markdown',
+                reply_markup=keyboard,
+                disable_web_page_preview=True
             )
             
             # Сохраняем ID сообщения
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
             
+            # Показываем пользователю, что карта загружается
+            context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
+            
+            self.logger.info(f"Пользователь {user_id} успешно получил доступ к карте")
             return self.TOPIC
         except Exception as e:
             self.logger.log_error(e, "Ошибка при открытии карты")
