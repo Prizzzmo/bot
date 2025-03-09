@@ -11,11 +11,11 @@ language = "python3"
 requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
-run = ["python3", "main.py"]
+run = ["sh", "-c", "python main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Запуск бота и веб-приложения"
+runButton = "Run Bot and Web App"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -48,6 +48,14 @@ author = 40317015
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python run_combined.py"
+
+[[workflows.workflow]]
+name = "Run Bot and Web App"
+author = 40331637
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
 
 [[ports]]
 localPort = 8080
