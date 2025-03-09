@@ -80,16 +80,44 @@
             margin: 20px;
             display: none;
         }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
         .welcome-banner {
             background: linear-gradient(135deg, #4a76a8, #3a5a78);
             color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 90%;
+            position: relative;
             opacity: 0;
-            transform: translateY(-20px);
-            animation: fadeIn 1s forwards;
+            transform: translateY(-30px);
+            animation: modalFadeIn 0.7s forwards;
+            animation-delay: 0.3s;
+        }
+        @keyframes modalFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         .stats {
             background-color: rgba(255,255,255,0.2);
@@ -128,13 +156,16 @@
 </head>
 <body>
     <div class="container">
-        <div class="welcome-banner" id="welcomeBanner">
-            <div class="welcome-title">Добро пожаловать в интерактивную карту <span class="tricolor">Истории России</span>!</div>
-            <div class="welcome-text">
-                Данный проект создан для образовательных целей и предоставляет визуальный интерфейс для изучения исторических событий России. Вы можете исследовать различные эпохи, выбирая категории и временные периоды, чтобы увидеть, где и когда происходили ключевые события нашей истории.
-            </div>
-            <div class="stats">
-                Статистика базы данных: <span id="eventsCount">{{events_count}}</span> исторических событий в <span id="categoriesCount">{{categories_count}}</span> категориях
+        <div class="modal-overlay" id="welcomeModal">
+            <div class="welcome-banner" id="welcomeBanner">
+                <div class="welcome-title">Добро пожаловать в интерактивную карту <span class="tricolor">Истории России</span>!</div>
+                <div class="welcome-text">
+                    Данный проект создан для образовательных целей и предоставляет визуальный интерфейс для изучения исторических событий России. Вы можете исследовать различные эпохи, выбирая категории и временные периоды, чтобы увидеть, где и когда происходили ключевые события нашей истории.
+                </div>
+                <div class="stats">
+                    Статистика базы данных: <span id="eventsCount">{{events_count}}</span> исторических событий в <span id="categoriesCount">{{categories_count}}</span> категориях
+                </div>
+                <button id="closeWelcomeBtn" style="position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 16px;">✕</button>
             </div>
         </div>
         
@@ -185,6 +216,29 @@
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
+        // Обработка модального окна приветствия
+        document.addEventListener('DOMContentLoaded', function() {
+            const welcomeModal = document.getElementById('welcomeModal');
+            const closeWelcomeBtn = document.getElementById('closeWelcomeBtn');
+            
+            // Показываем модальное окно при загрузке страницы
+            setTimeout(function() {
+                welcomeModal.classList.add('visible');
+            }, 500);
+            
+            // Закрываем модальное окно при нажатии на кнопку
+            closeWelcomeBtn.addEventListener('click', function() {
+                welcomeModal.classList.remove('visible');
+            });
+            
+            // Закрываем модальное окно при нажатии вне его области
+            welcomeModal.addEventListener('click', function(e) {
+                if (e.target === welcomeModal) {
+                    welcomeModal.classList.remove('visible');
+                }
+            });
+        });
+        
         // Инициализация карты
         const map = L.map('map').setView([55.75, 37.62], 4);
 
@@ -201,23 +255,34 @@
         fetch('/api/historical-events')
             .then(response => response.json())
             .then(data => {
+                console.log('Загружено событий из API:', data.length);
                 allEvents = data;
 
                 // Заполняем выпадающий список категорий
                 const categories = [...new Set(allEvents
                     .filter(event => event.category)
                     .map(event => event.category))];
+                console.log('Уникальные категории:', categories);
+                
                 const categorySelect = document.getElementById('categoryFilter');
+                
+                // Отчистим существующие опции (кроме первой)
+                while (categorySelect.options.length > 1) {
+                    categorySelect.remove(1);
+                }
 
+                // Добавляем отсортированные категории
                 categories.sort().forEach(category => {
                     const option = document.createElement('option');
                     option.value = category;
                     option.textContent = category;
                     categorySelect.appendChild(option);
+                    console.log('Добавлена категория:', category);
                 });
             })
             .catch(error => {
                 console.error('Ошибка загрузки исторических данных:', error);
+                alert('Произошла ошибка при загрузке данных. Пожалуйста, обновите страницу.');
             });
 
         // Функция для фильтрации и отображения событий на карте
@@ -238,13 +303,25 @@
             // Если не выбрана категория или век, не показываем события
             if (!categoryFilter || !centuryFilter) {
                 loadingDiv.style.display = 'none';
+                // Показываем пользователю сообщение о необходимости выбора обоих фильтров
+                alert('Пожалуйста, выберите категорию и век для отображения событий');
                 return;
             }
 
+            console.log('Выбранные фильтры:', { категория: categoryFilter, век: centuryFilter });
+
             // Фильтруем события
             const filteredEvents = allEvents.filter(event => {
-                // Требуются и категория, и век для отображения
-                if (!event.category || event.category !== categoryFilter) {
+                // Проверяем категорию
+                if (!event.category) {
+                    return false;
+                }
+                
+                // Исправляем сравнение категорий (учитываем регистр и пробелы)
+                const normalizedCategory = event.category.trim().toLowerCase();
+                const normalizedFilter = categoryFilter.trim().toLowerCase();
+                
+                if (normalizedCategory !== normalizedFilter) {
                     return false;
                 }
 
@@ -255,6 +332,8 @@
                 const century = Math.ceil(year / 100);
                 return century.toString() === centuryFilter;
             });
+            
+            console.log('Найдено событий:', filteredEvents.length);
 
             // Добавляем маркеры для отфильтрованных событий
             filteredEvents.forEach(event => {
