@@ -206,6 +206,98 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebarOverlay = document.getElementById('sidebar-overlay');
     const swipeIndicator = document.getElementById('swipe-indicator');
 
+    // Инициализация выпадающего меню сверху
+    const topMenuToggle = document.getElementById('top-menu-toggle');
+    const topDropdownMenu = document.getElementById('top-dropdown-menu');
+    const closeDropdown = document.getElementById('close-dropdown');
+    const dropdownNavItems = document.querySelectorAll('.dropdown-nav-item');
+    const dropdownDocsButton = document.getElementById('dropdown-docs-button');
+    const dropdownLogoutButton = document.getElementById('dropdown-logout-button');
+    
+    // Создаем оверлей для выпадающего меню если его нет
+    let topDropdownOverlay = document.querySelector('.top-dropdown-overlay');
+    if (!topDropdownOverlay) {
+        topDropdownOverlay = document.createElement('div');
+        topDropdownOverlay.className = 'top-dropdown-overlay';
+        document.body.appendChild(topDropdownOverlay);
+    }
+
+    // Функция для переключения выпадающего меню
+    function toggleTopMenu(show) {
+        const isOpen = topDropdownMenu.classList.contains('open');
+        
+        if (show === undefined) {
+            show = !isOpen;
+        }
+        
+        if (show) {
+            topDropdownMenu.classList.add('open');
+            topDropdownOverlay.classList.add('visible');
+            document.body.classList.add('menu-open');
+        } else {
+            topDropdownMenu.classList.remove('open');
+            topDropdownOverlay.classList.remove('visible');
+            document.body.classList.remove('menu-open');
+        }
+    }
+    
+    // Обработчики для выпадающего меню сверху
+    if (topMenuToggle) {
+        topMenuToggle.addEventListener('click', function() {
+            toggleTopMenu();
+        });
+    }
+    
+    if (closeDropdown) {
+        closeDropdown.addEventListener('click', function() {
+            toggleTopMenu(false);
+        });
+    }
+    
+    // Обработчик для оверлея выпадающего меню
+    topDropdownOverlay.addEventListener('click', function() {
+        toggleTopMenu(false);
+    });
+    
+    // Обработчики для пунктов меню в выпадающем меню
+    dropdownNavItems.forEach(item => {
+        item.addEventListener('click', function() {
+            // Переключаем активный класс
+            dropdownNavItems.forEach(el => el.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Закрываем меню после выбора
+            toggleTopMenu(false);
+            
+            // Дополнительные действия по необходимости
+            const pageName = this.getAttribute('data-page');
+            // Можно добавить код для переключения страниц здесь
+        });
+    });
+    
+    // Обработчики для кнопок в футере выпадающего меню
+    if (dropdownDocsButton) {
+        dropdownDocsButton.addEventListener('click', function() {
+            // Эмулируем клик по оригинальной кнопке документации
+            const originalDocsButton = document.getElementById('docs-button');
+            if (originalDocsButton) {
+                originalDocsButton.click();
+            }
+            toggleTopMenu(false);
+        });
+    }
+    
+    if (dropdownLogoutButton) {
+        dropdownLogoutButton.addEventListener('click', function() {
+            // Эмулируем клик по оригинальной кнопке выхода
+            const originalLogoutButton = document.getElementById('logout-button');
+            if (originalLogoutButton) {
+                originalLogoutButton.click();
+            }
+            toggleTopMenu(false);
+        });
+    }
+
     if(sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
             sidebar.classList.toggle('collapsed');

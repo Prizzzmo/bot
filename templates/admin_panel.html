@@ -17,6 +17,47 @@
             <i class="fas fa-bars"></i>
         </button>
         
+        <!-- Выпадающее меню сверху по центру -->
+        <div id="top-dropdown-menu" class="top-dropdown-menu">
+            <div class="dropdown-content">
+                <div class="dropdown-header">
+                    <h3><i class="fas fa-landmark"></i> Навигация</h3>
+                    <button id="close-dropdown" class="close-dropdown"><i class="fas fa-times"></i></button>
+                </div>
+                <ul class="dropdown-nav-links">
+                    <li class="dropdown-nav-item active" data-page="dashboard">
+                        <a href="#dashboard"><i class="fas fa-tachometer-alt"></i> Обзор</a>
+                    </li>
+                    <li class="dropdown-nav-item" data-page="events">
+                        <a href="#events"><i class="fas fa-calendar-alt"></i> События истории</a>
+                    </li>
+                    <li class="dropdown-nav-item" data-page="users">
+                        <a href="#users"><i class="fas fa-users"></i> Пользователи</a>
+                    </li>
+                    <li class="dropdown-nav-item" data-page="admins">
+                        <a href="#admins"><i class="fas fa-user-shield"></i> Администраторы</a>
+                    </li>
+                    <li class="dropdown-nav-item" data-page="logs">
+                        <a href="#logs"><i class="fas fa-file-alt"></i> Логи</a>
+                    </li>
+                    <li class="dropdown-nav-item" data-page="settings">
+                        <a href="#settings"><i class="fas fa-cog"></i> Настройки</a>
+                    </li>
+                    <li class="dropdown-nav-item" data-page="maintenance">
+                        <a href="#maintenance"><i class="fas fa-tools"></i> Обслуживание</a>
+                    </li>
+                </ul>
+                <div class="dropdown-footer">
+                    <button id="dropdown-docs-button" class="btn-docs dropdown-btn">
+                        <i class="fas fa-book"></i> Документация
+                    </button>
+                    <button id="dropdown-logout-button" class="btn-logout dropdown-btn">
+                        <i class="fas fa-sign-out-alt"></i> Выйти
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Затемнение и свайп-индикатор для мобильного меню -->
         <div class="sidebar-overlay" id="sidebar-overlay"></div>
         <div class="swipe-indicator" id="swipe-indicator">
@@ -195,6 +236,10 @@
                     <i id="current-section-icon" class="fas fa-tachometer-alt"></i>
                     <span id="current-section-name">Обзор</span>
                 </div>
+                
+                <button id="top-menu-toggle" class="top-menu-toggle">
+                    <i class="fas fa-bars"></i> Меню
+                </button>
                 
                 <div class="top-bar-actions">
                     <div class="search-box">
