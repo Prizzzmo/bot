@@ -1,65 +1,82 @@
 
+"""
+Скрипт для очистки всех видов кэша в системе
+"""
 import os
 import json
 import shutil
-import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-logger = logging.getLogger(__name__)
+def clear_api_cache():
+    """Очищает API кэш"""
+    cache_files = ['api_cache.json', 'cache.json']
+    
+    for file in cache_files:
+        if os.path.exists(file):
+            try:
+                os.remove(file)
+                print(f"✅ Файл {file} успешно удален")
+            except Exception as e:
+                print(f"❌ Ошибка при удалении файла {file}: {e}")
+    
+    # Очищаем директорию кэша, если она существует
+    cache_dirs = ['cache', '.cache']
+    
+    for directory in cache_dirs:
+        if os.path.exists(directory) and os.path.isdir(directory):
+            try:
+                shutil.rmtree(directory)
+                print(f"✅ Директория {directory} успешно удалена")
+            except Exception as e:
+                print(f"❌ Ошибка при удалении директории {directory}: {e}")
 
-def clear_cache_files():
-    """Очищает все файлы кэша в проекте"""
+def clear_memory_cache():
+    """Создаем/перезаписываем файл с пустым кэшем в памяти"""
+    empty_cache = {}
     
-    # Список файлов кэша для удаления
-    cache_files = [
-        'api_cache.json',
-    ]
-    
-    # Директории кэша для очистки
-    cache_dirs = [
-        'history_db_generator/temp',
-        'history_db_generator/temp_mistral',
-    ]
-    
-    # Удаляем отдельные файлы кэша
-    files_removed = 0
-    for file_path in cache_files:
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-                logger.info(f"Удален файл кэша: {file_path}")
-                files_removed += 1
-            except Exception as e:
-                logger.error(f"Ошибка при удалении файла {file_path}: {e}")
-    
-    # Очищаем директории кэша
-    dirs_cleared = 0
-    for dir_path in cache_dirs:
-        if os.path.exists(dir_path):
-            try:
-                # Удаляем все файлы в директории, но сохраняем саму директорию
-                for file_name in os.listdir(dir_path):
-                    file_path = os.path.join(dir_path, file_name)
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)
-                logger.info(f"Очищена директория кэша: {dir_path}")
-                dirs_cleared += 1
-            except Exception as e:
-                logger.error(f"Ошибка при очистке директории {dir_path}: {e}")
-    
-    # Очищаем кэши API через существующий класс
     try:
-        from src.api_cache import APICache
-        from src.logger import Logger
-        
-        logger_instance = Logger()
-        api_cache = APICache(logger_instance)
-        cleared_items = api_cache.clear_cache()
-        logger.info(f"Очищено {cleared_items} записей из APICache")
+        with open('api_cache.json', 'w', encoding='utf-8') as f:
+            json.dump(empty_cache, f)
+        print("✅ Кэш в памяти очищен (создан новый пустой файл)")
     except Exception as e:
-        logger.error(f"Ошибка при очистке APICache: {e}")
+        print(f"❌ Ошибка при очистке кэша в памяти: {e}")
+
+def create_backup():
+    """Создает резервную копию данных перед очисткой"""
+    backup_dir = 'backups'
     
-    logger.info(f"Итого: удалено {files_removed} файлов кэша, очищено {dirs_cleared} директорий кэша")
+    # Создаем директорию для резервных копий, если она не существует
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir)
+    
+    import time
+    timestamp = int(time.time())
+    
+    # Файлы, которые нужно скопировать
+    files_to_backup = [
+        'api_cache.json', 
+        'user_states.json', 
+        'historical_events.json',
+        'admins.json',
+        'bot_settings.json'
+    ]
+    
+    for file in files_to_backup:
+        if os.path.exists(file):
+            try:
+                backup_path = f"{backup_dir}/{file.replace('.json', '')}_backup_{timestamp}.json"
+                shutil.copy2(file, backup_path)
+                print(f"✅ Создана резервная копия {file} -> {backup_path}")
+            except Exception as e:
+                print(f"❌ Ошибка при создании резервной копии {file}: {e}")
 
 if __name__ == "__main__":
-    clear_cache_files()
+    print("🔄 Создание резервной копии данных...")
+    create_backup()
+    
+    print("\n🔄 Очистка API кэша...")
+    clear_api_cache()
+    
+    print("\n🔄 Очистка кэша в памяти...")
+    clear_memory_cache()
+    
+    print("\n✅ Операция завершена! Все кэши очищены.")
