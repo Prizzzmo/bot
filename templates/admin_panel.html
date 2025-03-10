@@ -90,6 +90,40 @@
                 </button>
             </div>
         </nav>
+
+    <script>
+        // Функция для открытия документации в iframe вместо загрузки
+        function viewDoc(docPath) {
+            const modal = document.createElement('div');
+            modal.className = 'doc-viewer-modal';
+            modal.innerHTML = `
+                <div class="doc-viewer-content">
+                    <div class="doc-viewer-header">
+                        <h2>Просмотр документации</h2>
+                        <button class="doc-viewer-close">&times;</button>
+                    </div>
+                    <div class="doc-viewer-body">
+                        <iframe src="${docPath}" width="100%" height="100%" frameborder="0"></iframe>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Обработчик закрытия
+            modal.querySelector('.doc-viewer-close').addEventListener('click', function() {
+                document.body.removeChild(modal);
+            });
+            
+            // Закрытие по клику вне контента
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+        }
+    </script>
+
         
         <!-- Основной контент -->
         <main class="content">
@@ -1024,15 +1058,15 @@
             <div class="docs-category">
                 <h3>Основная документация</h3>
                 <div class="docs-list">
-                    <a href="/docs/README.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/README.md', 'README.md')" class="docs-item">
                         <i class="fas fa-file-alt"></i>
                         <span class="docs-item-title">README - Обзор проекта</span>
                     </a>
-                    <a href="/docs/architecture.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/architecture.md', 'architecture.md')" class="docs-item">
                         <i class="fas fa-sitemap"></i>
                         <span class="docs-item-title">Архитектура системы</span>
                     </a>
-                    <a href="/docs/development_guide.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/development_guide.md', 'development_guide.md')" class="docs-item">
                         <i class="fas fa-code"></i>
                         <span class="docs-item-title">Руководство разработчика</span>
                     </a>
@@ -1042,15 +1076,15 @@
             <div class="docs-category">
                 <h3>Техническая документация</h3>
                 <div class="docs-list">
-                    <a href="/docs/api_components.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/api_components.md', 'api_components.md')" class="docs-item">
                         <i class="fas fa-plug"></i>
                         <span class="docs-item-title">API компоненты</span>
                     </a>
-                    <a href="/docs/database_structure.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/database_structure.md', 'database_structure.md')" class="docs-item">
                         <i class="fas fa-database"></i>
                         <span class="docs-item-title">Структура базы данных</span>
                     </a>
-                    <a href="/docs/caching_system.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/caching_system.md', 'caching_system.md')" class="docs-item">
                         <i class="fas fa-memory"></i>
                         <span class="docs-item-title">Система кэширования</span>
                     </a>
@@ -1060,15 +1094,15 @@
             <div class="docs-category">
                 <h3>Руководства и инструкции</h3>
                 <div class="docs-list">
-                    <a href="/docs/linux_installation.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/linux_installation.md', 'linux_installation.md')" class="docs-item">
                         <i class="fab fa-linux"></i>
                         <span class="docs-item-title">Установка на Linux</span>
                     </a>
-                    <a href="/docs/testing_guide.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('docs/testing_guide.md', 'testing_guide.md')" class="docs-item">
                         <i class="fas fa-vial"></i>
                         <span class="docs-item-title">Руководство по тестированию</span>
                     </a>
-                    <a href="/detailed_presentation.md" target="_blank" class="docs-item">
+                    <a href="javascript:downloadDoc('detailed_presentation.md', 'detailed_presentation.md')" class="docs-item">
                         <i class="fas fa-file-powerpoint"></i>
                         <span class="docs-item-title">Подробная презентация</span>
                     </a>

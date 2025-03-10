@@ -30,6 +30,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Обновляем время сервера
     startServerTimeUpdater();
+    
+    // Автоматически открываем окно документации при загрузке
+    setTimeout(() => {
+        toggleDocsModal();
+    }, 500); // Небольшая задержка для обеспечения корректной загрузки страницы
 });
 
 // Проверка аутентификации
@@ -2566,6 +2571,43 @@ function startServerTimeUpdater() {
         
         // Пока не используется
     }, 1000);
+}
+
+// Функция для загрузки документации
+function downloadDoc(docPath, fileName) {
+    // Создаем элемент для загрузки
+    fetch(docPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Файл не найден');
+            }
+            return response.text();
+        })
+        .then(content => {
+            // Создаем blob и ссылку для скачивания
+            const blob = new Blob([content], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Очищаем ресурсы
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+            showNotification(`Документ ${fileName} успешно загружен`, 'success');
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке документации:', error);
+            showNotification(`Ошибка при загрузке документации: ${error.message}`, 'error');
+            
+            // Предлагаем открыть документ в новой вкладке как запасной вариант
+            window.open(docPath, '_blank');
+        });
 }
 
 // При загрузке страницы переходим на страницу из хэша URL
