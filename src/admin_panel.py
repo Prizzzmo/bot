@@ -128,7 +128,7 @@ class AdminPanel:
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         update.message.reply_text(
-            f"👑 *Панель администратора TeleAdmin*\n\n"
+            f"👑 *Панель администратора*\n\n"
             f"Добро пожаловать, {update.effective_user.first_name}!\n"
             f"Выберите действие в меню ниже:",
             reply_markup=reply_markup,
