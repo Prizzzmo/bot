@@ -24,6 +24,7 @@ class HistoryMap:
         self.base_map = None
         self.events_data = None
         self.output_dir = "generated_maps"
+        self.webapp_url = "https://history-map-webapp.replit.app"  # URL вашего веб-приложения
         self.ensure_output_dir()
         
     def ensure_output_dir(self):
