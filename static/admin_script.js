@@ -82,11 +82,17 @@ function handleLogin(e) {
     e.preventDefault();
     
     const adminPassword = document.getElementById('admin-password').value;
+    const loginButton = document.querySelector('#admin-login-form button');
+    const originalButtonText = loginButton.innerHTML;
     
     if (!adminPassword) {
         showAuthError('Введите пароль администратора');
         return;
     }
+    
+    // Показываем индикатор загрузки
+    loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Вход...';
+    loginButton.disabled = true;
     
     fetch('/api/admin/login', {
         method: 'POST',
@@ -95,31 +101,49 @@ function handleLogin(e) {
         },
         body: JSON.stringify({ admin_password: adminPassword })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка HTTP: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            isAuthenticated = true;
-            currentUser = data.user;
-            showAdminPanel();
-            loadAdminData();
-            updateUserInfo();
-            showNotification('Вы успешно вошли в систему', 'success');
+            showAuthError('Вход выполнен успешно!', true);
+            setTimeout(() => {
+                isAuthenticated = true;
+                currentUser = data.user;
+                showAdminPanel();
+                loadAdminData();
+                updateUserInfo();
+                showNotification('Вы успешно вошли в систему', 'success');
+            }, 1000);
         } else {
+            loginButton.innerHTML = originalButtonText;
+            loginButton.disabled = false;
             showAuthError(data.message || 'Неверный пароль администратора');
         }
     })
     .catch(error => {
         console.error('Ошибка при входе:', error);
-        showAuthError('Ошибка при авторизации');
+        loginButton.innerHTML = originalButtonText;
+        loginButton.disabled = false;
+        showAuthError('Ошибка при авторизации: ' + error.message);
     });
 }
 
-// Показываем ошибку авторизации
-function showAuthError(message) {
+// Показываем ошибку или сообщение авторизации
+function showAuthError(message, isSuccess = false) {
     const authError = document.querySelector('.auth-error');
     if (authError) {
         authError.textContent = message;
+        
+        // Удаляем все классы стилей
+        authError.classList.remove('visible', 'success', 'error');
+        
+        // Добавляем соответствующие классы
         authError.classList.add('visible');
+        authError.classList.add(isSuccess ? 'success' : 'error');
         
         // Скрываем сообщение через 3 секунды
         setTimeout(() => {

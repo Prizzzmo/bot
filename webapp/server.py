@@ -612,6 +612,8 @@ def admin_login():
             # При успешной авторизации используем ID супер-администратора из admins.json
             admins = load_admins()
             admin_id = admins.get("super_admin_ids", [7225056628])[0]  # По умолчанию используем ID из admins.json
+            
+            logger.info(f"Успешный вход администратора с ID {admin_id}")
 
             response = jsonify({
                 "success": True,
@@ -627,7 +629,7 @@ def admin_login():
         return jsonify({"success": False, "message": "Неверный пароль администратора"})
     except Exception as e:
         logger.error(f"Ошибка при авторизации администратора: {e}")
-        return jsonify({"success": False, "message": "Ошибка при авторизации"})
+        return jsonify({"success": False, "message": f"Ошибка при авторизации: {str(e)}"})
 
 @app.route('/api/admin/users', methods=['GET'])
 def get_users():
