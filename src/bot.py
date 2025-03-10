@@ -9,7 +9,7 @@ import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatAction
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
 
-from src.handlers import Handler
+from src.handlers import CommandHandlers
 from src.service_container import ServiceContainer
 from src.factory import BotFactory
 from src.config import Config, TOPIC, CHOOSE_TOPIC, CONVERSATION, TEST, ANSWER, MAP, ANALYTICS, ADMIN
@@ -22,7 +22,7 @@ class Bot(IBot):
     Основной класс бота, реализующий основные функции взаимодействия с Telegram API.
     """
 
-    def __init__(self, config: Config, handlers: Handler, logger: ILogger, web_server=None):
+    def __init__(self, config: Config, handlers: CommandHandlers, logger: ILogger, web_server=None):
         """
         Инициализация бота.
 
