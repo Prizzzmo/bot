@@ -1508,6 +1508,12 @@ class CommandHandlers:
             # Обрабатываем все callback-запросы, начинающиеся с admin_
             if query.data.startswith('admin_'):
                 self.logger.debug(f"Обработка админ-callback: {query.data}")
+                
+                try:
+                    # Сначала отвечаем на callback query, чтобы убрать загрузку на кнопке
+                    query.answer()
+                except Exception as e:
+                    self.logger.warning(f"Не удалось ответить на callback query: {e}")
 
                 # Проверяем, это удаление админа или нет
                 if query.data.startswith('admin_delete_'):
@@ -1517,7 +1523,10 @@ class CommandHandlers:
                         self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
                     except (ValueError, IndexError) as e:
                         self.logger.error(f"Ошибка при обработке callback удаления админа: {e}")
-                        query.answer("Ошибка в формате callback данных")
+                        try:
+                            query.answer("Ошибка в формате callback данных")
+                        except:
+                            pass
                 else:
                     # Обычный admin callback
                     self.logger.info(f"Передача callback в handle_admin_callback: {query.data}")

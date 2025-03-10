@@ -86,8 +86,9 @@ class Bot:
             # Добавляем обработчик текстовых сообщений, который будет проверять текст "/карта"
             dp.add_handler(MessageHandler(Filters.regex(r'^/карта$'), self.handlers.map_command))
 
-            # Добавляем обработчик для обработки callback запросов администратора
-            dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'))
+            # Добавляем обработчик для обработки callback запросов администратора 
+            # с приоритетом более высоким, чем у ConversationHandler
+            dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'), group=1)
 
             # Добавляем контекстные данные для бота
             self.updater.dispatcher.bot_data['api_client'] = self.api_client

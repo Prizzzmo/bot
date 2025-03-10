@@ -20,6 +20,7 @@ from src.config import Config
 from src.factory import BotFactory
 from src.data_migration import DataMigration
 from src.task_queue import TaskQueue
+from telegram.ext import CallbackQueryHandler # Added import
 
 def check_running_bot():
     """
@@ -168,6 +169,7 @@ def main():
         # Создаем экземпляр бота через фабрику
         logger.info("Создание бота через фабрику")
         bot = BotFactory.create_bot(config)
+        import handlers # Added import
 
         # Проверяем, что бот был успешно создан
         if not bot:
@@ -176,6 +178,11 @@ def main():
 
         # Настраиваем бота
         logger.info("Настройка бота")
+        # Убеждаемся, что обработчик callback-запросов админ-панели правильно зарегистрирован
+        # Это нужно сделать явно, даже если setup() содержит подобную логику
+        dp = bot.updater.dispatcher
+        dp.add_handler(CallbackQueryHandler(handlers.admin_callback, pattern='^admin_'))
+
         if not bot.setup():
             logger.error("Ошибка при настройке бота!")
             return
