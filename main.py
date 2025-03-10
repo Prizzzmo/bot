@@ -87,7 +87,7 @@ def main():
     factory = BotFactory(logger)
 
     # Создаем бота и все необходимые сервисы
-    bot = factory.create_bot()
+    bot = BotFactory.create_bot(config)
 
     # Проверяем наличие админ-панели в обработчиках
     if hasattr(bot.handlers, 'admin_panel'):
