@@ -678,11 +678,11 @@ class CommandHandlers:
             import sys
             sys.path.append('webapp')
             from bot_integration import get_webapp_keyboard, get_map_description
-
+            
             # Получаем описание и клавиатуру
             description = get_map_description()
             keyboard = get_webapp_keyboard()
-
+            
             # Обновляем сообщение с информативным описанием и кнопкой для открытия веб-приложения
             query.edit_message_text(
                 description,
@@ -690,10 +690,10 @@ class CommandHandlers:
                 reply_markup=keyboard,
                 disable_web_page_preview=True
             )
-
+            
             # Показываем пользователю, что карта загружается
             context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
-
+            
             self.logger.info(f"Пользователь {user_id} открыл карту через меню")
             return self.TOPIC
 
@@ -882,6 +882,7 @@ class CommandHandlers:
                                             self.message_manager.save_message_id(update, context, sent_msg.message_id)
                                         except Exception as e2:
                                             self.logger.error(f"Вторая ошибка при отправке сообщения: {e2}")
+
                                 self.logger.info(f"Отправлено {len(messages) + sum(1 for m in messages[1:] if len(m) > 4000)} сообщений по теме '{topic}'")
                             except Exception as e:
                                 self.logger.error(f"Ошибка при отправке сообщения: {e}")
@@ -1385,7 +1386,7 @@ class CommandHandlers:
             try:
                 # Отправляем простое сообщение об ошибке без редактирования старого
                 error_msg = update.message.reply_text(
-                    ""Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте задать другой вопрос или вернитесь в меню.",
+                    "Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте задать другой вопрос или вернитесь в меню.",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
                 self.message_manager.save_message_id(update, context, error_msg.message_id)
@@ -1419,16 +1420,16 @@ class CommandHandlers:
         try:
             user_id = update.message.from_user.id
             self.logger.info(f"Пользователь {user_id} запросил карту исторических событий")
-
+            
             # Импортируем функции для взаимодействия с веб-приложением
             import sys
             sys.path.append('webapp')
             from bot_integration import get_webapp_keyboard, get_map_description
-
+            
             # Получаем описание и клавиатуру
             description = get_map_description()
             keyboard = get_webapp_keyboard()
-
+            
             # Отправляем сообщение с информативным описанием и кнопкой для открытия веб-приложения
             sent_msg = update.message.reply_text(
                 description,
@@ -1436,13 +1437,13 @@ class CommandHandlers:
                 reply_markup=keyboard,
                 disable_web_page_preview=True
             )
-
+            
             # Сохраняем ID сообщения
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
-
+            
             # Показываем пользователю, что карта загружается
             context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
-
+            
             self.logger.info(f"Пользователь {user_id} успешно получил доступ к карте")
             return self.TOPIC
         except Exception as e:
@@ -1463,11 +1464,9 @@ class CommandHandlers:
         """
         # Передаем управление в модуль админ-панели
         if hasattr(self, 'admin_panel'):
-            self.logger.info(f"Пользователь {update.effective_user.id} запросил админ-панель")
             self.admin_panel.handle_admin_command(update, context)
         else:
-            self.logger.warning(f"Пользователь {update.effective_user.id} запросил админ-панель, но она недоступна")
-            update.message.reply_text("Административная панель недоступна. Обратитесь к разработчику бота.")
+            update.message.reply_text("Административная панель недоступна")
 
     def clear_chat_command(self, update, context):
         """
@@ -1490,45 +1489,20 @@ class CommandHandlers:
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
-
-        Returns:
-            bool: True если callback был обработан, False в противном случае
         """
         query = update.callback_query
-        if not query or not query.data:
-            self.logger.warning("Получен пустой callback query")
-            return False
-
-        # Логируем информацию о callback для отладки
-        self.logger.info(f"Получен callback: {query.data} от пользователя {query.from_user.id}")
 
         # Проверяем наличие и передаем обработку в админ-панель
         if hasattr(self, 'admin_panel'):
             # Обрабатываем все callback-запросы, начинающиеся с admin_
             if query.data.startswith('admin_'):
-                self.logger.debug(f"Обработка админ-callback: {query.data}")
-
-                try:
-                    # Сначала отвечаем на callback query, чтобы убрать загрузку на кнопке
-                    query.answer()
-                except Exception as e:
-                    self.logger.warning(f"Не удалось ответить на callback query: {e}")
-
                 # Проверяем, это удаление админа или нет
                 if query.data.startswith('admin_delete_'):
                     # Извлекаем ID админа для удаления
-                    try:
-                        admin_id = int(query.data.split('_')[2])
-                        self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
-                    except (ValueError, IndexError) as e:
-                        self.logger.error(f"Ошибка при обработке callback удаления админа: {e}")
-                        try:
-                            query.answer("Ошибка в формате callback данных")
-                        except:
-                            pass
+                    admin_id = int(query.data.split('_')[2])
+                    self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
                 else:
                     # Обычный admin callback
-                    self.logger.info(f"Передача callback в handle_admin_callback: {query.data}")
                     self.admin_panel.handle_admin_callback(update, context)
                 return True
         return False
@@ -1577,59 +1551,3 @@ class CommandHandlers:
                 error_message,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
             )
-
-    def handle_callback_query(self, update, context):
-        """
-        Обрабатывает callback-запросы от inline-кнопок
-
-        Args:
-            update (telegram.Update): Объект обновления
-            context (telegram.ext.CallbackContext): Контекст обработчика
-        """
-        query = update.callback_query
-        data = query.data
-
-        self.logger.info(f"Получен callback: {data}")
-
-        # Передаем админские callback-запросы в admin_panel
-        if data.startswith('admin_'):
-            if hasattr(self, 'admin_panel'):
-                self.logger.info(f"Передача admin callback в admin_panel: {data}")
-                return self.admin_panel.handle_admin_callback(update, context)
-            else:
-                self.logger.warning(f"Получен админский callback, но admin_panel не инициализирован: {data}")
-                query.answer("Административная панель недоступна")
-                return self.TOPIC
-
-        # Обрабатываем различные типы callback-запросов
-        if data == 'start_quiz':
-            query.answer()
-            return self.start_quiz(update, context)
-        elif data == 'end_test':
-            query.answer()
-            return self.end_test(update, context)
-        elif data.startswith('topic_'):
-            query.answer()
-            topic_id = data.replace('topic_', '')
-            return self.handle_topic_selection(update, context, topic_id)
-        elif data == 'back_to_menu':
-            query.answer()
-            return self.button_handler(update, context)
-        elif data == 'more_topics':
-            query.answer()
-            return self.button_handler(update, context)
-        elif data == 'enter_own_topic':
-            query.answer()
-            return self.ask_for_own_topic(update, context)
-        elif data == 'add_to_favorites':
-            query.answer()
-            return self.add_to_favorites(update, context)
-        elif data == 'view_favorites':
-            query.answer()
-            return self.view_favorites(update, context)
-        elif data == 'view_history':
-            query.answer()
-            return self.view_history_map(update, context)
-        else:
-            query.answer(f"Неизвестный callback: {data}")
-            return self.TOPIC

@@ -20,7 +20,6 @@ from src.config import Config
 from src.factory import BotFactory
 from src.data_migration import DataMigration
 from src.task_queue import TaskQueue
-from telegram.ext import CallbackQueryHandler # Added import
 
 def check_running_bot():
     """
@@ -59,63 +58,20 @@ def check_running_bot():
 
     return True
 
-def setup_logger():
-    """
-    Настраивает логгер.
-    """
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler()
-        ]
-    )
-    return logging.getLogger(__name__)
-
-
 def main():
     """
-    Основная функция для инициализации и запуска бота
+    Основная функция для запуска бота и веб-сервера
     """
-    # Настройка логгера
-    logger = setup_logger()
-    logger.info("Запуск программы")
-
-    # Загружаем конфигурацию
-    config = Config()
-
-    # Создаем фабрику с использованием переданного логгера
-    factory = BotFactory(logger)
-
-    # Создаем бота и все необходимые сервисы
-    bot = BotFactory.create_bot(config)
-
-    # Проверяем наличие админ-панели в обработчиках
-    if hasattr(bot.handlers, 'admin_panel'):
-        logger.info("Админ-панель успешно инициализирована")
-    else:
-        logger.warning("Админ-панель не инициализирована")
-
-    try:
-        # Запускаем бота
-        bot.run()
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем")
-    except Exception as e:
-        logger.error(f"Неожиданная ошибка при запуске бота: {e}")
-        raise
-
-
     # Запуск веб-сервера в отдельном потоке
     import threading
     from webapp.server import run_server
-
+    
     # Устанавливаем переменную окружения для вебсервера
     repl_id = os.environ.get('REPL_ID', '')
     repl_slug = os.environ.get('REPL_SLUG', '')
     repl_owner = os.environ.get('REPL_OWNER', '')
     deployment_id = os.environ.get('REPL_DEPLOYMENT_ID', '')
-
+    
     # Сохраняем URL в переменной окружения для использования в bot_integration.py
     if deployment_id:
         os.environ['WEBAPP_URL'] = f"https://{deployment_id}.deployment.repl.co"
@@ -123,7 +79,7 @@ def main():
         os.environ['WEBAPP_URL'] = f"https://{repl_slug}.{repl_owner}.repl.co"
     else:
         os.environ['WEBAPP_URL'] = f"https://{repl_id}.id.repl.co"
-
+    
     # Запускаем веб-сервер
     webapp_thread = threading.Thread(target=run_server, args=('0.0.0.0', 8080), daemon=True)
     webapp_thread.start()
@@ -176,15 +132,10 @@ def main():
             return
 
         # Настраиваем бота
+        logger.info("Настройка бота")
         if not bot.setup():
             logger.error("Ошибка при настройке бота!")
             return
-
-        # Проверяем, что updater успешно инициализирован
-        if not hasattr(bot, 'updater') or bot.updater is None:
-            logger.error("Ошибка: updater не инициализирован после настройки бота")
-            return
-
 
         logger.info("Бот успешно настроен и готов к запуску")
 

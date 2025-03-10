@@ -1,51 +1,18 @@
-
 import os
 import json
 import logging
 import time
-import threading
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackContext, ContextTypes
-import datetime
-import sys
-import signal
-import psutil
+from telegram.ext import CallbackContext
 
 class AdminPanel:
     """Класс для управления админ-панелью бота"""
 
-    def __init__(self, logger, config, analytics=None, api_client=None, topic_service=None):
+    def __init__(self, logger, config):
         self.logger = logger
         self.config = config
-        self.admins_file = 'admins.json'
+        self.admins_file = 'admins.json' # Added for clarity and consistency
         self.admins = self._load_admins()
-        self.analytics = analytics
-        self.api_client = api_client
-        self.topic_service = topic_service
-        self.start_time = time.time()
-        
-        # Проверяем наличие файла настроек бота
-        if not os.path.exists('bot_settings.json'):
-            self._create_default_settings()
-
-    def _create_default_settings(self):
-        """Создает файл настроек по умолчанию"""
-        default_settings = {
-            "auto_update_topics": True,
-            "collect_statistics": True,
-            "developer_mode": False,
-            "private_mode": False,
-            "log_level": "INFO",
-            "max_messages_per_user": 100,
-            "notification_enabled": True
-        }
-        
-        try:
-            with open('bot_settings.json', 'w', encoding='utf-8') as f:
-                json.dump(default_settings, f, indent=4)
-            self.logger.info("Создан файл настроек по умолчанию")
-        except Exception as e:
-            self.logger.error(f"Ошибка при создании файла настроек: {e}")
 
     def _load_admins(self):
         """Загружает список администраторов из файла с обработкой ошибок и кэшированием"""
@@ -90,10 +57,10 @@ class AdminPanel:
             # Обновляем кэш
             self._admin_cache = self.admins.copy()
             self._admin_cache_time = time.time()
-            return True
+            return True #Added return for consistency
         except Exception as e:
             self.logger.error(f"Ошибка при сохранении списка администраторов: {e}")
-            return False
+            return False #Added return for consistency
 
     def is_admin(self, user_id):
         """Проверяет, является ли пользователь администратором"""
@@ -191,8 +158,6 @@ class AdminPanel:
             self._show_logs(query, context)
         elif action == 'admin_restart':
             self._restart_bot(query, context)
-        elif action == 'admin_restart_confirm':
-            self._restart_bot_confirm(query, context)
         elif action == 'admin_settings' and self.is_super_admin(user_id):
             self._show_settings(query, context)
         elif action == 'admin_maintenance' and self.is_super_admin(user_id):
@@ -206,69 +171,26 @@ class AdminPanel:
         elif action.startswith('admin_remove_'):
             # Обработка удаления админа
             self._handle_remove_admin(query, context, action)
-        elif action == 'admin_clear_cache':
-            # Очистка кэша
-            self._clear_cache(query, context)
-        elif action == 'admin_backup':
-            # Резервное копирование
-            self._create_backup(query, context)
-        elif action == 'admin_update_api':
-            # Обновление данных API
-            self._update_api_data(query, context)
-        elif action == 'admin_clean_logs':
-            # Очистка логов
-            self._clean_logs(query, context)
-        elif action.startswith('admin_toggle_'):
-            # Переключение настроек
-            self._toggle_setting(query, context, action.replace('admin_toggle_', ''))
-        elif action == 'admin_system_info':
-            # Информация о системе
-            self._show_system_info(query, context)
-        elif action == 'admin_user_stats':
-            # Статистика пользователей
-            self._show_user_stats(query, context)
 
     def _show_stats(self, query, context):
         """Показывает статистику бота"""
         try:
-            # Получаем статистику
+            # Подсчет количества сообщений и пользователей
             user_count = self._count_users()
             message_count = self._count_messages()
-            uptime = self._get_uptime()
-            bot_starts = self._count_bot_starts()
-            topic_requests = self._count_topic_requests()
-            completed_tests = self._count_completed_tests()
 
-            # Получаем данные по популярным темам, если сервис темы доступен
-            popular_topics = "Нет данных"
-            if self.topic_service:
-                try:
-                    topics = self.topic_service.get_popular_topics(5)
-                    if topics:
-                        popular_topics = "\n".join([f"{i+1}. {topic}" for i, topic in enumerate(topics)])
-                except Exception as e:
-                    self.logger.error(f"Ошибка при получении популярных тем: {e}")
-                    popular_topics = f"Ошибка: {str(e)}"
-
-            # Формируем текст статистики
             stats_text = (
                 "📊 *Статистика бота*\n\n"
                 f"👥 Уникальных пользователей: {user_count}\n"
                 f"💬 Всего сообщений: {message_count}\n"
-                f"⏱️ Время работы: {uptime}\n\n"
+                f"⏱️ Время работы: {self._get_uptime()}\n\n"
                 f"*Пользовательская активность за последние 24 часа:*\n"
-                f"🔄 Запусков бота: {bot_starts}\n"
-                f"📝 Запросов тем: {topic_requests}\n"
-                f"✅ Пройдено тестов: {completed_tests}\n\n"
-                f"*Популярные темы:*\n{popular_topics}"
+                f"🔄 Запусков бота: {self._count_bot_starts()}\n"
+                f"📝 Запросов тем: {self._count_topic_requests()}\n"
+                f"✅ Пройдено тестов: {self._count_completed_tests()}\n"
             )
 
-            # Создаем клавиатуру с дополнительными опциями
-            keyboard = [
-                [InlineKeyboardButton("📈 Подробная статистика пользователей", callback_data='admin_user_stats')],
-                [InlineKeyboardButton("💻 Информация о системе", callback_data='admin_system_info')],
-                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
-            ]
+            keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             query.edit_message_text(
@@ -283,143 +205,6 @@ class AdminPanel:
             query.edit_message_text(
                 f"Ошибка при загрузке статистики: {e}",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]])
-            )
-
-    def _show_system_info(self, query, context):
-        """Показывает информацию о системе"""
-        try:
-            # Получаем информацию о системе
-            mem = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            cpu_percent = psutil.cpu_percent(interval=1)
-            
-            # Получаем список процессов Python
-            python_processes = []
-            for proc in psutil.process_iter(['pid', 'name', 'username', 'memory_percent']):
-                if 'python' in proc.info['name'].lower():
-                    python_processes.append(proc)
-            
-            # Сортируем по использованию памяти
-            python_processes.sort(key=lambda x: x.info['memory_percent'], reverse=True)
-            
-            # Формируем строку с информацией о процессах
-            processes_info = ""
-            for i, proc in enumerate(python_processes[:5], 1):
-                try:
-                    mem_usage = proc.memory_info().rss / (1024 * 1024)
-                    processes_info += f"{i}. PID: {proc.info['pid']}, Память: {mem_usage:.2f} МБ\n"
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    processes_info += f"{i}. Процесс недоступен\n"
-            
-            if not processes_info:
-                processes_info = "Нет активных Python процессов"
-            
-            # Формируем текст с информацией о системе
-            system_text = (
-                "💻 *Информация о системе*\n\n"
-                f"*Процессор:*\n"
-                f"Загрузка CPU: {cpu_percent}%\n\n"
-                f"*Память:*\n"
-                f"Всего: {mem.total / (1024 * 1024 * 1024):.2f} ГБ\n"
-                f"Используется: {mem.used / (1024 * 1024 * 1024):.2f} ГБ ({mem.percent}%)\n"
-                f"Свободно: {mem.free / (1024 * 1024 * 1024):.2f} ГБ\n\n"
-                f"*Диск:*\n"
-                f"Всего: {disk.total / (1024 * 1024 * 1024):.2f} ГБ\n"
-                f"Используется: {disk.used / (1024 * 1024 * 1024):.2f} ГБ ({disk.percent}%)\n"
-                f"Свободно: {disk.free / (1024 * 1024 * 1024):.2f} ГБ\n\n"
-                f"*Python процессы (топ 5):*\n{processes_info}"
-            )
-            
-            keyboard = [[InlineKeyboardButton("🔙 К статистике", callback_data='admin_stats')]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            query.edit_message_text(
-                system_text,
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
-            
-            self.logger.info(f"Админ {query.from_user.id} просмотрел информацию о системе")
-        except Exception as e:
-            self.logger.error(f"Ошибка при отображении информации о системе: {e}")
-            query.edit_message_text(
-                f"Ошибка при загрузке информации о системе: {e}",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 К статистике", callback_data='admin_stats')]])
-            )
-
-    def _show_user_stats(self, query, context):
-        """Показывает подробную статистику пользователей"""
-        try:
-            # Получаем статистику из Analytics, если доступно
-            if self.analytics:
-                try:
-                    # Статистика активных пользователей по дням недели
-                    daily_users = self.analytics.get_active_users_by_day()
-                    
-                    # Статистика по времени суток
-                    hourly_users = self.analytics.get_active_users_by_hour()
-                    
-                    # Успеваемость пользователей в тестах
-                    test_stats = self.analytics.get_test_completion_stats()
-                    
-                    # Формируем строки для статистики
-                    days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-                    days_stats = "\n".join([f"{days[i]}: {count} пользователей" for i, count in enumerate(daily_users)])
-                    
-                    # Формируем строки для часов (группируем по 4 часа)
-                    hours_grouped = [
-                        sum(hourly_users[0:6]),  # 0-6
-                        sum(hourly_users[6:12]),  # 6-12
-                        sum(hourly_users[12:18]),  # 12-18
-                        sum(hourly_users[18:24])   # 18-24
-                    ]
-                    hours_stats = (
-                        f"00:00-06:00: {hours_grouped[0]} пользователей\n"
-                        f"06:00-12:00: {hours_grouped[1]} пользователей\n"
-                        f"12:00-18:00: {hours_grouped[2]} пользователей\n"
-                        f"18:00-00:00: {hours_grouped[3]} пользователей"
-                    )
-                    
-                    # Статистика тестов
-                    test_stats_text = (
-                        f"Средний балл: {test_stats.get('avg_score', 0):.1f}%\n"
-                        f"Пройдено тестов: {test_stats.get('completed_tests', 0)}\n"
-                        f"Не завершено: {test_stats.get('abandoned_tests', 0)}"
-                    )
-                    
-                except Exception as e:
-                    self.logger.error(f"Ошибка при получении данных аналитики: {e}")
-                    days_stats = "Нет данных"
-                    hours_stats = "Нет данных"
-                    test_stats_text = "Нет данных"
-            else:
-                days_stats = "Аналитика недоступна"
-                hours_stats = "Аналитика недоступна"
-                test_stats_text = "Аналитика недоступна"
-            
-            # Формируем текст с подробной статистикой
-            stats_text = (
-                "📈 *Подробная статистика пользователей*\n\n"
-                f"*Активность по дням недели:*\n{days_stats}\n\n"
-                f"*Активность по времени суток:*\n{hours_stats}\n\n"
-                f"*Статистика тестов:*\n{test_stats_text}"
-            )
-            
-            keyboard = [[InlineKeyboardButton("🔙 К статистике", callback_data='admin_stats')]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            query.edit_message_text(
-                stats_text,
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
-            
-            self.logger.info(f"Админ {query.from_user.id} просмотрел подробную статистику пользователей")
-        except Exception as e:
-            self.logger.error(f"Ошибка при отображении подробной статистики пользователей: {e}")
-            query.edit_message_text(
-                f"Ошибка при загрузке подробной статистики: {e}",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 К статистике", callback_data='admin_stats')]])
             )
 
     def _show_admin_management(self, query, context):
@@ -492,18 +277,10 @@ class AdminPanel:
                 current_part += "```"
                 log_parts.append(current_part)
 
-            # Добавляем кнопки для управления логами
-            keyboard = [
-                [InlineKeyboardButton("📉 Логи ошибок", callback_data='admin_logs_errors')],
-                [InlineKeyboardButton("🧹 Очистить логи", callback_data='admin_clean_logs')],
-                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            # Отправляем первую часть с кнопками
+            # Отправляем первую часть с кнопкой назад
             query.edit_message_text(
                 log_parts[0] if log_parts else "Логи отсутствуют",
-                reply_markup=reply_markup,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
 
@@ -545,55 +322,6 @@ class AdminPanel:
             parse_mode='Markdown'
         )
 
-    def _restart_bot_confirm(self, query, context):
-        """Подтверждение перезапуска бота"""
-        user_id = query.from_user.id
-
-        if not self.is_admin(user_id):
-            query.answer("У вас нет прав для перезапуска бота")
-            return
-
-        try:
-            # Сообщаем о начале перезапуска
-            query.edit_message_text(
-                "🔄 *Перезапуск бота*\n\n"
-                "Бот будет перезапущен через 5 секунд...\n"
-                "Пожалуйста, подождите.",
-                parse_mode='Markdown'
-            )
-            
-            # Логируем действие
-            self.logger.warning(f"Бот перезапускается администратором {user_id}")
-            
-            # Запускаем функцию перезапуска в отдельном потоке
-            restart_thread = threading.Thread(target=self._perform_restart)
-            restart_thread.daemon = True
-            restart_thread.start()
-            
-            return True
-        except Exception as e:
-            self.logger.error(f"Ошибка при перезапуске бота: {e}")
-            query.edit_message_text(
-                f"❌ Ошибка при перезапуске бота: {e}",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]])
-            )
-            return False
-
-    def _perform_restart(self):
-        """Выполняет фактический перезапуск бота"""
-        try:
-            # Ждем 5 секунд перед перезапуском
-            time.sleep(5)
-            
-            # Создаем файл-индикатор для restart.sh скрипта
-            with open("bot.restart", "w") as f:
-                f.write(f"Restart triggered at {datetime.datetime.now()}")
-            
-            # Завершаем текущий процесс - скрипт перезапуска должен поднять бота снова
-            os.kill(os.getpid(), signal.SIGTERM)
-        except Exception as e:
-            self.logger.error(f"Не удалось перезапустить бота: {e}")
-
     def _show_settings(self, query, context):
         """Показывает настройки бота (только для супер-админов)"""
         user_id = query.from_user.id
@@ -607,13 +335,10 @@ class AdminPanel:
 
         settings_text = (
             "⚙️ *Настройки бота*\n\n"
-            f"🔄 Автоматическое обновление тем: {'✅ Включено' if settings.get('auto_update_topics', True) else '❌ Выключено'}\n"
-            f"📊 Сбор статистики: {'✅ Включено' if settings.get('collect_statistics', True) else '❌ Выключено'}\n"
-            f"🔍 Режим разработчика: {'✅ Включено' if settings.get('developer_mode', False) else '❌ Выключено'}\n"
-            f"🔐 Приватный режим: {'✅ Включено' if settings.get('private_mode', False) else '❌ Выключено'}\n"
-            f"🔔 Уведомления: {'✅ Включены' if settings.get('notification_enabled', True) else '❌ Выключены'}\n"
-            f"📝 Уровень логирования: {settings.get('log_level', 'INFO')}\n"
-            f"👤 Макс. сообщений на пользователя: {settings.get('max_messages_per_user', 100)}"
+            f"🔄 Автоматическое обновление тем: {'Включено' if settings.get('auto_update_topics', True) else 'Выключено'}\n"
+            f"📊 Сбор статистики: {'Включено' if settings.get('collect_statistics', True) else 'Выключено'}\n"
+            f"🔍 Режим разработчика: {'Включено' if settings.get('developer_mode', False) else 'Выключено'}\n"
+            f"🔐 Приватный режим: {'Включено' if settings.get('private_mode', False) else 'Выключено'}\n"
         )
 
         keyboard = [
@@ -621,7 +346,6 @@ class AdminPanel:
             [InlineKeyboardButton("📊 Сбор статистики", callback_data='admin_toggle_statistics')],
             [InlineKeyboardButton("🔍 Режим разработчика", callback_data='admin_toggle_dev_mode')],
             [InlineKeyboardButton("🔐 Приватный режим", callback_data='admin_toggle_private_mode')],
-            [InlineKeyboardButton("🔔 Уведомления", callback_data='admin_toggle_notifications')],
             [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
         ]
 
@@ -634,51 +358,6 @@ class AdminPanel:
         )
 
         self.logger.info(f"Супер-админ {query.from_user.id} открыл настройки бота")
-
-    def _toggle_setting(self, query, context, setting_key):
-        """Переключает настройку бота"""
-        user_id = query.from_user.id
-
-        if not self.is_super_admin(user_id):
-            query.answer("У вас нет прав супер-администратора")
-            return
-
-        # Преобразуем ключ настройки в формат из файла настроек
-        setting_map = {
-            'auto_update': 'auto_update_topics',
-            'statistics': 'collect_statistics',
-            'dev_mode': 'developer_mode',
-            'private_mode': 'private_mode',
-            'notifications': 'notification_enabled'
-        }
-        
-        setting_name = setting_map.get(setting_key)
-        if not setting_name:
-            query.answer(f"Неизвестная настройка: {setting_key}")
-            return
-        
-        try:
-            # Получаем текущие настройки
-            settings = self._get_bot_settings()
-            
-            # Инвертируем значение настройки
-            current_value = settings.get(setting_name, False)
-            settings[setting_name] = not current_value
-            
-            # Сохраняем обновленные настройки
-            self._save_bot_settings(settings)
-            
-            # Отображаем сообщение об успешном изменении
-            new_value = "включена" if settings[setting_name] else "выключена"
-            query.answer(f"Настройка {setting_name} {new_value}")
-            
-            # Обновляем экран настроек
-            self._show_settings(query, context)
-            
-            self.logger.info(f"Супер-админ {user_id} изменил настройку {setting_name} на {settings[setting_name]}")
-        except Exception as e:
-            self.logger.error(f"Ошибка при изменении настройки {setting_key}: {e}")
-            query.answer(f"Ошибка: {e}")
 
     def _show_maintenance(self, query, context):
         """Показывает меню технического обслуживания (только для супер-админов)"""
@@ -710,327 +389,6 @@ class AdminPanel:
         )
 
         self.logger.info(f"Супер-админ {query.from_user.id} открыл меню технического обслуживания")
-
-    def _clear_cache(self, query, context):
-        """Очищает кэш API и другие временные данные"""
-        user_id = query.from_user.id
-
-        if not self.is_super_admin(user_id):
-            query.answer("У вас нет прав супер-администратора")
-            return
-
-        try:
-            # Очищаем кэш API, если клиент доступен
-            api_cache_cleared = False
-            if self.api_client and hasattr(self.api_client, 'clear_cache'):
-                self.api_client.clear_cache()
-                api_cache_cleared = True
-                self.logger.info(f"Админ {user_id} очистил кэш API")
-            
-            # Очищаем кэш тем, если сервис доступен
-            topic_cache_cleared = False
-            if self.topic_service and hasattr(self.topic_service, 'clear_cache'):
-                self.topic_service.clear_cache()
-                topic_cache_cleared = True
-                self.logger.info(f"Админ {user_id} очистил кэш тем")
-
-            # Проверяем файл кэша API
-            api_cache_file = 'api_cache.json'
-            if os.path.exists(api_cache_file):
-                try:
-                    os.remove(api_cache_file)
-                    api_cache_file_removed = True
-                    self.logger.info(f"Админ {user_id} удалил файл кэша API")
-                except Exception as e:
-                    api_cache_file_removed = False
-                    self.logger.error(f"Ошибка при удалении файла кэша API: {e}")
-            else:
-                api_cache_file_removed = None
-
-            # Формируем сообщение о результате
-            result_text = "🗑️ *Очистка кэша*\n\n"
-            
-            if api_cache_cleared:
-                result_text += "✅ Кэш API успешно очищен\n"
-            else:
-                result_text += "⚠️ API клиент недоступен или не поддерживает очистку кэша\n"
-                
-            if topic_cache_cleared:
-                result_text += "✅ Кэш тем успешно очищен\n"
-            else:
-                result_text += "⚠️ Сервис тем недоступен или не поддерживает очистку кэша\n"
-                
-            if api_cache_file_removed is True:
-                result_text += "✅ Файл кэша API успешно удален\n"
-            elif api_cache_file_removed is False:
-                result_text += "❌ Ошибка при удалении файла кэша API\n"
-            elif api_cache_file_removed is None:
-                result_text += "ℹ️ Файл кэша API не найден\n"
-                
-            # Отображаем результат
-            query.edit_message_text(
-                result_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка при очистке кэша: {e}")
-            query.edit_message_text(
-                f"❌ Ошибка при очистке кэша: {e}",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
-
-    def _create_backup(self, query, context):
-        """Создает резервную копию данных бота"""
-        user_id = query.from_user.id
-
-        if not self.is_super_admin(user_id):
-            query.answer("У вас нет прав супер-администратора")
-            return
-
-        try:
-            # Сообщаем о начале создания резервной копии
-            query.edit_message_text(
-                "💾 *Создание резервной копии*\n\n"
-                "Подождите, идет создание резервной копии данных...",
-                parse_mode='Markdown'
-            )
-            
-            # Текущее время для имени файла
-            timestamp = int(time.time())
-            backup_dir = "backups"
-            
-            # Создаем директорию для резервных копий, если она не существует
-            if not os.path.exists(backup_dir):
-                os.makedirs(backup_dir)
-            
-            # Список файлов для резервного копирования
-            files_to_backup = [
-                'user_states.json',
-                'historical_events.json',
-                'admins.json',
-                'bot_settings.json',
-                'api_cache.json'
-            ]
-            
-            # Копируем каждый файл в директорию резервных копий
-            backup_files = []
-            for file_name in files_to_backup:
-                if os.path.exists(file_name):
-                    backup_file_name = f"{file_name.split('.')[0]}_backup_{timestamp}.json"
-                    backup_path = os.path.join(backup_dir, backup_file_name)
-                    try:
-                        import shutil
-                        shutil.copy2(file_name, backup_path)
-                        backup_files.append((file_name, backup_path))
-                        self.logger.info(f"Создана резервная копия файла {file_name}")
-                    except Exception as e:
-                        self.logger.error(f"Ошибка при копировании файла {file_name}: {e}")
-            
-            # Также создаем общую резервную копию
-            data_backup_path = os.path.join(backup_dir, f"data_backup_v{len(backup_files)}_{timestamp}")
-            try:
-                import zipfile
-                with zipfile.ZipFile(data_backup_path + '.zip', 'w') as zipf:
-                    for file_name in files_to_backup:
-                        if os.path.exists(file_name):
-                            zipf.write(file_name)
-                    # Добавляем лог в архив
-                    log_files = self._get_log_files()
-                    if log_files:
-                        zipf.write(log_files[0])
-                self.logger.info(f"Создана общая резервная копия данных: {data_backup_path}.zip")
-                backup_files.append(("Все данные", data_backup_path + '.zip'))
-            except Exception as e:
-                self.logger.error(f"Ошибка при создании общей резервной копии: {e}")
-            
-            # Формируем сообщение о результате
-            result_text = "💾 *Резервное копирование завершено*\n\n"
-            
-            if backup_files:
-                result_text += "Созданы следующие резервные копии:\n\n"
-                for original, backup in backup_files:
-                    result_text += f"• {original} → {os.path.basename(backup)}\n"
-            else:
-                result_text += "⚠️ Не удалось создать ни одной резервной копии."
-            
-            # Отображаем результат
-            query.edit_message_text(
-                result_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
-            
-            self.logger.info(f"Админ {user_id} создал резервную копию данных")
-        except Exception as e:
-            self.logger.error(f"Ошибка при создании резервной копии: {e}")
-            query.edit_message_text(
-                f"❌ Ошибка при создании резервной копии: {e}",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
-
-    def _update_api_data(self, query, context):
-        """Обновляет данные API (принудительно обновляет кэшированные данные)"""
-        user_id = query.from_user.id
-
-        if not self.is_super_admin(user_id):
-            query.answer("У вас нет прав супер-администратора")
-            return
-
-        try:
-            # Сообщаем о начале обновления
-            query.edit_message_text(
-                "🔄 *Обновление данных API*\n\n"
-                "Подождите, идет обновление данных...",
-                parse_mode='Markdown'
-            )
-            
-            # Обновляем данные API, если клиент доступен
-            api_updated = False
-            if self.api_client and hasattr(self.api_client, 'refresh_data'):
-                self.api_client.refresh_data()
-                api_updated = True
-                self.logger.info(f"Админ {user_id} обновил данные API")
-            
-            # Обновляем темы, если сервис доступен
-            topics_updated = False
-            if self.topic_service and hasattr(self.topic_service, 'refresh_topics'):
-                self.topic_service.refresh_topics()
-                topics_updated = True
-                self.logger.info(f"Админ {user_id} обновил темы")
-            
-            # Формируем сообщение о результате
-            result_text = "🔄 *Обновление данных*\n\n"
-            
-            if api_updated:
-                result_text += "✅ Данные API успешно обновлены\n"
-            else:
-                result_text += "⚠️ API клиент недоступен или не поддерживает обновление данных\n"
-                
-            if topics_updated:
-                result_text += "✅ Темы успешно обновлены\n"
-            else:
-                result_text += "⚠️ Сервис тем недоступен или не поддерживает обновление\n"
-            
-            # Отображаем результат
-            query.edit_message_text(
-                result_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка при обновлении данных API: {e}")
-            query.edit_message_text(
-                f"❌ Ошибка при обновлении данных API: {e}",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
-
-    def _clean_logs(self, query, context):
-        """Очищает старые лог-файлы"""
-        user_id = query.from_user.id
-
-        if not self.is_super_admin(user_id):
-            query.answer("У вас нет прав супер-администратора")
-            return
-
-        try:
-            # Сообщаем о начале очистки
-            query.edit_message_text(
-                "🧹 *Очистка логов*\n\n"
-                "Подождите, идет очистка старых лог-файлов...",
-                parse_mode='Markdown'
-            )
-            
-            # Получаем все лог-файлы
-            log_files = self._get_log_files()
-            
-            # Оставляем только файлы старше 7 дней (кроме текущего)
-            import datetime
-            current_date = datetime.datetime.now().date()
-            files_to_delete = []
-            current_log = None
-            
-            for log_file in log_files:
-                try:
-                    # Извлекаем дату из имени файла
-                    file_name = os.path.basename(log_file)
-                    if file_name == "bot.log":
-                        current_log = log_file
-                        continue
-                    
-                    if file_name.startswith("bot_log_") and len(file_name) > 12:
-                        date_str = file_name[8:16]  # Формат YYYYMMDD
-                        file_date = datetime.datetime.strptime(date_str, "%Y%m%d").date()
-                        
-                        # Если файл старше 7 дней, добавляем в список на удаление
-                        if (current_date - file_date).days > 7:
-                            files_to_delete.append(log_file)
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке даты файла лога {log_file}: {e}")
-            
-            # Удаляем старые лог-файлы
-            deleted_count = 0
-            for file_path in files_to_delete:
-                try:
-                    os.remove(file_path)
-                    deleted_count += 1
-                except Exception as e:
-                    self.logger.error(f"Ошибка при удалении лог-файла {file_path}: {e}")
-            
-            # Очищаем текущий лог, если он слишком большой (более 10 МБ)
-            current_log_truncated = False
-            if current_log and os.path.exists(current_log):
-                file_size = os.path.getsize(current_log)
-                if file_size > 10 * 1024 * 1024:  # 10 МБ
-                    try:
-                        # Создаем резервную копию перед очисткой
-                        backup_path = f"{current_log}.bak"
-                        import shutil
-                        shutil.copy2(current_log, backup_path)
-                        
-                        # Очищаем файл, оставляя последние 1000 строк
-                        with open(current_log, 'r', encoding='utf-8') as f:
-                            lines = f.readlines()
-                        
-                        with open(current_log, 'w', encoding='utf-8') as f:
-                            f.writelines(lines[-1000:])
-                            
-                        current_log_truncated = True
-                        self.logger.info(f"Текущий лог-файл усечен (оставлено последние 1000 строк)")
-                    except Exception as e:
-                        self.logger.error(f"Ошибка при усечении текущего лог-файла: {e}")
-            
-            # Формируем сообщение о результате
-            result_text = "🧹 *Очистка логов завершена*\n\n"
-            
-            if deleted_count > 0:
-                result_text += f"✅ Удалено {deleted_count} старых лог-файлов\n"
-            else:
-                result_text += "ℹ️ Не найдено старых лог-файлов для удаления\n"
-                
-            if current_log_truncated:
-                result_text += "✅ Текущий лог-файл был усечен из-за большого размера\n"
-            
-            # Отображаем результат
-            query.edit_message_text(
-                result_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
-            
-            self.logger.info(f"Админ {user_id} очистил старые лог-файлы")
-        except Exception as e:
-            self.logger.error(f"Ошибка при очистке логов: {e}")
-            query.edit_message_text(
-                f"❌ Ошибка при очистке логов: {e}",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_maintenance')]]),
-                parse_mode='Markdown'
-            )
 
     def _back_to_admin_menu(self, query, context):
         """Возвращает пользователя в главное меню админ-панели"""
@@ -1134,169 +492,70 @@ class AdminPanel:
     def _count_users(self):
         """Подсчитывает количество уникальных пользователей"""
         try:
-            # Попытка получить данные из Analytics
-            if self.analytics and hasattr(self.analytics, 'get_unique_users_count'):
-                return self.analytics.get_unique_users_count()
-            
-            # Запасной вариант - чтение из user_states.json
-            if os.path.exists('user_states.json'):
-                with open('user_states.json', 'r', encoding='utf-8') as f:
-                    user_states = json.load(f)
-                    return len(user_states)
-            
-            return 0
-        except Exception as e:
-            self.logger.error(f"Ошибка при подсчёте пользователей: {e}")
+            # Заглушка, нужно реализовать фактический подсчет из базы данных
+            return 42  # Пример
+        except Exception:
             return 0
 
     def _count_messages(self):
         """Подсчитывает общее количество сообщений"""
         try:
-            # Попытка получить данные из Analytics
-            if self.analytics and hasattr(self.analytics, 'get_total_messages_count'):
-                return self.analytics.get_total_messages_count()
-            
-            # Заглушка
-            return 0
-        except Exception as e:
-            self.logger.error(f"Ошибка при подсчёте сообщений: {e}")
+            # Заглушка, нужно реализовать фактический подсчет из базы данных
+            return 1337  # Пример
+        except Exception:
             return 0
 
     def _get_uptime(self):
         """Возвращает время работы бота"""
         try:
-            uptime_seconds = time.time() - self.start_time
-            
-            # Преобразуем в читаемый формат
-            days = int(uptime_seconds // 86400)
-            hours = int((uptime_seconds % 86400) // 3600)
-            minutes = int((uptime_seconds % 3600) // 60)
-            
-            if days > 0:
-                return f"{days} дн. {hours} ч. {minutes} мин."
-            elif hours > 0:
-                return f"{hours} ч. {minutes} мин."
-            else:
-                return f"{minutes} мин."
-        except Exception as e:
-            self.logger.error(f"Ошибка при расчёте времени работы: {e}")
+            # Заглушка, нужно реализовать фактический подсчет времени работы
+            return "3 дня 7 часов"  # Пример
+        except Exception:
             return "Неизвестно"
 
     def _count_bot_starts(self):
         """Подсчитывает количество запусков бота за последние 24 часа"""
         try:
-            # Попытка получить данные из Analytics
-            if self.analytics and hasattr(self.analytics, 'get_bot_starts_count'):
-                return self.analytics.get_bot_starts_count(hours=24)
-            
-            # Запасной вариант - чтение из логов
-            log_content = self._get_last_logs(1000)
-            count = 0
-            current_time = time.time()
-            
-            for line in log_content:
-                if " запустил бота" in line:
-                    try:
-                        # Извлекаем время из лога
-                        log_time_str = line.split(" - ")[0]
-                        log_time = time.mktime(time.strptime(log_time_str, "%Y-%m-%d %H:%M:%S"))
-                        
-                        # Если событие произошло за последние 24 часа
-                        if current_time - log_time < 86400:
-                            count += 1
-                    except Exception:
-                        pass
-            
-            return count
-        except Exception as e:
-            self.logger.error(f"Ошибка при подсчёте запусков бота: {e}")
+            # Заглушка, нужно реализовать фактический подсчет из логов
+            return 25  # Пример
+        except Exception:
             return 0
 
     def _count_topic_requests(self):
         """Подсчитывает количество запросов тем за последние 24 часа"""
         try:
-            # Попытка получить данные из Analytics
-            if self.analytics and hasattr(self.analytics, 'get_topic_requests_count'):
-                return self.analytics.get_topic_requests_count(hours=24)
-            
-            # Запасной вариант - чтение из логов
-            log_content = self._get_last_logs(1000)
-            count = 0
-            current_time = time.time()
-            
-            for line in log_content:
-                if " выбрал тему: " in line or " ввел свою тему: " in line:
-                    try:
-                        # Извлекаем время из лога
-                        log_time_str = line.split(" - ")[0]
-                        log_time = time.mktime(time.strptime(log_time_str, "%Y-%m-%d %H:%M:%S"))
-                        
-                        # Если событие произошло за последние 24 часа
-                        if current_time - log_time < 86400:
-                            count += 1
-                    except Exception:
-                        pass
-            
-            return count
-        except Exception as e:
-            self.logger.error(f"Ошибка при подсчёте запросов тем: {e}")
+            # Заглушка, нужно реализовать фактический подсчет из логов
+            return 73  # Пример
+        except Exception:
             return 0
 
     def _count_completed_tests(self):
         """Подсчитывает количество пройденных тестов за последние 24 часа"""
         try:
-            # Попытка получить данные из Analytics
-            if self.analytics and hasattr(self.analytics, 'get_completed_tests_count'):
-                return self.analytics.get_completed_tests_count(hours=24)
-            
-            # Запасной вариант - чтение из логов
-            log_content = self._get_last_logs(1000)
-            count = 0
-            current_time = time.time()
-            
-            for line in log_content:
-                if " завершил тест с результатом " in line:
-                    try:
-                        # Извлекаем время из лога
-                        log_time_str = line.split(" - ")[0]
-                        log_time = time.mktime(time.strptime(log_time_str, "%Y-%m-%d %H:%M:%S"))
-                        
-                        # Если событие произошло за последние 24 часа
-                        if current_time - log_time < 86400:
-                            count += 1
-                    except Exception:
-                        pass
-            
-            return count
-        except Exception as e:
-            self.logger.error(f"Ошибка при подсчёте пройденных тестов: {e}")
+            # Заглушка, нужно реализовать фактический подсчет из логов
+            return 18  # Пример
+        except Exception:
             return 0
-
-    def _get_log_files(self):
-        """Получает список всех файлов логов"""
-        log_files = []
-        
-        # Проверяем директорию логов
-        log_dir = "logs"
-        if os.path.exists(log_dir) and os.path.isdir(log_dir):
-            for file_name in os.listdir(log_dir):
-                if file_name.startswith("bot_log_") or file_name == "bot.log":
-                    log_files.append(os.path.join(log_dir, file_name))
-        
-        # Проверяем корневую директорию
-        for file_name in os.listdir("."):
-            if file_name.startswith("bot_log_") or file_name == "bot.log":
-                log_files.append(file_name)
-        
-        # Сортируем по времени изменения (новые сначала)
-        log_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-        
-        return log_files
 
     def _get_last_logs(self, lines=100):
         """Получает последние строки из файла логов"""
         try:
-            log_files = self._get_log_files()
+            log_files = []
+            log_dir = "logs"
+
+            # Проверяем, существует ли директория логов
+            if os.path.exists(log_dir) and os.path.isdir(log_dir):
+                # Получаем список файлов логов
+                files = os.listdir(log_dir)
+                log_files = [os.path.join(log_dir, f) for f in files if f.startswith("bot_log_")]
+
+            # Если директории нет или нет файлов логов, проверяем в корневой директории
+            if not log_files:
+                files = [f for f in os.listdir() if f.startswith("bot_log_")]
+                log_files = files
+
+            # Сортируем файлы по дате изменения (новые в начале)
+            log_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
             if not log_files:
                 return ["Файлы логов не найдены"]
@@ -1323,31 +582,11 @@ class AdminPanel:
                     "auto_update_topics": True,
                     "collect_statistics": True,
                     "developer_mode": False,
-                    "private_mode": False,
-                    "notification_enabled": True,
-                    "log_level": "INFO",
-                    "max_messages_per_user": 100
+                    "private_mode": False
                 }
         except Exception as e:
             self.logger.error(f"Ошибка при загрузке настроек бота: {e}")
             return {}
-
-    def _save_bot_settings(self, settings):
-        """Сохраняет настройки бота в файл"""
-        try:
-            # Сохраняем настройки через временный файл
-            temp_file = "bot_settings.json.tmp"
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, indent=4)
-            
-            # Атомарно заменяем оригинальный файл
-            os.replace(temp_file, "bot_settings.json")
-            
-            self.logger.info("Настройки бота успешно сохранены")
-            return True
-        except Exception as e:
-            self.logger.error(f"Ошибка при сохранении настроек бота: {e}")
-            return False
 
     def process_new_admin_id(self, update, context):
         """Обрабатывает ввод ID нового администратора"""

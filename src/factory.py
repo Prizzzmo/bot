@@ -103,13 +103,7 @@ class BotFactory:
         container.register("analytics_service", analytics_service)
 
         # Админ-панель
-        admin_panel = AdminPanel(
-            logger=logger, 
-            config=config,
-            analytics=analytics_service,
-            api_client=api_client,
-            topic_service=topic_service
-        )
+        admin_panel = AdminPanel(logger, config)
 
         # Обработчик команд
         command_handlers = CommandHandlers(
