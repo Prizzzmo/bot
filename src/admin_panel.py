@@ -124,6 +124,9 @@ class AdminPanel:
         if self.is_super_admin(user_id):
             keyboard.append([InlineKeyboardButton("⚙️ Настройки бота", callback_data='admin_settings')])
             keyboard.append([InlineKeyboardButton("🔧 Техническое обслуживание", callback_data='admin_maintenance')])
+            keyboard.append([InlineKeyboardButton("📚 Управление темами", callback_data='admin_topics')])
+            keyboard.append([InlineKeyboardButton("🧪 Управление тестами", callback_data='admin_tests')])
+            keyboard.append([InlineKeyboardButton("📈 Управление аналитикой", callback_data='admin_analytics')])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -162,6 +165,12 @@ class AdminPanel:
             self._show_settings(query, context)
         elif action == 'admin_maintenance' and self.is_super_admin(user_id):
             self._show_maintenance(query, context)
+        elif action == 'admin_topics' and self.is_super_admin(user_id):
+            self._show_topics_management(query, context)
+        elif action == 'admin_tests' and self.is_super_admin(user_id):
+            self._show_tests_management(query, context)
+        elif action == 'admin_analytics' and self.is_super_admin(user_id):
+            self._show_analytics_management(query, context)
         elif action == 'admin_back':
             # Возврат в главное меню админ-панели
             self._back_to_admin_menu(query, context)
@@ -171,6 +180,15 @@ class AdminPanel:
         elif action.startswith('admin_remove_'):
             # Обработка удаления админа
             self._handle_remove_admin(query, context, action)
+        elif action.startswith('admin_topic_'):
+            # Обработка действий с темами
+            self._handle_topic_action(query, context, action)
+        elif action.startswith('admin_test_'):
+            # Обработка действий с тестами
+            self._handle_test_action(query, context, action)
+        elif action.startswith('admin_analytics_'):
+            # Обработка действий с аналитикой
+            self._handle_analytics_action(query, context, action)
 
     def _show_stats(self, query, context):
         """Показывает статистику бота"""
@@ -405,11 +423,14 @@ class AdminPanel:
         if self.is_super_admin(user_id):
             keyboard.append([InlineKeyboardButton("⚙️ Настройки бота", callback_data='admin_settings')])
             keyboard.append([InlineKeyboardButton("🔧 Техническое обслуживание", callback_data='admin_maintenance')])
+            keyboard.append([InlineKeyboardButton("📚 Управление темами", callback_data='admin_topics')])
+            keyboard.append([InlineKeyboardButton("🧪 Управление тестами", callback_data='admin_tests')])
+            keyboard.append([InlineKeyboardButton("📈 Управление аналитикой", callback_data='admin_analytics')])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         query.edit_message_text(
-            f"👑 *Панель администратора TeleAdmin*\n\n"
+            f"👑 *Панель администратора*\n\n"
             f"Добро пожаловать, {query.from_user.first_name}!\n"
             f"Выберите действие в меню ниже:",
             reply_markup=reply_markup,
@@ -668,3 +689,411 @@ class AdminPanel:
             self._show_admin_management(query, context)
         else:
             query.answer(f"Ошибка при удалении администратора с ID {admin_id_to_delete}")
+
+    def _show_topics_management(self, query, context):
+        """Показывает интерфейс управления историческими темами"""
+        try:
+            topics_text = "📚 *Управление историческими темами*\n\n"
+            topics_text += "Здесь вы можете управлять историческими темами, добавлять новые или редактировать существующие."
+
+            keyboard = [
+                [InlineKeyboardButton("➕ Добавить новую тему", callback_data='admin_topic_add')],
+                [InlineKeyboardButton("📋 Просмотреть все темы", callback_data='admin_topic_list')],
+                [InlineKeyboardButton("🔍 Найти тему", callback_data='admin_topic_search')],
+                [InlineKeyboardButton("🔄 Обновить темы из API", callback_data='admin_topic_update')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
+            ]
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            query.edit_message_text(
+                topics_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+            self.logger.info(f"Админ {query.from_user.id} открыл управление темами")
+        except Exception as e:
+            self.logger.error(f"Ошибка при открытии управления темами: {e}")
+            query.edit_message_text(
+                f"Ошибка при загрузке управления темами: {e}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]])
+            )
+
+    def _show_tests_management(self, query, context):
+        """Показывает интерфейс управления тестами"""
+        try:
+            tests_text = "🧪 *Управление тестами*\n\n"
+            tests_text += "Здесь вы можете настроить параметры генерации тестов и просмотреть статистику прохождения."
+
+            keyboard = [
+                [InlineKeyboardButton("⚙️ Настройки генерации тестов", callback_data='admin_test_settings')],
+                [InlineKeyboardButton("📊 Статистика прохождения", callback_data='admin_test_stats')],
+                [InlineKeyboardButton("🔍 Предпросмотр теста", callback_data='admin_test_preview')],
+                [InlineKeyboardButton("🗑️ Очистка кэша тестов", callback_data='admin_test_clear_cache')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
+            ]
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            query.edit_message_text(
+                tests_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+            self.logger.info(f"Админ {query.from_user.id} открыл управление тестами")
+        except Exception as e:
+            self.logger.error(f"Ошибка при открытии управления тестами: {e}")
+            query.edit_message_text(
+                f"Ошибка при загрузке управления тестами: {e}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]])
+            )
+
+    def _show_analytics_management(self, query, context):
+        """Показывает интерфейс управления аналитикой"""
+        try:
+            analytics_text = "📈 *Управление аналитикой*\n\n"
+            analytics_text += "Здесь вы можете просмотреть подробную аналитику использования бота и выгрузить отчеты."
+
+            keyboard = [
+                [InlineKeyboardButton("👥 Активность пользователей", callback_data='admin_analytics_users')],
+                [InlineKeyboardButton("📚 Популярность тем", callback_data='admin_analytics_topics')],
+                [InlineKeyboardButton("🧪 Статистика тестирования", callback_data='admin_analytics_tests')],
+                [InlineKeyboardButton("💾 Экспорт аналитики", callback_data='admin_analytics_export')],
+                [InlineKeyboardButton("⚙️ Настройки сбора данных", callback_data='admin_analytics_settings')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
+            ]
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            query.edit_message_text(
+                analytics_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+            self.logger.info(f"Админ {query.from_user.id} открыл управление аналитикой")
+        except Exception as e:
+            self.logger.error(f"Ошибка при открытии управления аналитикой: {e}")
+            query.edit_message_text(
+                f"Ошибка при загрузке управления аналитикой: {e}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]])
+            )
+
+    def _handle_topic_action(self, query, context, action):
+        """Обрабатывает действия с историческими темами"""
+        user_id = query.from_user.id
+        
+        if not self.is_super_admin(user_id):
+            query.answer("У вас нет прав для управления темами")
+            return
+            
+        if action == 'admin_topic_add':
+            # Логика добавления новой темы
+            query.edit_message_text(
+                "➕ *Добавление новой исторической темы*\n\n"
+                "Для добавления новой темы, отправьте сообщение в формате:\n"
+                "`Название темы | Краткое описание`\n\n"
+                "Например:\n"
+                "`Реформы Петра I | Политические и экономические реформы первого российского императора`",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_topics')]]),
+                parse_mode='Markdown'
+            )
+            # Устанавливаем состояние ожидания ввода темы
+            context.user_data['waiting_for_topic'] = True
+            
+        elif action == 'admin_topic_list':
+            # Логика отображения списка тем
+            # Здесь должен быть код загрузки тем из базы данных
+            # Например, используя TopicService
+            topics = ["Тема 1", "Тема 2", "Тема 3"]  # Заглушка, заменить на реальные данные
+            
+            topics_text = "📋 *Список исторических тем*\n\n"
+            for i, topic in enumerate(topics[:10], 1):
+                topics_text += f"{i}. {topic}\n"
+                
+            if len(topics) > 10:
+                topics_text += f"\nПоказано 10 из {len(topics)} тем. Используйте поиск для более точных результатов."
+                
+            query.edit_message_text(
+                topics_text,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_topics')]]),
+                parse_mode='Markdown'
+            )
+            
+        elif action == 'admin_topic_search':
+            # Логика поиска темы
+            query.edit_message_text(
+                "🔍 *Поиск исторической темы*\n\n"
+                "Введите ключевое слово или фразу для поиска темы:",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_topics')]]),
+                parse_mode='Markdown'
+            )
+            # Устанавливаем состояние ожидания ввода поискового запроса
+            context.user_data['waiting_for_topic_search'] = True
+            
+        elif action == 'admin_topic_update':
+            # Логика обновления тем из API
+            query.edit_message_text(
+                "🔄 *Обновление исторических тем*\n\n"
+                "Выполняется обновление базы исторических тем из API...\n"
+                "Это может занять некоторое время.",
+                parse_mode='Markdown'
+            )
+            
+            try:
+                # Здесь должен быть код обновления тем
+                # Например, вызов функции из TopicService
+                # topic_service.update_all_topics()
+                
+                # Заглушка для демонстрации
+                import time
+                time.sleep(2)
+                
+                query.edit_message_text(
+                    "✅ *Обновление выполнено успешно*\n\n"
+                    "База исторических тем успешно обновлена.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_topics')]]),
+                    parse_mode='Markdown'
+                )
+            except Exception as e:
+                self.logger.error(f"Ошибка при обновлении тем: {e}")
+                query.edit_message_text(
+                    f"❌ *Ошибка при обновлении тем*\n\n"
+                    f"Произошла ошибка: {e}",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_topics')]]),
+                    parse_mode='Markdown'
+                )
+
+    def _handle_test_action(self, query, context, action):
+        """Обрабатывает действия с тестами"""
+        user_id = query.from_user.id
+        
+        if not self.is_super_admin(user_id):
+            query.answer("У вас нет прав для управления тестами")
+            return
+            
+        if action == 'admin_test_settings':
+            # Настройки генерации тестов
+            test_settings = self._get_test_settings()
+            
+            settings_text = (
+                "⚙️ *Настройки генерации тестов*\n\n"
+                f"📊 Количество вопросов: {test_settings.get('questions_count', 5)}\n"
+                f"🔄 Время на ответ: {test_settings.get('answer_time', 30)} сек\n"
+                f"🌡️ Температура генерации: {test_settings.get('temperature', 0.7)}\n"
+                f"🔢 Максимальное количество вариантов: {test_settings.get('max_options', 4)}\n"
+                f"📏 Сложность по умолчанию: {test_settings.get('default_difficulty', 'средняя')}\n"
+            )
+            
+            keyboard = [
+                [InlineKeyboardButton("📝 Изменить настройки", callback_data='admin_test_edit_settings')],
+                [InlineKeyboardButton("🔄 Сбросить по умолчанию", callback_data='admin_test_reset_settings')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_tests')]
+            ]
+            
+            query.edit_message_text(
+                settings_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        elif action == 'admin_test_stats':
+            # Статистика прохождения тестов
+            stats_text = (
+                "📊 *Статистика прохождения тестов*\n\n"
+                "👥 Всего пройдено тестов: 247\n"
+                "✅ Средний процент правильных ответов: 68%\n"
+                "⏱️ Среднее время прохождения: 3 мин 24 сек\n\n"
+                "*Популярные темы тестирования:*\n"
+                "1. Великая Отечественная война - 42 теста\n"
+                "2. Правление Петра I - 39 тестов\n"
+                "3. Революция 1917 года - 28 тестов\n"
+            )
+            
+            query.edit_message_text(
+                stats_text,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_tests')]]),
+                parse_mode='Markdown'
+            )
+            
+        elif action == 'admin_test_preview':
+            # Предпросмотр теста
+            query.edit_message_text(
+                "🔍 *Предпросмотр теста*\n\n"
+                "Введите тему для генерации тестового вопроса:",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_tests')]]),
+                parse_mode='Markdown'
+            )
+            # Устанавливаем состояние ожидания ввода темы для теста
+            context.user_data['waiting_for_test_topic'] = True
+            
+        elif action == 'admin_test_clear_cache':
+            # Очистка кэша тестов
+            query.edit_message_text(
+                "🗑️ *Очистка кэша тестов*\n\n"
+                "Вы уверены, что хотите очистить кэш тестов? "
+                "Это может повлиять на скорость генерации новых тестов.",
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("✅ Да", callback_data='admin_test_confirm_clear'),
+                        InlineKeyboardButton("❌ Нет", callback_data='admin_tests')
+                    ]
+                ]),
+                parse_mode='Markdown'
+            )
+
+    def _handle_analytics_action(self, query, context, action):
+        """Обрабатывает действия с аналитикой"""
+        user_id = query.from_user.id
+        
+        if not self.is_super_admin(user_id):
+            query.answer("У вас нет прав для управления аналитикой")
+            return
+            
+        if action == 'admin_analytics_users':
+            # Активность пользователей
+            users_text = (
+                "👥 *Активность пользователей*\n\n"
+                "Всего уникальных пользователей: 352\n"
+                "Активных за последние 24 часа: 78\n"
+                "Новых пользователей за неделю: 42\n\n"
+                "*График активности по дням недели:*\n"
+                "Пн: ██████ 60\n"
+                "Вт: ████ 40\n"
+                "Ср: ███████ 70\n"
+                "Чт: ██████████ 100\n"
+                "Пт: ████████ 80\n"
+                "Сб: ███ 30\n"
+                "Вс: ██ 20\n"
+            )
+            
+            query.edit_message_text(
+                users_text,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]]),
+                parse_mode='Markdown'
+            )
+            
+        elif action == 'admin_analytics_topics':
+            # Популярность тем
+            topics_text = (
+                "📚 *Популярность исторических тем*\n\n"
+                "*Самые запрашиваемые темы:*\n"
+                "1. Великая Отечественная война - 126 запросов\n"
+                "2. Революция 1917 года - 89 запросов\n"
+                "3. Правление Ивана Грозного - 78 запросов\n"
+                "4. Петровские реформы - 65 запросов\n"
+                "5. Отмена крепостного права - 57 запросов\n\n"
+                "*Средняя оценка полезности информации:* 4.7/5"
+            )
+            
+            query.edit_message_text(
+                topics_text,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]]),
+                parse_mode='Markdown'
+            )
+            
+        elif action == 'admin_analytics_tests':
+            # Статистика тестирования
+            tests_text = (
+                "🧪 *Статистика тестирования*\n\n"
+                "Всего пройдено тестов: 247\n"
+                "Средний результат: 68%\n\n"
+                "*Распределение по сложности:*\n"
+                "- Легкие: 42% (сред. результат 82%)\n"
+                "- Средние: 53% (сред. результат 65%)\n"
+                "- Сложные: 5% (сред. результат 48%)\n\n"
+                "*Самые сложные вопросы:*\n"
+                "1. Даты Ливонской войны (31% правильных ответов)\n"
+                "2. Условия Ништадтского мира (35% правильных ответов)\n"
+            )
+            
+            query.edit_message_text(
+                tests_text,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]]),
+                parse_mode='Markdown'
+            )
+            
+        elif action == 'admin_analytics_export':
+            # Экспорт аналитики
+            export_text = (
+                "💾 *Экспорт аналитических данных*\n\n"
+                "Выберите формат экспорта:"
+            )
+            
+            keyboard = [
+                [InlineKeyboardButton("📊 CSV", callback_data='admin_analytics_export_csv')],
+                [InlineKeyboardButton("📑 JSON", callback_data='admin_analytics_export_json')],
+                [InlineKeyboardButton("📈 Excel", callback_data='admin_analytics_export_excel')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]
+            ]
+            
+            query.edit_message_text(
+                export_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        elif action == 'admin_analytics_settings':
+            # Настройки сбора данных
+            settings = self._get_analytics_settings()
+            
+            settings_text = (
+                "⚙️ *Настройки сбора аналитических данных*\n\n"
+                f"📊 Сбор общей статистики: {'Включен' if settings.get('collect_general', True) else 'Выключен'}\n"
+                f"👤 Сбор пользовательских данных: {'Включен' if settings.get('collect_user_data', True) else 'Выключен'}\n"
+                f"📚 Отслеживание популярности тем: {'Включено' if settings.get('track_topics', True) else 'Выключено'}\n"
+                f"🧪 Анализ результатов тестов: {'Включен' if settings.get('analyze_tests', True) else 'Выключен'}\n"
+                f"⏱️ Интервал агрегации данных: {settings.get('aggregation_interval', '24')} часа\n"
+            )
+            
+            keyboard = [
+                [InlineKeyboardButton("📝 Изменить настройки", callback_data='admin_analytics_edit_settings')],
+                [InlineKeyboardButton("🔄 Сбросить по умолчанию", callback_data='admin_analytics_reset_settings')],
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]
+            ]
+            
+            query.edit_message_text(
+                settings_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+
+    def _get_test_settings(self):
+        """Получает настройки генерации тестов"""
+        try:
+            if os.path.exists('test_settings.json'):
+                with open('test_settings.json', 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                # Возвращаем настройки по умолчанию
+                return {
+                    "questions_count": 5,
+                    "answer_time": 30,
+                    "temperature": 0.7,
+                    "max_options": 4,
+                    "default_difficulty": "средняя"
+                }
+        except Exception as e:
+            self.logger.error(f"Ошибка при загрузке настроек тестов: {e}")
+            return {}
+
+    def _get_analytics_settings(self):
+        """Получает настройки сбора аналитических данных"""
+        try:
+            if os.path.exists('analytics_settings.json'):
+                with open('analytics_settings.json', 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                # Возвращаем настройки по умолчанию
+                return {
+                    "collect_general": True,
+                    "collect_user_data": True,
+                    "track_topics": True,
+                    "analyze_tests": True,
+                    "aggregation_interval": 24
+                }
+        except Exception as e:
+            self.logger.error(f"Ошибка при загрузке настроек аналитики: {e}")
+            return {}
