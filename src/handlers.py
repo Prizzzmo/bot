@@ -1467,6 +1467,27 @@ class CommandHandlers:
             self.admin_panel.handle_admin_command(update, context)
         else:
             update.message.reply_text("Административная панель недоступна")
+            
+    def neadmin_command(self, update, context):
+        """
+        Обрабатывает команду /neadmin для быстрого перехода на веб-админку.
+
+        Args:
+            update (telegram.Update): Объект обновления Telegram
+            context (telegram.ext.CallbackContext): Контекст разговора
+        """
+        admin_panel_url = "https://5ff54f10-3551-4b4b-80c0-8778fdd1c7f8-00-hortvjq6og1s.sisko.replit.dev/admin-panel"
+        
+        # Формируем кнопку с ссылкой на админ-панель
+        keyboard = [[InlineKeyboardButton("🔧 Открыть панель администратора", url=admin_panel_url)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        update.message.reply_text(
+            "🔐 *Административная панель*\n\nНажмите на кнопку ниже, чтобы открыть веб-интерфейс администратора:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        self.logger.info(f"Пользователь {update.message.from_user.id} запросил доступ к веб-админке через команду /neadmin")
 
     def clear_chat_command(self, update, context):
         """

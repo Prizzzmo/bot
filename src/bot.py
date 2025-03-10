@@ -75,6 +75,9 @@ class Bot:
 
             # Добавляем обработчик для команды администратора
             dp.add_handler(CommandHandler('admin', self.handlers.admin_command))
+            
+            # Добавляем обработчик для команды быстрого доступа к веб-админке
+            dp.add_handler(CommandHandler('neadmin', self.handlers.neadmin_command))
 
             # Добавляем обработчик для команды очистки чата
             dp.add_handler(CommandHandler('clear', self.handlers.clear_chat_command))
