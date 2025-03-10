@@ -180,7 +180,11 @@ class Bot:
             return False
 
         try:
-            self.handlers = ConversationHandler(
+            from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
+            from src.config import TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION
+            
+            # Создаем ConversationHandler
+            conv_handler = ConversationHandler(
                 entry_points=[CommandHandler('start', self.handlers.start)],
                 states={
                     TOPIC: [
@@ -212,6 +216,10 @@ class Bot:
             if hasattr(self, 'admin_panel'):
                 self.handlers.admin_panel = self.admin_panel
                 self.logger.info("Admin panel подключен к handlers")
+            
+            # Добавляем обработчик в диспетчер
+            self.updater.dispatcher.add_handler(conv_handler)
+            self.logger.info("Обработчики успешно добавлены в диспетчер")
             return True
         except Exception as e:
             self.logger.log_error(e, "Ошибка при инициализации обработчиков")
