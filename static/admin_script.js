@@ -1,4 +1,3 @@
-
 // Глобальные переменные
 let isAuthenticated = false;
 let currentUser = null;
@@ -18,23 +17,26 @@ let adminTypes = {
 document.addEventListener('DOMContentLoaded', function() {
     // Проверяем авторизацию
     checkAuthentication();
-    
+
     // Применяем сохраненную тему
     applyTheme();
-    
+
     // Применяем сохраненное состояние боковой панели
     applySidebarState();
-    
+
     // Регистрируем обработчики событий для UI компонентов
     registerEventHandlers();
-    
+
     // Обновляем время сервера
     startServerTimeUpdater();
-    
-    // Автоматически открываем окно документации при загрузке
-    setTimeout(() => {
-        toggleDocsModal();
-    }, 500); // Небольшая задержка для обеспечения корректной загрузки страницы
+
+    // Инициализация мобильного меню
+    initMobileMenu();
+
+    // Показываем окно документации при запуске
+    if (window.innerWidth <= 768) {
+        adjustForMobile();
+    }
 });
 
 // Проверка аутентификации
@@ -46,7 +48,7 @@ function checkAuthentication() {
         id: 7225056628, // ID из admins.json
         is_super_admin: true
     };
-    
+
     // Показываем админ-панель и загружаем данные
     showAdminPanel();
     loadAdminData();
@@ -65,7 +67,7 @@ function showAdminPanel() {
 function loadAdminData() {
     // Загружаем данные для выбранной страницы
     loadPageData(currentPage);
-    
+
     // Общие данные для всех страниц
     loadAdminsData();
 }
@@ -95,7 +97,7 @@ function loadPageData(page) {
             loadMaintenanceData();
             break;
     }
-    
+
     // Обновляем хлебные крошки и активный пункт меню
     updateBreadcrumbs(page);
     updateActiveMenuItem(page);
@@ -112,7 +114,7 @@ function updateBreadcrumbs(page) {
         'settings': 'fa-cog',
         'maintenance': 'fa-tools'
     };
-    
+
     const pageNames = {
         'dashboard': 'Обзор',
         'events': 'События истории',
@@ -122,7 +124,7 @@ function updateBreadcrumbs(page) {
         'settings': 'Настройки',
         'maintenance': 'Обслуживание'
     };
-    
+
     document.getElementById('current-section-icon').className = `fas ${pageIcons[page]}`;
     document.getElementById('current-section-name').textContent = pageNames[page];
 }
@@ -132,7 +134,7 @@ function updateActiveMenuItem(page) {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
     });
-    
+
     const activeItem = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (activeItem) {
         activeItem.classList.add('active');
@@ -149,79 +151,93 @@ function registerEventHandlers() {
             switchPage(page);
         });
     });
-    
+
     // Обработка нажатия на выход
     document.getElementById('logout-button').addEventListener('click', handleLogout);
-    
+
     // Обработка нажатия на кнопку документации
     document.getElementById('docs-button').addEventListener('click', toggleDocsModal);
-    
+
     // Обработка закрытия модального окна документации
     document.getElementById('docs-modal-close').addEventListener('click', closeDocsModal);
     document.getElementById('docs-modal-overlay').addEventListener('click', closeDocsModal);
-    
+
     // Обработка переключения темы
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-    
+
     // Обработка переключения боковой панели
     document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
-    
+
     // Обработка полноэкранного режима
     document.getElementById('fullscreen-toggle').addEventListener('click', toggleFullscreen);
-    
+
     // Обработка обновления данных
     document.getElementById('refresh-data').addEventListener('click', refreshCurrentPageData);
-    
+
     // События формы настроек
     const settingsForm = document.getElementById('settings-form');
     if (settingsForm) {
         settingsForm.addEventListener('submit', handleSettingsSubmit);
     }
-    
+
     // Обработчики для страницы администраторов
     const addAdminForm = document.getElementById('add-admin-form');
     if (addAdminForm) {
         addAdminForm.addEventListener('submit', handleAddAdminSubmit);
     }
-    
+
     const removeAdminForm = document.getElementById('remove-admin-form');
     if (removeAdminForm) {
         removeAdminForm.addEventListener('submit', handleRemoveAdminSubmit);
     }
-    
+
     // Обработчики для модальных окон
     document.getElementById('modal-overlay').addEventListener('click', function(e) {
         if (e.target === this) {
             closeModal();
         }
     });
-    
+
     // Обработчики для операций обслуживания
     document.querySelectorAll('.maintenance-action').forEach(button => {
         button.addEventListener('click', handleMaintenanceAction);
     });
-    
+
     // Обработчики для таблиц данных
     setupEventsTableHandlers();
     setupUsersTableHandlers();
-    
+
     // Обработчики для панели логов
     setupLogsHandlers();
-    
+
     // Глобальный поиск
     document.getElementById('global-search').addEventListener('input', handleGlobalSearch);
-    
+
     // Привязываем обработчики для связанных элементов управления
     setupRangeInputSync();
-    
+
     // Привязываем выбор периода активности к обновлению графика
     document.getElementById('activity-period').addEventListener('change', updateActivityChart);
-    
+
     // Кнопка просмотра всех активностей
     document.getElementById('view-all-activities').addEventListener('click', viewAllActivities);
-    
+
     // Кнопка проверки системы
     document.getElementById('check-system').addEventListener('click', checkSystemStatus);
+
+    // Добавляем обработчик для нажатия вне меню на мобильных устройствах
+    document.addEventListener('click', function(event) {
+        const sidebar = document.querySelector('.sidebar');
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+
+        // Если кликнули вне меню и оно открыто на мобильном устройстве
+        if (window.innerWidth <= 768 && 
+            sidebar && sidebar.classList.contains('visible') && 
+            !sidebar.contains(event.target) && 
+            event.target !== mobileMenuToggle) {
+            sidebar.classList.remove('visible');
+        }
+    });
 }
 
 // Переключение страницы
@@ -230,16 +246,16 @@ function switchPage(page) {
     document.querySelectorAll('.page').forEach(p => {
         p.classList.remove('active');
     });
-    
+
     // Показываем выбранную страницу
     const activePage = document.getElementById(`${page}-page`);
     if (activePage) {
         activePage.classList.add('active');
         currentPage = page;
-        
+
         // Загружаем данные для выбранной страницы
         loadPageData(page);
-        
+
         // Обновляем URL с использованием hash
         window.location.hash = page;
     }
@@ -249,7 +265,7 @@ function switchPage(page) {
 function handleLogout() {
     // Очищаем куки администратора
     document.cookie = 'admin_id=; Max-Age=0; path=/;';
-    
+
     // Перезагружаем страницу или перенаправляем
     window.location.href = '/';
 }
@@ -265,7 +281,7 @@ function toggleTheme() {
 function applyTheme() {
     const body = document.body;
     const themeIcon = document.querySelector('#theme-toggle i');
-    
+
     if (isDarkTheme) {
         body.classList.add('dark-theme');
         themeIcon.classList.remove('fa-moon');
@@ -287,7 +303,7 @@ function toggleSidebar() {
 // Применение состояния боковой панели
 function applySidebarState() {
     const body = document.body;
-    
+
     if (sidebarCollapsed) {
         body.classList.add('sidebar-collapsed');
     } else {
@@ -298,12 +314,12 @@ function applySidebarState() {
 // Переключение полноэкранного режима
 function toggleFullscreen() {
     const fsIcon = document.querySelector('#fullscreen-toggle i');
-    
+
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => {
             showNotification('Ошибка включения полноэкранного режима: ' + err.message, 'error');
         });
-        
+
         fsIcon.classList.remove('fa-expand');
         fsIcon.classList.add('fa-compress');
     } else {
@@ -318,16 +334,16 @@ function toggleFullscreen() {
 // Обновление данных текущей страницы
 function refreshCurrentPageData() {
     const refreshIcon = document.querySelector('#refresh-data i');
-    
+
     // Анимация вращения
     refreshIcon.classList.add('fa-spin');
-    
+
     // Загрузка данных текущей страницы
     loadPageData(currentPage);
-    
+
     // Отображаем уведомление
     showNotification('Данные успешно обновлены', 'success');
-    
+
     // Останавливаем анимацию через 1 секунду
     setTimeout(() => {
         refreshIcon.classList.remove('fa-spin');
@@ -337,13 +353,13 @@ function refreshCurrentPageData() {
 // Отображение уведомления
 function showNotification(message, type = 'info') {
     const container = document.getElementById('notifications-container');
-    
+
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
-    
+
     const icon = document.createElement('i');
     icon.className = 'fas';
-    
+
     switch(type) {
         case 'success':
             icon.classList.add('fa-check-circle');
@@ -357,11 +373,11 @@ function showNotification(message, type = 'info') {
         default:
             icon.classList.add('fa-info-circle');
     }
-    
+
     const content = document.createElement('div');
     content.className = 'notification-content';
     content.textContent = message;
-    
+
     const closeBtn = document.createElement('button');
     closeBtn.className = 'notification-close';
     closeBtn.innerHTML = '&times;';
@@ -371,13 +387,13 @@ function showNotification(message, type = 'info') {
             notification.remove();
         }, 300);
     });
-    
+
     notification.appendChild(icon);
     notification.appendChild(content);
     notification.appendChild(closeBtn);
-    
+
     container.appendChild(notification);
-    
+
     // Автоматическое скрытие через 5 секунд
     setTimeout(() => {
         if (notification.parentNode) {
@@ -411,15 +427,15 @@ function updateDashboardCounters(data) {
     // Обновляем счетчики и их изменения
     document.getElementById('user-count').textContent = data.user_count || 0;
     document.getElementById('user-change').textContent = data.user_growth ? `+${data.user_growth}%` : '+0%';
-    
+
     document.getElementById('message-count').textContent = data.message_count || 0;
     document.getElementById('message-change').textContent = data.message_growth ? `+${data.message_growth}%` : '+0%';
-    
+
     document.getElementById('events-count').textContent = data.events_count || 0;
     document.getElementById('events-change').textContent = data.events_growth ? `+${data.events_growth}%` : '+0%';
-    
+
     document.getElementById('uptime').textContent = data.uptime || '00:00:00';
-    
+
     // Обновляем статистику запросов
     const queriesStats = document.getElementById('queries-stats');
     if (queriesStats && data.queries) {
@@ -452,7 +468,7 @@ function updateSystemInfo(data) {
         cache_size: '250 МБ',
         last_update: '2 часа назад'
     };
-    
+
     const sysInfoEl = document.getElementById('system-info');
     if (sysInfoEl) {
         sysInfoEl.innerHTML = `
@@ -505,11 +521,11 @@ function loadRecentActivities() {
             timestamp: '2023-03-09 15:40'
         }
     ];
-    
+
     const activitiesList = document.getElementById('recent-activities');
     if (activitiesList) {
         activitiesList.innerHTML = '';
-        
+
         activities.forEach(activity => {
             const actionIcons = {
                 'login': 'fa-sign-in-alt',
@@ -519,9 +535,9 @@ function loadRecentActivities() {
                 'add_admin': 'fa-user-plus',
                 'remove_admin': 'fa-user-minus'
             };
-            
+
             const icon = actionIcons[activity.action] || 'fa-history';
-            
+
             const li = document.createElement('li');
             li.className = 'activity-item';
             li.innerHTML = `
@@ -536,7 +552,7 @@ function loadRecentActivities() {
                     <div class="activity-description">${activity.details}</div>
                 </div>
             `;
-            
+
             activitiesList.appendChild(li);
         });
     }
@@ -546,7 +562,7 @@ function loadRecentActivities() {
 function updateActivityChart() {
     const period = document.getElementById('activity-period').value;
     const chartImg = document.getElementById('activity-chart');
-    
+
     if (chartImg) {
         // В реальном проекте здесь был бы запрос к API
         // Для примера просто меняем параметр URL для имитации обновления
@@ -593,7 +609,7 @@ function viewAllActivities() {
                     <i class="fas fa-filter"></i> Применить
                 </button>
             </div>
-            
+
             <div class="activities-list-container">
                 <ul class="activities-list">
                     <li class="activity-item">
@@ -668,9 +684,9 @@ function viewAllActivities() {
             </button>
         </div>
     `;
-    
+
     openModal(modalContent, 'large');
-    
+
     // Привязываем обработчик к кнопке фильтрации
     document.getElementById('filter-activities-btn').addEventListener('click', function() {
         showNotification('Фильтры применены', 'success');
@@ -680,7 +696,7 @@ function viewAllActivities() {
 // Функция проверки статуса системы
 function checkSystemStatus() {
     showNotification('Выполняется проверка системы...', 'info');
-    
+
     // Имитация проверки (в реальном проекте здесь был бы запрос)
     setTimeout(() => {
         // Показываем результаты проверки в модальном окне
@@ -747,7 +763,7 @@ function checkSystemStatus() {
                 </button>
             </div>
         `;
-        
+
         openModal(modalContent);
     }, 1500);
 }
@@ -755,7 +771,7 @@ function checkSystemStatus() {
 // Функция для исправления проблем системы
 function executeSystemFix() {
     showNotification('Выполняется исправление проблем...', 'info');
-    
+
     // Имитация исправления
     setTimeout(() => {
         showNotification('Проблемы успешно исправлены', 'success');
@@ -766,7 +782,7 @@ function executeSystemFix() {
 // Экспорт истории активностей
 function exportActivities() {
     showNotification('Выполняется экспорт активностей...', 'info');
-    
+
     // Имитация экспорта
     setTimeout(() => {
         showNotification('Данные успешно экспортированы', 'success');
@@ -777,17 +793,17 @@ function exportActivities() {
 function loadEventsData() {
     // Загружаем категории для фильтров
     loadEventCategories();
-    
+
     // Загружаем события для таблицы с учетом пагинации
     const page = eventsPagination.currentPage;
     const itemsPerPage = eventsPagination.itemsPerPage;
-    
+
     // Запрос данных от API
     fetch(`/api/historical-events?page=${page}&limit=${itemsPerPage}`)
         .then(response => response.json())
         .then(data => {
             displayEventsData(data);
-            
+
             // Обновляем пагинацию
             eventsPagination.totalPages = Math.ceil(data.length / itemsPerPage);
             updateEventsPagination();
@@ -809,7 +825,7 @@ function loadEventCategories() {
                 while (categoryFilter.options.length > 1) {
                     categoryFilter.remove(1);
                 }
-                
+
                 // Добавляем новые опции
                 categories.forEach(category => {
                     const option = document.createElement('option');
@@ -822,18 +838,18 @@ function loadEventCategories() {
         .catch(error => {
             console.error('Ошибка при загрузке категорий:', error);
         });
-    
+
     // Симуляция данных для века и региона
     const centuries = ['XVIII', 'XIX', 'XX', 'XXI'];
     const regions = ['Европейская часть', 'Сибирь', 'Дальний Восток', 'Кавказ', 'Средняя Азия'];
-    
+
     const centuryFilter = document.getElementById('event-century-filter');
     if (centuryFilter) {
         // Очищаем предыдущие опции, оставляя первую
         while (centuryFilter.options.length > 1) {
             centuryFilter.remove(1);
         }
-        
+
         // Добавляем новые опции
         centuries.forEach(century => {
             const option = document.createElement('option');
@@ -842,14 +858,14 @@ function loadEventCategories() {
             centuryFilter.appendChild(option);
         });
     }
-    
+
     const regionFilter = document.getElementById('event-location-filter');
     if (regionFilter) {
         // Очищаем предыдущие опции, оставляя первую
         while (regionFilter.options.length > 1) {
             regionFilter.remove(1);
         }
-        
+
         // Добавляем новые опции
         regions.forEach(region => {
             const option = document.createElement('option');
@@ -864,10 +880,10 @@ function loadEventCategories() {
 function displayEventsData(events) {
     const tbody = document.getElementById('events-table-body');
     if (!tbody) return;
-    
+
     // Очищаем таблицу
     tbody.innerHTML = '';
-    
+
     // Если нет данных, показываем сообщение
     if (!events || events.length === 0) {
         const tr = document.createElement('tr');
@@ -875,14 +891,14 @@ function displayEventsData(events) {
         tbody.appendChild(tr);
         return;
     }
-    
+
     // Отображаем данные о событиях
     const startIndex = (eventsPagination.currentPage - 1) * eventsPagination.itemsPerPage;
     const endIndex = Math.min(startIndex + eventsPagination.itemsPerPage, events.length);
-    
+
     for (let i = 0; i < Math.min(eventsPagination.itemsPerPage, events.length); i++) {
         const event = events[i];
-        
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${event.id || '-'}</td>
@@ -902,10 +918,10 @@ function displayEventsData(events) {
                 </button>
             </td>
         `;
-        
+
         tbody.appendChild(tr);
     }
-    
+
     // Привязываем обработчики событий к кнопкам
     tbody.querySelectorAll('.btn-view').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -913,14 +929,14 @@ function displayEventsData(events) {
             viewEvent(eventId);
         });
     });
-    
+
     tbody.querySelectorAll('.btn-edit').forEach(btn => {
         btn.addEventListener('click', function() {
             const eventId = this.getAttribute('data-id');
             editEvent(eventId);
         });
     });
-    
+
     tbody.querySelectorAll('.btn-delete').forEach(btn => {
         btn.addEventListener('click', function() {
             const eventId = this.getAttribute('data-id');
@@ -933,13 +949,13 @@ function displayEventsData(events) {
 function updateEventsPagination() {
     const paginationContainer = document.getElementById('events-pagination');
     if (!paginationContainer) return;
-    
+
     // Очищаем контейнер
     paginationContainer.innerHTML = '';
-    
+
     // Если нет страниц, не показываем пагинацию
     if (eventsPagination.totalPages <= 1) return;
-    
+
     // Добавляем кнопку "Предыдущая"
     const prevBtn = document.createElement('button');
     prevBtn.className = 'pagination-item prev';
@@ -952,7 +968,7 @@ function updateEventsPagination() {
         }
     });
     paginationContainer.appendChild(prevBtn);
-    
+
     // Добавляем кнопки с номерами страниц
     for (let i = 1; i <= eventsPagination.totalPages; i++) {
         // Показываем только текущую страницу, первую, последнюю и по одной странице до и после текущей
@@ -982,7 +998,7 @@ function updateEventsPagination() {
             paginationContainer.appendChild(dots);
         }
     }
-    
+
     // Добавляем кнопку "Следующая"
     const nextBtn = document.createElement('button');
     nextBtn.className = 'pagination-item next';
@@ -1008,7 +1024,7 @@ function setupEventsTableHandlers() {
             loadEventsData();
         });
     }
-    
+
     // Обработка кнопок фильтров
     const filterApply = document.getElementById('filter-apply');
     if (filterApply) {
@@ -1018,17 +1034,17 @@ function setupEventsTableHandlers() {
             const century = document.getElementById('event-century-filter').value;
             const location = document.getElementById('event-location-filter').value;
             const search = document.getElementById('event-search').value;
-            
+
             // Сбрасываем на первую страницу
             eventsPagination.currentPage = 1;
-            
+
             // Применяем фильтры и загружаем данные
             loadEventsData();
-            
+
             showNotification('Фильтры применены', 'success');
         });
     }
-    
+
     const filterReset = document.getElementById('filter-reset');
     if (filterReset) {
         filterReset.addEventListener('click', function() {
@@ -1037,17 +1053,17 @@ function setupEventsTableHandlers() {
             document.getElementById('event-century-filter').value = 'all';
             document.getElementById('event-location-filter').value = 'all';
             document.getElementById('event-search').value = '';
-            
+
             // Сбрасываем на первую страницу
             eventsPagination.currentPage = 1;
-            
+
             // Загружаем данные без фильтров
             loadEventsData();
-            
+
             showNotification('Фильтры сброшены', 'success');
         });
     }
-    
+
     // Обработка кнопки добавления нового события
     const addNewEvent = document.getElementById('add-new-event');
     if (addNewEvent) {
@@ -1061,7 +1077,7 @@ function setupEventsTableHandlers() {
 function showEventForm(eventId = null) {
     let event = null;
     let formTitle = 'Добавление нового события';
-    
+
     // Если указан ID, то это редактирование
     if (eventId) {
         formTitle = 'Редактирование события';
@@ -1076,7 +1092,7 @@ function showEventForm(eventId = null) {
             description: 'Описание события'
         };
     }
-    
+
     const modalContent = `
         <div class="modal-header">
             <h2>${formTitle}</h2>
@@ -1085,18 +1101,18 @@ function showEventForm(eventId = null) {
         <div class="modal-body">
             <form id="event-form">
                 <input type="hidden" id="event-id" value="${event ? event.id : ''}">
-                
+
                 <div class="form-group">
                     <label for="event-title">Название события</label>
                     <input type="text" id="event-title" class="form-control" value="${event ? event.title : ''}" required>
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="event-date">Дата</label>
                         <input type="text" id="event-date" class="form-control" value="${event ? event.date : ''}" placeholder="ГГГГ-ММ-ДД" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="event-category">Категория</label>
                         <select id="event-category" class="form-control" required>
@@ -1108,19 +1124,19 @@ function showEventForm(eventId = null) {
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="event-lat">Широта</label>
                         <input type="number" id="event-lat" class="form-control" value="${event && event.location ? event.location.lat : ''}" step="0.0001" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="event-lng">Долгота</label>
                         <input type="number" id="event-lng" class="form-control" value="${event && event.location ? event.location.lng : ''}" step="0.0001" required>
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="event-description">Описание</label>
                     <textarea id="event-description" class="form-control" rows="5" required>${event ? event.description : ''}</textarea>
@@ -1136,7 +1152,7 @@ function showEventForm(eventId = null) {
             </button>
         </div>
     `;
-    
+
     openModal(modalContent);
 }
 
@@ -1144,7 +1160,7 @@ function showEventForm(eventId = null) {
 function saveEvent() {
     const eventId = document.getElementById('event-id').value;
     const isNew = !eventId;
-    
+
     // Собираем данные формы
     const eventData = {
         id: eventId || Date.now().toString(), // Генерируем ID для новых событий
@@ -1157,22 +1173,22 @@ function saveEvent() {
         },
         description: document.getElementById('event-description').value
     };
-    
+
     // Проверка обязательных полей
     if (!eventData.title || !eventData.date || !eventData.category || !eventData.location.lat || !eventData.location.lng || !eventData.description) {
         showNotification('Пожалуйста, заполните все обязательные поля', 'warning');
         return;
     }
-    
+
     // В реальном приложении здесь будет отправка данных на сервер
     // Для примера просто показываем уведомление
-    
+
     if (isNew) {
         showNotification('Событие успешно добавлено', 'success');
     } else {
         showNotification('Событие успешно обновлено', 'success');
     }
-    
+
     // Закрываем модальное окно и обновляем данные
     closeModal();
     loadEventsData();
@@ -1190,7 +1206,7 @@ function viewEvent(eventId) {
         location: { lat: 55.7558, lng: 37.6173 },
         description: 'Подробное описание исторического события, содержащее важную информацию о ходе событий, их причинах и последствиях для истории России.'
     };
-    
+
     const modalContent = `
         <div class="modal-header">
             <h2>${event.title}</h2>
@@ -1229,7 +1245,7 @@ function viewEvent(eventId) {
             </button>
         </div>
     `;
-    
+
     openModal(modalContent);
 }
 
@@ -1259,7 +1275,7 @@ function deleteEvent(eventId) {
             </button>
         </div>
     `;
-    
+
     openModal(modalContent, 'small');
 }
 
@@ -1267,9 +1283,9 @@ function deleteEvent(eventId) {
 function confirmDeleteEvent(eventId) {
     // В реальном приложении здесь будет отправка запроса на удаление
     // Для примера просто показываем уведомление
-    
+
     showNotification(`Событие с ID ${eventId} успешно удалено`, 'success');
-    
+
     // Закрываем модальное окно и обновляем данные
     closeModal();
     loadEventsData();
@@ -1282,7 +1298,7 @@ function loadUsersData() {
         .then(response => response.json())
         .then(users => {
             displayUsersData(users);
-            
+
             // Обновляем пагинацию
             usersPagination.totalPages = Math.ceil(users.length / usersPagination.itemsPerPage);
             updateUsersPagination();
@@ -1297,10 +1313,10 @@ function loadUsersData() {
 function displayUsersData(users) {
     const tbody = document.getElementById('users-table-body');
     if (!tbody) return;
-    
+
     // Очищаем таблицу
     tbody.innerHTML = '';
-    
+
     // Если нет данных, показываем сообщение
     if (!users || users.length === 0) {
         const tr = document.createElement('tr');
@@ -1308,19 +1324,19 @@ function displayUsersData(users) {
         tbody.appendChild(tr);
         return;
     }
-    
+
     // Отображаем данные о пользователях
     users.forEach(user => {
         const tr = document.createElement('tr');
-        
+
         // Определяем класс строки в зависимости от статуса
         if (user.status === 'blocked') {
             tr.classList.add('blocked-row');
         }
-        
+
         // Добавляем статус как класс для стилизации
         tr.classList.add(`status-${user.status}`);
-        
+
         tr.innerHTML = `
             <td>${user.id || '-'}</td>
             <td>${user.name || '-'}</td>
@@ -1346,10 +1362,10 @@ function displayUsersData(users) {
                 </button>
             </td>
         `;
-        
+
         tbody.appendChild(tr);
     });
-    
+
     // Привязываем обработчики событий к кнопкам
     tbody.querySelectorAll('.btn-view').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -1357,21 +1373,21 @@ function displayUsersData(users) {
             viewUser(userId);
         });
     });
-    
+
     tbody.querySelectorAll('.btn-block').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-id');
             blockUser(userId);
         });
     });
-    
+
     tbody.querySelectorAll('.btn-unblock').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-id');
             unblockUser(userId);
         });
     });
-    
+
     tbody.querySelectorAll('.btn-message').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-id');
@@ -1387,7 +1403,7 @@ function getStatusText(status) {
         'inactive': 'Неактивен',
         'blocked': 'Заблокирован'
     };
-    
+
     return statusTexts[status] || status;
 }
 
@@ -1395,13 +1411,13 @@ function getStatusText(status) {
 function updateUsersPagination() {
     const paginationContainer = document.getElementById('users-pagination');
     if (!paginationContainer) return;
-    
+
     // Очищаем контейнер
     paginationContainer.innerHTML = '';
-    
+
     // Если нет страниц, не показываем пагинацию
     if (usersPagination.totalPages <= 1) return;
-    
+
     // Добавляем кнопку "Предыдущая"
     const prevBtn = document.createElement('button');
     prevBtn.className = 'pagination-item prev';
@@ -1414,7 +1430,7 @@ function updateUsersPagination() {
         }
     });
     paginationContainer.appendChild(prevBtn);
-    
+
     // Добавляем кнопки с номерами страниц
     for (let i = 1; i <= usersPagination.totalPages; i++) {
         // Показываем только текущую страницу, первую, последнюю и по одной странице до и после текущей
@@ -1434,8 +1450,8 @@ function updateUsersPagination() {
             });
             paginationContainer.appendChild(pageBtn);
         } else if (
-            (i === usersPagination.currentPage - 2 && usersPagination.currentPage > 3) || 
-            (i === usersPagination.currentPage + 2 && usersPagination.currentPage < usersPagination.totalPages - 2)
+            (i === eventsPagination.currentPage - 2 && eventsPagination.currentPage > 3) || 
+            (i === eventsPagination.currentPage + 2 && eventsPagination.currentPage < eventsPagination.totalPages - 2)
         ) {
             // Добавляем многоточие
             const dots = document.createElement('span');
@@ -1444,7 +1460,7 @@ function updateUsersPagination() {
             paginationContainer.appendChild(dots);
         }
     }
-    
+
     // Добавляем кнопку "Следующая"
     const nextBtn = document.createElement('button');
     nextBtn.className = 'pagination-item next';
@@ -1470,7 +1486,7 @@ function setupUsersTableHandlers() {
             loadUsersData();
         });
     }
-    
+
     // Обработка кнопок фильтров
     const filterApply = document.getElementById('users-filter-apply');
     if (filterApply) {
@@ -1479,17 +1495,17 @@ function setupUsersTableHandlers() {
             const status = document.getElementById('user-status-filter').value;
             const activity = document.getElementById('user-activity-filter').value;
             const search = document.getElementById('user-search').value;
-            
+
             // Сбрасываем на первую страницу
             usersPagination.currentPage = 1;
-            
+
             // Применяем фильтры и загружаем данные
             loadUsersData();
-            
+
             showNotification('Фильтры применены', 'success');
         });
     }
-    
+
     const filterReset = document.getElementById('users-filter-reset');
     if (filterReset) {
         filterReset.addEventListener('click', function() {
@@ -1497,17 +1513,17 @@ function setupUsersTableHandlers() {
             document.getElementById('user-status-filter').value = 'all';
             document.getElementById('user-activity-filter').value = 'all';
             document.getElementById('user-search').value = '';
-            
+
             // Сбрасываем на первую страницу
             usersPagination.currentPage = 1;
-            
+
             // Загружаем данные без фильтров
             loadUsersData();
-            
+
             showNotification('Фильтры сброшены', 'success');
         });
     }
-    
+
     // Обработка кнопки экспорта
     const exportUsers = document.getElementById('export-users');
     if (exportUsers) {
@@ -1520,7 +1536,7 @@ function setupUsersTableHandlers() {
 // Функция экспорта данных о пользователях
 function exportUsersData() {
     showNotification('Выполняется экспорт данных о пользователях...', 'info');
-    
+
     // Имитация экспорта
     setTimeout(() => {
         showNotification('Данные успешно экспортированы', 'success');
@@ -1598,7 +1614,7 @@ function viewUser(userId) {
                     </button>
                 </div>
             `;
-            
+
             openModal(modalContent);
         })
         .catch(error => {
@@ -1639,9 +1655,9 @@ function blockUser(userId) {
             </button>
         </div>
     `;
-    
+
     openModal(modalContent, 'small');
-    
+
     // Отображение поля для ввода другой причины
     document.getElementById('block-reason').addEventListener('change', function() {
         const otherReasonContainer = document.getElementById('other-reason-container');
@@ -1657,7 +1673,7 @@ function blockUser(userId) {
 function confirmBlockUser(userId) {
     const blockReason = document.getElementById('block-reason').value;
     let reason = blockReason;
-    
+
     if (blockReason === 'other') {
         const otherReason = document.getElementById('other-reason').value;
         if (!otherReason) {
@@ -1666,7 +1682,7 @@ function confirmBlockUser(userId) {
         }
         reason = otherReason;
     }
-    
+
     // В реальном приложении здесь будет отправка запроса на блокировку
     fetch(`/api/admin/user/${userId}/block`, {
         method: 'POST',
@@ -1711,7 +1727,7 @@ function unblockUser(userId) {
             </button>
         </div>
     `;
-    
+
     openModal(modalContent, 'small');
 }
 
@@ -1747,20 +1763,20 @@ function messageUser(userId) {
         </div>
         <div class="modal-body">
             <p>Отправка сообщения пользователю с ID ${userId}</p>
-            
+
             <div class="form-group">
                 <label for="message-subject">Тема сообщения:</label>
                 <input type="text" id="message-subject" class="form-control" placeholder="Введите тему сообщения">
             </div>
-            
+
             <div class="form-group">
                 <label for="message-text">Текст сообщения:</label>
                 <textarea id="message-text" class="form-control" rows="5" placeholder="Введите текст сообщения"></textarea>
             </div>
-            
+
             <div class="form-check">
                 <input type="checkbox" id="message-important" class="form-check-input">
-                <label for="message-important" class="form-check-label">Пометить как важное</label>
+                <<label for="message-important" class="form-check-label">Пометить как важное</label>
             </div>
         </div>
         <div class="modal-footer">
@@ -1772,7 +1788,7 @@ function messageUser(userId) {
             </button>
         </div>
     `;
-    
+
     openModal(modalContent);
 }
 
@@ -1781,18 +1797,18 @@ function sendUserMessage(userId) {
     const subject = document.getElementById('message-subject').value;
     const text = document.getElementById('message-text').value;
     const isImportant = document.getElementById('message-important').checked;
-    
+
     // Проверка обязательных полей
     if (!subject || !text) {
         showNotification('Заполните тему и текст сообщения', 'warning');
         return;
     }
-    
+
     // В реальном приложении здесь будет отправка запроса
     // Для примера просто показываем уведомление
-    
+
     showNotification(`Сообщение пользователю ${userId} отправлено`, 'success');
-    
+
     // Закрываем модальное окно
     closeModal();
 }
@@ -1816,11 +1832,11 @@ function displayAdminsData(admins) {
     const superAdminList = document.getElementById('super-admin-list');
     const adminList = document.getElementById('admin-list');
     const adminToRemoveSelect = document.getElementById('admin-to-remove');
-    
+
     // Обновляем список супер-администраторов
     if (superAdminList) {
         superAdminList.innerHTML = '';
-        
+
         if (admins.super_admin_ids && admins.super_admin_ids.length > 0) {
             admins.super_admin_ids.forEach(adminId => {
                 const li = document.createElement('li');
@@ -1843,11 +1859,11 @@ function displayAdminsData(admins) {
             superAdminList.appendChild(li);
         }
     }
-    
+
     // Обновляем список обычных администраторов
     if (adminList) {
         adminList.innerHTML = '';
-        
+
         if (admins.admin_ids && admins.admin_ids.length > 0) {
             admins.admin_ids.forEach(adminId => {
                 const li = document.createElement('li');
@@ -1870,18 +1886,18 @@ function displayAdminsData(admins) {
             adminList.appendChild(li);
         }
     }
-    
+
     // Обновляем список администраторов для удаления
     if (adminToRemoveSelect) {
         // Очищаем предыдущие опции, оставляя первую
         while (adminToRemoveSelect.options.length > 1) {
             adminToRemoveSelect.remove(1);
         }
-        
+
         // Добавляем супер-администраторов
         if (admins.super_admin_ids && admins.super_admin_ids.length > 0) {
             const currentUserId = currentUser.id;
-            
+
             admins.super_admin_ids.forEach(adminId => {
                 // Не добавляем текущего пользователя в список для удаления
                 if (adminId !== currentUserId) {
@@ -1892,7 +1908,7 @@ function displayAdminsData(admins) {
                 }
             });
         }
-        
+
         // Добавляем обычных администраторов
         if (admins.admin_ids && admins.admin_ids.length > 0) {
             admins.admin_ids.forEach(adminId => {
@@ -1903,7 +1919,7 @@ function displayAdminsData(admins) {
             });
         }
     }
-    
+
     // Проверяем, нужно ли показывать блок управления администраторами
     const adminManagement = document.querySelector('.admin-management');
     if (adminManagement) {
@@ -1918,16 +1934,16 @@ function displayAdminsData(admins) {
 // Обработчик отправки формы добавления администратора
 function handleAddAdminSubmit(e) {
     e.preventDefault();
-    
+
     const adminId = document.getElementById('new-admin-id').value;
     const isSuper = document.getElementById('is-super-admin').checked;
-    
+
     // Проверка ID администратора
     if (!adminId) {
         showNotification('Укажите ID пользователя', 'warning');
         return;
     }
-    
+
     // Отправка запроса на добавление администратора
     fetch('/api/admin/admins', {
         method: 'POST',
@@ -1960,15 +1976,15 @@ function handleAddAdminSubmit(e) {
 // Обработчик отправки формы удаления администратора
 function handleRemoveAdminSubmit(e) {
     e.preventDefault();
-    
+
     const adminId = document.getElementById('admin-to-remove').value;
-    
+
     // Проверка ID администратора
     if (!adminId) {
         showNotification('Выберите администратора для удаления', 'warning');
         return;
     }
-    
+
     // Отправка запроса на удаление администратора
     fetch(`/api/admin/admins/${adminId}`, {
         method: 'DELETE'
@@ -1997,16 +2013,16 @@ function loadLogsData() {
     const level = document.getElementById('log-level').value;
     const component = document.getElementById('log-component').value;
     const limit = document.getElementById('log-limit').value;
-    
+
     // Формируем URL с параметрами
     const url = `/api/admin/logs?level=${level}&component=${component}&limit=${limit}`;
-    
+
     // Запрос данных от API
     fetch(url)
         .then(response => response.json())
         .then(logs => {
             displayLogsData(logs);
-            
+
             // Обновляем статистику логов
             document.getElementById('log-stats').textContent = `Загружено строк: ${logs.length}`;
         })
@@ -2020,22 +2036,22 @@ function loadLogsData() {
 function displayLogsData(logs) {
     const logsContainer = document.getElementById('logs-container');
     if (!logsContainer) return;
-    
+
     // Очищаем контейнер
     logsContainer.innerHTML = '';
-    
+
     // Если нет данных, показываем сообщение
     if (!logs || logs.length === 0) {
         logsContainer.textContent = 'Логи отсутствуют';
         return;
     }
-    
+
     // Отображаем логи с цветовой подсветкой
     let logsHtml = '';
-    
+
     logs.forEach(log => {
         let logClass = '';
-        
+
         // Определяем класс на основе уровня логирования
         if (log.includes(' - ERROR - ') || log.includes(' - CRITICAL - ')) {
             logClass = 'log-error';
@@ -2046,12 +2062,12 @@ function displayLogsData(logs) {
         } else if (log.includes(' - DEBUG - ')) {
             logClass = 'log-debug';
         }
-        
+
         logsHtml += `<div class="log-line ${logClass}">${escapeHtml(log)}</div>`;
     });
-    
+
     logsContainer.innerHTML = logsHtml;
-    
+
     // Если включена автопрокрутка, прокручиваем до конца
     if (document.getElementById('auto-scroll').classList.contains('active')) {
         logsContainer.scrollTop = logsContainer.scrollHeight;
@@ -2077,13 +2093,13 @@ function setupLogsHandlers() {
             loadLogsData();
         });
     }
-    
+
     // Обработчик кнопки автопрокрутки
     const autoScroll = document.getElementById('auto-scroll');
     if (autoScroll) {
         autoScroll.addEventListener('click', function() {
             this.classList.toggle('active');
-            
+
             // Если включена автопрокрутка, прокручиваем до конца
             if (this.classList.contains('active')) {
                 const logsContainer = document.getElementById('logs-container');
@@ -2091,14 +2107,14 @@ function setupLogsHandlers() {
             }
         });
     }
-    
+
     // Обработчик кнопки копирования логов
     const copyLogs = document.getElementById('copy-logs');
     if (copyLogs) {
         copyLogs.addEventListener('click', function() {
             const logsContainer = document.getElementById('logs-container');
             const logsText = logsContainer.innerText;
-            
+
             // Копируем текст в буфер обмена
             navigator.clipboard.writeText(logsText)
                 .then(() => {
@@ -2110,14 +2126,14 @@ function setupLogsHandlers() {
                 });
         });
     }
-    
+
     // Обработчик кнопки разворачивания логов
     const expandLogs = document.getElementById('expand-logs');
     if (expandLogs) {
         expandLogs.addEventListener('click', function() {
             const logsTerminal = document.querySelector('.logs-terminal');
             logsTerminal.classList.toggle('expanded');
-            
+
             // Меняем иконку
             const icon = this.querySelector('i');
             if (logsTerminal.classList.contains('expanded')) {
@@ -2129,22 +2145,22 @@ function setupLogsHandlers() {
             }
         });
     }
-    
+
     // Обработчик кнопки экспорта логов
     const exportLogs = document.getElementById('export-logs');
     if (exportLogs) {
         exportLogs.addEventListener('click', function() {
             const level = document.getElementById('log-level').value;
             const limit = document.getElementById('log-limit').value;
-            
+
             // Формируем URL для экспорта
             const url = `/api/admin/export-logs?level=${level}&limit=${limit}`;
-            
+
             // Открываем URL в новой вкладке для скачивания
             window.open(url, '_blank');
         });
     }
-    
+
     // Обработчик кнопки очистки логов
     const clearLogs = document.getElementById('clear-logs');
     if (clearLogs) {
@@ -2168,11 +2184,11 @@ function setupLogsHandlers() {
                     </button>
                 </div>
             `;
-            
+
             openModal(modalContent, 'small');
         });
     }
-    
+
     // Обработчики изменения фильтров
     const logFilters = document.querySelectorAll('#log-level, #log-component, #log-limit');
     logFilters.forEach(filter => {
@@ -2186,9 +2202,9 @@ function setupLogsHandlers() {
 function confirmClearLogs() {
     // В реальном приложении здесь будет отправка запроса на очистку логов
     // Для примера просто показываем уведомление
-    
+
     showNotification('Логи успешно очищены', 'success');
-    
+
     // Закрываем модальное окно и обновляем данные
     closeModal();
     loadLogsData();
@@ -2216,35 +2232,35 @@ function fillSettingsForm(settings) {
     document.getElementById('collect-statistics').checked = settings.collect_statistics !== false;
     document.getElementById('developer-mode').checked = settings.developer_mode === true;
     document.getElementById('private-mode').checked = settings.private_mode === true;
-    
+
     // Настройки API
     if (settings.api_request_limit) {
         document.getElementById('api-request-limit').value = settings.api_request_limit;
         document.getElementById('api-request-limit-range').value = settings.api_request_limit;
     }
-    
+
     if (settings.cache_duration) {
         document.getElementById('cache-duration').value = settings.cache_duration;
         document.getElementById('cache-duration-range').value = settings.cache_duration;
     }
-    
+
     if (settings.api_model) {
         document.getElementById('api-model').value = settings.api_model;
     }
-    
+
     if (settings.api_key) {
         document.getElementById('api-key').value = settings.api_key;
     }
-    
+
     // Настройки уведомлений
     if (settings.notification_level) {
         document.getElementById('notification-level').value = settings.notification_level;
     }
-    
+
     if (settings.notification_channel) {
         document.getElementById('notification-channel').value = settings.notification_channel;
     }
-    
+
     if (settings.notification_schedule) {
         document.getElementById('notification-schedule').value = settings.notification_schedule;
     }
@@ -2253,7 +2269,7 @@ function fillSettingsForm(settings) {
 // Обработчик отправки формы настроек
 function handleSettingsSubmit(e) {
     e.preventDefault();
-    
+
     // Собираем данные формы
     const settings = {
         // Основные настройки
@@ -2261,19 +2277,19 @@ function handleSettingsSubmit(e) {
         collect_statistics: document.getElementById('collect-statistics').checked,
         developer_mode: document.getElementById('developer-mode').checked,
         private_mode: document.getElementById('private-mode').checked,
-        
+
         // Настройки API
         api_request_limit: parseInt(document.getElementById('api-request-limit').value),
         cache_duration: parseInt(document.getElementById('cache-duration').value),
         api_model: document.getElementById('api-model').value,
         api_key: document.getElementById('api-key').value,
-        
+
         // Настройки уведомлений
         notification_level: document.getElementById('notification-level').value,
         notification_channel: document.getElementById('notification-channel').value,
         notification_schedule: document.getElementById('notification-schedule').value
     };
-    
+
     // Отправка настроек на сервер
     fetch('/api/admin/settings', {
         method: 'POST',
@@ -2301,39 +2317,39 @@ function setupRangeInputSync() {
     // API лимит запросов
     const apiRequestLimitRange = document.getElementById('api-request-limit-range');
     const apiRequestLimit = document.getElementById('api-request-limit');
-    
+
     if (apiRequestLimitRange && apiRequestLimit) {
         apiRequestLimitRange.addEventListener('input', function() {
             apiRequestLimit.value = this.value;
         });
-        
+
         apiRequestLimit.addEventListener('input', function() {
             apiRequestLimitRange.value = this.value;
         });
     }
-    
+
     // Продолжительность кэширования
     const cacheDurationRange = document.getElementById('cache-duration-range');
     const cacheDuration = document.getElementById('cache-duration');
-    
+
     if (cacheDurationRange && cacheDuration) {
         cacheDurationRange.addEventListener('input', function() {
             cacheDuration.value = this.value;
         });
-        
+
         cacheDuration.addEventListener('input', function() {
             cacheDurationRange.value = this.value;
         });
     }
-    
+
     // Переключатель видимости API ключа
     const toggleApiKey = document.getElementById('toggle-api-key');
     const apiKey = document.getElementById('api-key');
-    
+
     if (toggleApiKey && apiKey) {
         toggleApiKey.addEventListener('click', function() {
             const icon = this.querySelector('i');
-            
+
             if (apiKey.type === 'password') {
                 apiKey.type = 'text';
                 icon.classList.remove('fa-eye');
@@ -2360,7 +2376,7 @@ function loadMaintenanceData() {
         .catch(error => {
             console.error('Ошибка при получении размера кэша:', error);
         });
-    
+
     // Загружаем время последнего резервного копирования
     fetch('/api/admin/maintenance/last-backup')
         .then(response => response.json())
@@ -2372,7 +2388,7 @@ function loadMaintenanceData() {
         .catch(error => {
             console.error('Ошибка при получении времени последнего резервного копирования:', error);
         });
-    
+
     // Загружаем размер логов
     fetch('/api/admin/maintenance/logs-size')
         .then(response => response.json())
@@ -2389,11 +2405,11 @@ function loadMaintenanceData() {
 // Обработчик действий обслуживания
 function handleMaintenanceAction(e) {
     const action = this.getAttribute('data-action');
-    
+
     // Показываем индикатор загрузки
     this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Выполнение...`;
     this.disabled = true;
-    
+
     // Выполняем действие
     fetch(`/api/admin/maintenance/${action}`, {
         method: 'POST'
@@ -2402,13 +2418,13 @@ function handleMaintenanceAction(e) {
     .then(data => {
         // Восстанавливаем кнопку
         this.disabled = false;
-        
+
         if (data.success) {
             showNotification(data.message || 'Операция выполнена успешно', 'success');
-            
+
             // Обновляем данные страницы
             loadMaintenanceData();
-            
+
             // Обработка специфических действий
             if (action === 'backup') {
                 document.getElementById('last-backup-time').textContent = data.backup_time || 'Сейчас';
@@ -2419,14 +2435,14 @@ function handleMaintenanceAction(e) {
         } else {
             showNotification(data.error || 'Ошибка при выполнении операции', 'error');
         }
-        
+
         // Восстанавливаем исходный текст кнопки
         updateMaintenanceButtonText(this, action);
     })
     .catch(error => {
         console.error(`Ошибка при выполнении действия ${action}:`, error);
         showNotification(`Ошибка при выполнении операции: ${error.message}`, 'error');
-        
+
         // Восстанавливаем кнопку и текст
         this.disabled = false;
         updateMaintenanceButtonText(this, action);
@@ -2445,7 +2461,7 @@ function updateMaintenanceButtonText(button, action) {
         'integrate': '<i class="fas fa-exchange-alt"></i> Выполнить',
         'security': '<i class="fas fa-tasks"></i> Выполнить'
     };
-    
+
     button.innerHTML = actionTexts[action] || '<i class="fas fa-check"></i> Выполнить';
 }
 
@@ -2453,9 +2469,9 @@ function updateMaintenanceButtonText(button, action) {
 function startProgressTracking() {
     const progressBar = document.getElementById('api-progress');
     const progressText = document.querySelector('.progress-text');
-    
+
     if (!progressBar || !progressText) return;
-    
+
     let progress = 0;
     const progressInterval = setInterval(() => {
         // Симуляция прогресса для демонстрации
@@ -2464,10 +2480,10 @@ function startProgressTracking() {
             clearInterval(progressInterval);
             progress = 100;
         }
-        
+
         progressBar.style.width = `${progress}%`;
         progressText.textContent = `${progress}%`;
-        
+
         if (progress === 100) {
             showNotification('Обновление данных API завершено', 'success');
         }
@@ -2478,21 +2494,21 @@ function startProgressTracking() {
 function openModal(content, size = 'medium') {
     const modalOverlay = document.getElementById('modal-overlay');
     const modalContainer = document.getElementById('modal-container');
-    
+
     if (!modalOverlay || !modalContainer) return;
-    
+
     // Устанавливаем размер модального окна
     modalContainer.className = `modal ${size}`;
-    
+
     // Устанавливаем содержимое
     modalContainer.innerHTML = content;
-    
+
     // Показываем модальное окно
     modalOverlay.style.display = 'flex';
     setTimeout(() => {
         modalOverlay.classList.add('visible');
     }, 10);
-    
+
     // Блокируем прокрутку страницы
     document.body.style.overflow = 'hidden';
 }
@@ -2500,15 +2516,15 @@ function openModal(content, size = 'medium') {
 // Закрытие модального окна
 function closeModal() {
     const modalOverlay = document.getElementById('modal-overlay');
-    
+
     if (!modalOverlay) return;
-    
+
     // Скрываем модальное окно
     modalOverlay.classList.remove('visible');
     setTimeout(() => {
         modalOverlay.style.display = 'none';
     }, 300);
-    
+
     // Разблокируем прокрутку страницы
     document.body.style.overflow = '';
 }
@@ -2517,7 +2533,7 @@ function closeModal() {
 function toggleDocsModal() {
     const docsModal = document.getElementById('docs-modal');
     const docsOverlay = document.getElementById('docs-modal-overlay');
-    
+
     if (docsModal.style.display === 'block') {
         closeDocsModal();
     } else {
@@ -2531,7 +2547,7 @@ function toggleDocsModal() {
 function closeDocsModal() {
     const docsModal = document.getElementById('docs-modal');
     const docsOverlay = document.getElementById('docs-modal-overlay');
-    
+
     docsModal.style.display = 'none';
     docsOverlay.style.display = 'none';
     document.body.style.overflow = '';
@@ -2540,9 +2556,9 @@ function closeDocsModal() {
 // Обработчик глобального поиска
 function handleGlobalSearch() {
     const searchTerm = this.value.trim().toLowerCase();
-    
+
     if (searchTerm.length < 2) return;
-    
+
     // Выводим результаты поиска в уведомлении
     showNotification(`Поиск по запросу: "${searchTerm}"`, 'info');
 }
@@ -2551,11 +2567,11 @@ function handleGlobalSearch() {
 function updateUserInfo() {
     const userNameEl = document.getElementById('user-name');
     const userRoleEl = document.getElementById('user-role');
-    
+
     if (userNameEl) {
         userNameEl.textContent = 'Администратор';
     }
-    
+
     if (userRoleEl) {
         userRoleEl.textContent = currentUser && currentUser.is_super_admin ? 'Супер-администратор' : 'Администратор';
     }
@@ -2568,7 +2584,7 @@ function startServerTimeUpdater() {
         // В реальной версии здесь был бы запрос к серверу
         // Для демонстрации используем текущее время браузера
         const now = new Date();
-        
+
         // Пока не используется
     }, 1000);
 }
@@ -2592,19 +2608,19 @@ function downloadDoc(docPath, fileName) {
             a.download = fileName;
             document.body.appendChild(a);
             a.click();
-            
+
             // Очищаем ресурсы
             setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }, 100);
-            
+
             showNotification(`Документ ${fileName} успешно загружен`, 'success');
         })
         .catch(error => {
             console.error('Ошибка при загрузке документации:', error);
             showNotification(`Ошибка при загрузке документации: ${error.message}`, 'error');
-            
+
             // Предлагаем открыть документ в новой вкладке как запасной вариант
             window.open(docPath, '_blank');
         });
@@ -2624,4 +2640,22 @@ if (window.location.hash) {
     if (page && document.getElementById(`${page}-page`)) {
         currentPage = page;
     }
+}
+
+// Инициализация мобильного меню
+function initMobileMenu() {
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const sidebar = document.querySelector('.sidebar');
+
+    if (mobileMenuToggle && sidebar) {
+        mobileMenuToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('visible');
+        });
+    }
+}
+
+// Настройки для мобильных устройств
+function adjustForMobile() {
+    // Показываем окно документации при запуске на мобильных устройствах
+    toggleDocsModal();
 }

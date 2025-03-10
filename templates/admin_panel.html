@@ -12,6 +12,11 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Мобильная иконка меню, видимая только на мобильных устройствах -->
+        <button id="mobile-menu-toggle" class="mobile-menu-toggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        
         <!-- Боковая панель навигации -->
         <nav class="sidebar">
             <div class="sidebar-header">
@@ -19,7 +24,7 @@
                     <i class="fas fa-landmark"></i>
                     <span>HistoryAdmin</span>
                 </div>
-                <button id="sidebar-toggle" class="sidebar-toggle">
+                <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Свернуть меню">
                     <i class="fas fa-bars"></i>
                 </button>
             </div>
