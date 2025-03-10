@@ -122,30 +122,39 @@ class Bot:
                 return
                 
             # Оптимизированные настройки для более эффективного сбора обновлений
-            # Уменьшен таймаут для более быстрого обнаружения ошибок
-            # Явное указание типов обновлений для обработки
             self.logger.info("Запуск start_polling...")
             try:
+                # Принудительно логируем на уровне INFO для отслеживания запуска
+                import logging
+                logging.getLogger('telegram.ext.updater').setLevel(logging.INFO)
+                
                 self.updater.start_polling(
-                    timeout=10,  # Увеличиваем таймаут для более стабильной работы
+                    timeout=10,  # Таймаут для более стабильной работы
                     drop_pending_updates=True,  # Пропуск накопившихся обновлений
                     allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Только необходимые типы обновлений
-                    poll_interval=0.5  # Увеличиваем интервал опроса для снижения нагрузки
+                    poll_interval=0.5  # Интервал опроса для снижения нагрузки
                 )
-                self.logger.info("Бот успешно запущен")
-                self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
+                
+                # Дополнительная проверка состояния диспетчера
+                self.logger.info(f"Polling запущен, диспетчер активен: {self.updater.dispatcher.running}")
+                self.logger.info(f"Работающих потоков: {self.updater.dispatcher.workers}")
+                self.logger.info("Бот успешно запущен и готов принимать сообщения")
+                
+                # Более информативная обработка idle режима
+                self.logger.info("Входим в режим idle, бот доступен для взаимодействия...")
+                
+                # Явное оповещение о готовности бота к работе
+                print("=== БОТ ЗАПУЩЕН И ГОТОВ К ИСПОЛЬЗОВАНИЮ ===")
+                print(f"Имя бота: @{bot_info.username}")
+                
+                self.updater.idle()
+                
             except Exception as e:
                 self.logger.error(f"Ошибка при запуске polling: {e}")
+                import traceback
+                self.logger.error(f"Детали ошибки: {traceback.format_exc()}")
                 return
 
-            # Вместо собственной реализации используем встроенный метод idle
-            # который более надежно обрабатывает сигналы и блокировку
-            try:
-                self.logger.info("Входим в режим idle...")
-                self.updater.idle()
-            except Exception as e:
-                self.logger.error(f"Ошибка в idle режиме: {e}")
-                
             # Если idle вернул управление, значит бот завершает работу
             self.logger.info("Бот завершил работу")
         except Exception as e:

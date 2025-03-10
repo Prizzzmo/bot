@@ -81,6 +81,11 @@ def main():
                 logging.StreamHandler()
             ]
         )
+        
+        # Установка логирования для telegram библиотеки
+        logging.getLogger('telegram').setLevel(logging.INFO)
+        logging.getLogger('telegram.ext').setLevel(logging.INFO)
+        
         logger = logging.getLogger(__name__)
         logger.info("Запуск историчеcкого образовательного бота")
 
@@ -131,8 +136,18 @@ def main():
         # Регистрируем очередь задач в конфигурации для доступа из других модулей
         config.set_task_queue(task_queue)
 
+        print("\n=== НАЧАЛО ЗАПУСКА TELEGRAM БОТА ===\n")
+        
+        # Проверяем наличие токена Telegram
+        if not config.telegram_token:
+            logger.error("ОШИБКА: Не найден TELEGRAM_TOKEN в .env файле!")
+            print("ОШИБКА: Не найден TELEGRAM_TOKEN в .env файле!")
+            return
+            
+        logger.info(f"Используется TELEGRAM_TOKEN: {config.telegram_token[:6]}...{config.telegram_token[-4:]}")
 
         # Запускаем бота напрямую в основном потоке
+        logger.info("Вызов метода bot.run()...")
         bot.run()
 
     except KeyboardInterrupt:
