@@ -11,7 +11,6 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageH
 
 from src.handlers import CommandHandlers
 from src.service_container import ServiceContainer
-from src.factory import BotFactory
 from src.config import Config, TOPIC, CHOOSE_TOPIC, CONVERSATION, TEST, ANSWER, MAP, ANALYTICS, ADMIN
 from src.logger import BotLogger
 from src.interfaces import IBot, ILogger

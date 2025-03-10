@@ -11,7 +11,6 @@ from src.message_manager import MessageManager
 from src.state_manager import StateManager
 from src.admin_panel import AdminPanel
 from src.handlers import CommandHandlers
-from src.bot import Bot
 from src.analytics import AnalyticsService
 from src.web_server import WebServer
 from src.test_service import TestService
@@ -51,6 +50,9 @@ class BotFactory:
         Returns:
             Bot: Настроенный экземпляр бота
         """
+        # Импортируем Bot здесь во избежание циклического импорта
+        from src.bot import Bot
+        
         # Создаем логгер
         logger = Logger()
         logger.info("Инициализация компонентов бота")
