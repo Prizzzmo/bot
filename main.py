@@ -84,7 +84,7 @@ def main():
     config = Config()
 
     # Создаем фабрику с использованием переданного логгера
-    factory = BotFactory(logger, config)
+    factory = BotFactory(logger)
 
     # Создаем бота и все необходимые сервисы
     bot = factory.create_bot()
