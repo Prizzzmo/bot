@@ -1014,6 +1014,114 @@ def clean_logs():
         return False
 
 def run_server(host='0.0.0.0', port=8080):
+
+
+@app.route('/api/admin/get-doc')
+def get_doc():
+    """API для получения документации для скачивания"""
+    try:
+        doc_path = request.args.get('path')
+        if not doc_path:
+            return jsonify({"error": "Путь к документу не указан"}), 400
+            
+        # Проверка безопасности пути
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
+        
+        # Проверяем, что путь находится в пределах разрешенных директорий
+        if not absolute_path.startswith(base_path):
+            return jsonify({"error": "Доступ запрещен"}), 403
+            
+        # Проверяем существование файла
+        if not os.path.exists(absolute_path):
+            return jsonify({"error": "Файл не найден"}), 404
+            
+        # Определяем тип файла
+        file_ext = os.path.splitext(absolute_path)[1].lower()
+        mime_types = {
+            '.md': 'text/markdown',
+            '.txt': 'text/plain',
+            '.pdf': 'application/pdf',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.html': 'text/html',
+        }
+        mime_type = mime_types.get(file_ext, 'application/octet-stream')
+        
+        # Имя файла для скачивания
+        filename = os.path.basename(absolute_path)
+        
+        # Отправляем файл
+        return send_file(absolute_path, 
+                        mimetype=mime_type,
+                        as_attachment=True, 
+                        download_name=filename)
+                        
+    except Exception as e:
+        logger.error(f"Ошибка при получении документа: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/view-doc')
+def view_doc():
+    """API для просмотра документации в iframe"""
+    try:
+        doc_path = request.args.get('path')
+        if not doc_path:
+            return "Путь к документу не указан", 400
+            
+        # Проверка безопасности пути
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
+        
+        # Проверяем, что путь находится в пределах разрешенных директорий
+        if not absolute_path.startswith(base_path):
+            return "Доступ запрещен", 403
+            
+        # Проверяем существование файла
+        if not os.path.exists(absolute_path):
+            return "Файл не найден", 404
+            
+        # Если это markdown файл, преобразуем его в HTML для отображения
+        file_ext = os.path.splitext(absolute_path)[1].lower()
+        if file_ext == '.md':
+            try:
+                import markdown
+                with open(absolute_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                html_content = markdown.markdown(content)
+                return f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: 0 auto; }}
+                        pre {{ background-color: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }}
+                        code {{ font-family: monospace; background-color: #f5f5f5; padding: 2px 4px; border-radius: 3px; }}
+                        img {{ max-width: 100%; height: auto; }}
+                        h1, h2, h3, h4, h5, h6 {{ margin-top: 1.5em; margin-bottom: 0.5em; }}
+                        p {{ margin: 1em 0; }}
+                    </style>
+                </head>
+                <body>
+                    {html_content}
+                </body>
+                </html>
+                """
+            except ImportError:
+                # Если модуль markdown не установлен, просто отображаем текст
+                with open(absolute_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                return f"<pre>{content}</pre>"
+                
+        # Для других типов файлов отправляем их как есть
+        return send_file(absolute_path)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при просмотре документа: {e}")
+        return f"Ошибка при просмотре документа: {str(e)}", 500
+
     """Запуск веб-сервера"""
     logger.info(f"Запуск веб-сервера на {host}:{port}")
     app.run(host=host, port=port, debug=False)

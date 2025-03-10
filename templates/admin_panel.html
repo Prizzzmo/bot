@@ -92,7 +92,42 @@
         </nav>
 
     <script>
-        // Функция для открытия документации в iframe вместо загрузки
+        // Функция для скачивания документации
+        function downloadDoc(docPath, fileName) {
+            // Создаем ссылку для скачивания
+            fetch('/api/admin/get-doc?path=' + encodeURIComponent(docPath))
+                .then(response => {
+                    if (response.ok) {
+                        return response.blob();
+                    }
+                    throw new Error('Ошибка при загрузке документа');
+                })
+                .then(blob => {
+                    // Создаем ссылку для скачивания
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Очищаем ресурсы
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showNotification(`Документ ${fileName} успешно загружен`, 'success');
+                })
+                .catch(error => {
+                    console.error('Ошибка при скачивании документа:', error);
+                    showNotification(`Ошибка при скачивании документа: ${error.message}`, 'error');
+                    
+                    // Предлагаем открыть документ для просмотра как альтернативу
+                    viewDoc(docPath);
+                });
+        }
+        
+        // Функция для просмотра документации в iframe
         function viewDoc(docPath) {
             const modal = document.createElement('div');
             modal.className = 'doc-viewer-modal';
@@ -103,7 +138,7 @@
                         <button class="doc-viewer-close">&times;</button>
                     </div>
                     <div class="doc-viewer-body">
-                        <iframe src="${docPath}" width="100%" height="100%" frameborder="0"></iframe>
+                        <iframe src="/api/admin/view-doc?path=${encodeURIComponent(docPath)}" width="100%" height="100%" frameborder="0"></iframe>
                     </div>
                 </div>
             `;
