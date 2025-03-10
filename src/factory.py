@@ -54,6 +54,7 @@ class BotFactory:
         from src.bot import Bot
         
         # Создаем логгер
+        from src.logger import Logger
         logger = Logger()
         logger.info("Инициализация компонентов бота")
 
@@ -137,13 +138,9 @@ class BotFactory:
         # Создаем бота
         bot = Bot(
             config=config,
+            handlers=command_handlers,
             logger=logger,
-            command_handlers=command_handlers,
-            test_service=test_service,
-            topic_service=topic_service,
-            api_client=api_client,
-            analytics=analytics_service,
-            text_cache_service=text_cache_service
+            web_server=web_server
         )
 
         # Сохраняем ссылку на контейнер сервисов в боте

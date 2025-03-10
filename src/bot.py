@@ -109,7 +109,7 @@ class Bot(IBot):
 
             return True
         except Exception as e:
-            self.logger.log_error(e, "Ошибка при настройке бота")
+            self.logger.log_error(e, {"context": "Ошибка при настройке бота"})
             return False
 
     def start(self, use_webhook: bool = False, webhook_url: str = "", port: int = 8443) -> bool:
@@ -150,9 +150,18 @@ class Bot(IBot):
 
             return True
         except Exception as e:
-            self.logger.log_error(e, "Ошибка при запуске бота")
+            self.logger.log_error(e, {"context": "Ошибка при запуске бота"})
             return False
 
+    def run(self) -> bool:
+        """
+        Запуск бота с использованием стандартных настроек.
+        
+        Returns:
+            bool: True, если запуск успешен
+        """
+        return self.start(use_webhook=False)
+        
     def stop(self) -> bool:
         """
         Остановка бота.
@@ -168,7 +177,7 @@ class Bot(IBot):
                 return True
             return False
         except Exception as e:
-            self.logger.log_error(e, "Ошибка при остановке бота")
+            self.logger.log_error(e, {"context": "Ошибка при остановке бота"})
             return False
 
     def _update_startup_info(self) -> None:

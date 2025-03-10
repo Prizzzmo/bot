@@ -186,7 +186,7 @@ class Logger(ILogger):
         if self.log_level <= logging.DEBUG:
             self.buffered_logger.debug(message)
 
-    def log_error(self, error: Exception, additional_info: Optional[Dict[str, Any]] = None) -> None:
+    def log_error(self, error: Exception, additional_info=None) -> None:
         """
         Расширенное логирование исключения с дополнительной информацией.
 
