@@ -15,6 +15,9 @@
 </head>
 <body>
     <div id="app">
+        <div class="admin-top-button">
+            <button id="admin-top-button" class="admin-button">Администрирование</button>
+        </div>
         <div class="header">
             <h1>История России на карте</h1>
             <div class="filter-controls">
@@ -40,23 +43,20 @@
             <p id="event-description"></p>
         </div>
         
-        <div class="admin-button-container">
-            <button id="admin-button" class="admin-button">Администрирование</button>
         </div>
-    </div>
 
     <script src="app.js"></script>
     <script>
         // Обработчик кнопки администрирования
-        document.getElementById('admin-button').addEventListener('click', function() {
+        document.getElementById('admin-top-button').addEventListener('click', function() {
             window.location.href = '/admin-panel';
         });
     </script>
     
     <style>
-        .admin-button-container {
+        .admin-top-button {
             position: fixed;
-            bottom: 20px;
+            top: 10px;
             right: 20px;
             z-index: 1000;
         }
