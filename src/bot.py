@@ -216,6 +216,10 @@ class Bot:
             if hasattr(self, 'admin_panel'):
                 self.handlers.admin_panel = self.admin_panel
                 self.logger.info("Admin panel подключен к handlers")
+                
+                # Регистрируем обработчик команды /admin
+                self.updater.dispatcher.add_handler(CommandHandler('admin', self.handlers.admin_command))
+                self.logger.info("Обработчик команды /admin зарегистрирован")
             
             # Добавляем обработчик в диспетчер
             self.updater.dispatcher.add_handler(conv_handler)
