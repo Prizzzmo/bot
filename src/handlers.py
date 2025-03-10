@@ -1491,20 +1491,32 @@ class CommandHandlers:
             context (telegram.ext.CallbackContext): Контекст разговора
         """
         query = update.callback_query
-
-        # Проверяем наличие и передаем обработку в админ-панель
-        if hasattr(self, 'admin_panel'):
-            # Обрабатываем все callback-запросы, начинающиеся с admin_
-            if query.data.startswith('admin_'):
-                # Проверяем, это удаление админа или нет
-                if query.data.startswith('admin_delete_'):
-                    # Извлекаем ID админа для удаления
-                    admin_id = int(query.data.split('_')[2])
-                    self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
-                else:
-                    # Обычный admin callback
-                    self.admin_panel.handle_admin_callback(update, context)
-                return True
+        
+        try:
+            # Проверяем наличие и передаем обработку в админ-панель
+            if hasattr(self, 'admin_panel'):
+                # Обрабатываем все callback-запросы, начинающиеся с admin_
+                if query.data.startswith('admin_'):
+                    self.logger.info(f"Обработка admin callback: {query.data}")
+                    # Проверяем, это удаление админа или нет
+                    if query.data.startswith('admin_delete_'):
+                        # Извлекаем ID админа для удаления
+                        admin_id = int(query.data.split('_')[2])
+                        self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
+                    else:
+                        # Обычный admin callback
+                        self.admin_panel.handle_admin_callback(update, context)
+                    return True
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке admin callback: {e}")
+            try:
+                query.answer("Произошла ошибка при обработке команды")
+                query.edit_message_text(
+                    "Произошла ошибка при обработке команды администратора. Пожалуйста, попробуйте снова.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+            except Exception:
+                pass
         return False
 
     def error_handler(self, update, context):

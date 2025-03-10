@@ -687,38 +687,38 @@ class AdminPanel:
             # Список MD-файлов документации
             docs_dir = "docs"
             doc_files = []
-            
+
             if os.path.exists(docs_dir) and os.path.isdir(docs_dir):
                 doc_files = [f for f in os.listdir(docs_dir) if f.endswith('.md')]
-            
+
             # Создаем кнопки для документов
             keyboard = []
-            
+
             # Документация в TXT формате
             for doc_file in doc_files:
                 file_name = doc_file.replace('.md', '')
                 keyboard.append([InlineKeyboardButton(f"📄 {file_name} (TXT)", callback_data=f'admin_doc_txt_{file_name}')])
-            
+
             # Документация в формате Word
             for doc_file in doc_files:
                 file_name = doc_file.replace('.md', '')
                 keyboard.append([InlineKeyboardButton(f"📑 {file_name} (Word)", callback_data=f'admin_doc_word_{file_name}')])
-            
+
             # Дополнительные файлы документации
             keyboard.append([InlineKeyboardButton("📋 Полная документация (TXT)", callback_data='admin_doc_full_txt')])
             keyboard.append([InlineKeyboardButton("📚 Полная документация (Word)", callback_data='admin_doc_full_word')])
-            
+
             # Кнопка назад
             keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data='admin_back')])
-            
+
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             query.edit_message_text(
                 docs_text,
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
-            
+
             self.logger.info(f"Админ {query.from_user.id} открыл доступ к документации")
         except Exception as e:
             self.logger.error(f"Ошибка при отображении документации: {e}")
@@ -730,27 +730,27 @@ class AdminPanel:
     def _handle_documentation_action(self, query, context, action):
         """Обрабатывает действия с документацией"""
         user_id = query.from_user.id
-        
+
         # Проверяем наличие директории для создания временных файлов
         temp_dir = "temp_docs"
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
-            
+
         try:
             # Обработка запроса на получение документа в TXT формате
             if action.startswith('admin_doc_txt_'):
                 file_name = action.replace('admin_doc_txt_', '')
                 doc_path = os.path.join("docs", f"{file_name}.md")
-                
+
                 if os.path.exists(doc_path):
                     # Конвертируем MD в TXT (просто копируем содержимое)
                     with open(doc_path, 'r', encoding='utf-8') as md_file:
                         content = md_file.read()
-                        
+
                     txt_path = os.path.join(temp_dir, f"{file_name}.txt")
                     with open(txt_path, 'w', encoding='utf-8') as txt_file:
                         txt_file.write(content)
-                        
+
                     # Отправляем файл
                     with open(txt_path, 'rb') as document:
                         context.bot.send_document(
@@ -759,38 +759,38 @@ class AdminPanel:
                             filename=f"{file_name}.txt",
                             caption=f"📄 Документация '{file_name}' в формате TXT"
                         )
-                    
+
                     # Удаляем временный файл
                     os.remove(txt_path)
-                    
+
                     query.answer(f"Документ {file_name}.txt отправлен")
                 else:
                     query.answer(f"Файл {file_name}.md не найден")
-                    
+
             # Обработка запроса на получение документа в Word формате
             elif action.startswith('admin_doc_word_'):
                 file_name = action.replace('admin_doc_word_', '')
                 doc_path = os.path.join("docs", f"{file_name}.md")
-                
+
                 if os.path.exists(doc_path):
                     # Создаем Word документ
                     from docx import Document
                     doc = Document()
-                    
+
                     # Добавляем заголовок
                     doc.add_heading(file_name, 0)
-                    
+
                     # Читаем содержимое MD файла
                     with open(doc_path, 'r', encoding='utf-8') as md_file:
                         content = md_file.read()
-                        
+
                     # Добавляем содержимое в документ (простое добавление)
                     doc.add_paragraph(content)
-                    
+
                     # Сохраняем документ
                     docx_path = os.path.join(temp_dir, f"{file_name}.docx")
                     doc.save(docx_path)
-                    
+
                     # Отправляем файл
                     with open(docx_path, 'rb') as document:
                         context.bot.send_document(
@@ -799,14 +799,14 @@ class AdminPanel:
                             filename=f"{file_name}.docx",
                             caption=f"📑 Документация '{file_name}' в формате Word"
                         )
-                    
+
                     # Удаляем временный файл
                     os.remove(docx_path)
-                    
+
                     query.answer(f"Документ {file_name}.docx отправлен")
                 else:
                     query.answer(f"Файл {file_name}.md не найден")
-                    
+
             # Обработка запроса на получение полной документации в TXT формате
             elif action == 'admin_doc_full_txt':
                 # Проверяем наличие директории документации
@@ -814,28 +814,28 @@ class AdminPanel:
                 if os.path.exists(docs_dir) and os.path.isdir(docs_dir):
                     # Создаем общий TXT файл со всей документацией
                     full_txt_path = os.path.join(temp_dir, "Полная_документация.txt")
-                    
+
                     with open(full_txt_path, 'w', encoding='utf-8') as txt_file:
                         # Перебираем все MD файлы
                         doc_files = [f for f in os.listdir(docs_dir) if f.endswith('.md')]
                         doc_files.sort()  # Сортируем для порядка
-                        
+
                         for doc_file in doc_files:
                             file_path = os.path.join(docs_dir, doc_file)
                             title = doc_file.replace('.md', '')
-                            
+
                             # Добавляем заголовок и разделитель
                             txt_file.write(f"{'=' * 80}\n")
                             txt_file.write(f"{title.upper()}\n")
                             txt_file.write(f"{'=' * 80}\n\n")
-                            
+
                             # Добавляем содержимое файла
                             with open(file_path, 'r', encoding='utf-8') as md_file:
                                 txt_file.write(md_file.read())
-                                
+
                             # Добавляем разделитель между документами
                             txt_file.write(f"\n\n{'=' * 80}\n\n")
-                    
+
                     # Отправляем файл
                     with open(full_txt_path, 'rb') as document:
                         context.bot.send_document(
@@ -844,14 +844,14 @@ class AdminPanel:
                             filename="Полная_документация.txt",
                             caption="📋 Полная документация проекта в формате TXT"
                         )
-                    
+
                     # Удаляем временный файл
                     os.remove(full_txt_path)
-                    
+
                     query.answer("Полная документация в TXT формате отправлена")
                 else:
                     query.answer("Директория документации не найдена")
-                    
+
             # Обработка запроса на получение полной документации в Word формате
             elif action == 'admin_doc_full_word':
                 # Проверяем наличие директории документации
@@ -860,33 +860,33 @@ class AdminPanel:
                     # Создаем Word документ
                     from docx import Document
                     doc = Document()
-                    
+
                     # Добавляем титульный лист
                     doc.add_heading("Полная документация проекта", 0)
-                    
+
                     # Перебираем все MD файлы
                     doc_files = [f for f in os.listdir(docs_dir) if f.endswith('.md')]
                     doc_files.sort()  # Сортируем для порядка
-                    
+
                     for doc_file in doc_files:
                         file_path = os.path.join(docs_dir, doc_file)
                         title = doc_file.replace('.md', '')
-                        
+
                         # Добавляем заголовок раздела
                         doc.add_heading(title, 1)
-                        
+
                         # Добавляем содержимое файла
                         with open(file_path, 'r', encoding='utf-8') as md_file:
                             content = md_file.read()
                             doc.add_paragraph(content)
-                        
+
                         # Добавляем разрыв страницы после каждого документа
                         doc.add_page_break()
-                    
+
                     # Сохраняем документ
                     docx_path = os.path.join(temp_dir, "Полная_документация.docx")
                     doc.save(docx_path)
-                    
+
                     # Отправляем файл
                     with open(docx_path, 'rb') as document:
                         context.bot.send_document(
@@ -895,17 +895,17 @@ class AdminPanel:
                             filename="Полная_документация.docx",
                             caption="📚 Полная документация проекта в формате Word"
                         )
-                    
+
                     # Удаляем временный файл
                     os.remove(docx_path)
-                    
+
                     query.answer("Полная документация в Word формате отправлена")
                 else:
                     query.answer("Директория документации не найдена")
-            
+
             # Возвращаемся обратно к выбору документации
             self._show_documentation(query, context)
-            
+
         except Exception as e:
             self.logger.error(f"Ошибка при обработке документации: {e}")
             query.answer(f"Ошибка при обработке документации: {e}")
@@ -1033,11 +1033,11 @@ class AdminPanel:
     def _handle_topic_action(self, query, context, action):
         """Обрабатывает действия с историческими темами"""
         user_id = query.from_user.id
-        
+
         if not self.is_super_admin(user_id):
             query.answer("У вас нет прав для управления темами")
             return
-            
+
         if action == 'admin_topic_add':
             # Логика добавления новой темы
             query.edit_message_text(
@@ -1046,42 +1046,42 @@ class AdminPanel:
                 "`Название темы | Краткое описание`\n\n"
                 "Например:\n"
                 "`Реформы Петра I | Политические и экономические реформы первого российского императора`",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_topics')]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
             # Устанавливаем состояние ожидания ввода темы
             context.user_data['waiting_for_topic'] = True
-            
+
         elif action == 'admin_topic_list':
             # Логика отображения списка тем
             # Здесь должен быть код загрузки тем из базы данных
             # Например, используя TopicService
             topics = ["Тема 1", "Тема 2", "Тема 3"]  # Заглушка, заменить на реальные данные
-            
+
             topics_text = "📋 *Список исторических тем*\n\n"
             for i, topic in enumerate(topics[:10], 1):
                 topics_text += f"{i}. {topic}\n"
-                
+
             if len(topics) > 10:
                 topics_text += f"\nПоказано 10 из {len(topics)} тем. Используйте поиск для более точных результатов."
-                
+
             query.edit_message_text(
                 topics_text,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_topics')]]),
                 parse_mode='Markdown'
             )
-            
+
         elif action == 'admin_topic_search':
             # Логика поиска темы
             query.edit_message_text(
                 "🔍 *Поиск исторической темы*\n\n"
                 "Введите ключевое слово или фразу для поиска темы:",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_topics')]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
             # Устанавливаем состояние ожидания ввода поискового запроса
             context.user_data['waiting_for_topic_search'] = True
-            
+
         elif action == 'admin_topic_update':
             # Логика обновления тем из API
             query.edit_message_text(
@@ -1090,20 +1090,20 @@ class AdminPanel:
                 "Это может занять некоторое время.",
                 parse_mode='Markdown'
             )
-            
+
             try:
                 # Здесь должен быть код обновления тем
                 # Например, вызов функции из TopicService
                 # topic_service.update_all_topics()
-                
+
                 # Заглушка для демонстрации
                 import time
                 time.sleep(2)
-                
+
                 query.edit_message_text(
                     "✅ *Обновление выполнено успешно*\n\n"
                     "База исторических тем успешно обновлена.",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_topics')]]),
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]),
                     parse_mode='Markdown'
                 )
             except Exception as e:
@@ -1111,22 +1111,22 @@ class AdminPanel:
                 query.edit_message_text(
                     f"❌ *Ошибка при обновлении тем*\n\n"
                     f"Произошла ошибка: {e}",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_topics')]]),
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]),
                     parse_mode='Markdown'
                 )
 
     def _handle_test_action(self, query, context, action):
         """Обрабатывает действия с тестами"""
         user_id = query.from_user.id
-        
+
         if not self.is_super_admin(user_id):
             query.answer("У вас нет прав для управления тестами")
             return
-            
+
         if action == 'admin_test_settings':
             # Настройки генерации тестов
             test_settings = self._get_test_settings()
-            
+
             settings_text = (
                 "⚙️ *Настройки генерации тестов*\n\n"
                 f"📊 Количество вопросов: {test_settings.get('questions_count', 5)}\n"
@@ -1135,19 +1135,19 @@ class AdminPanel:
                 f"🔢 Максимальное количество вариантов: {test_settings.get('max_options', 4)}\n"
                 f"📏 Сложность по умолчанию: {test_settings.get('default_difficulty', 'средняя')}\n"
             )
-            
+
             keyboard = [
                 [InlineKeyboardButton("📝 Изменить настройки", callback_data='admin_test_edit_settings')],
                 [InlineKeyboardButton("🔄 Сбросить по умолчанию", callback_data='admin_test_reset_settings')],
-                [InlineKeyboardButton("🔙 Назад", callback_data='admin_tests')]
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
             ]
-            
+
             query.edit_message_text(
                 settings_text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='Markdown'
             )
-            
+
         elif action == 'admin_test_stats':
             # Статистика прохождения тестов
             stats_text = (
@@ -1160,24 +1160,24 @@ class AdminPanel:
                 "2. Правление Петра I - 39 тестов\n"
                 "3. Революция 1917 года - 28 тестов\n"
             )
-            
+
             query.edit_message_text(
                 stats_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_tests')]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
-            
+
         elif action == 'admin_test_preview':
             # Предпросмотр теста
             query.edit_message_text(
                 "🔍 *Предпросмотр теста*\n\n"
                 "Введите тему для генерации тестового вопроса:",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_tests')]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
             # Устанавливаем состояние ожидания ввода темы для теста
             context.user_data['waiting_for_test_topic'] = True
-            
+
         elif action == 'admin_test_clear_cache':
             # Очистка кэша тестов
             query.edit_message_text(
@@ -1187,7 +1187,7 @@ class AdminPanel:
                 reply_markup=InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton("✅ Да", callback_data='admin_test_confirm_clear'),
-                        InlineKeyboardButton("❌ Нет", callback_data='admin_tests')
+                        InlineKeyboardButton("❌ Нет", callback_data='admin_back')
                     ]
                 ]),
                 parse_mode='Markdown'
@@ -1196,11 +1196,11 @@ class AdminPanel:
     def _handle_analytics_action(self, query, context, action):
         """Обрабатывает действия с аналитикой"""
         user_id = query.from_user.id
-        
+
         if not self.is_super_admin(user_id):
             query.answer("У вас нет прав для управления аналитикой")
             return
-            
+
         if action == 'admin_analytics_users':
             # Активность пользователей
             users_text = (
@@ -1217,13 +1217,13 @@ class AdminPanel:
                 "Сб: ███ 30\n"
                 "Вс: ██ 20\n"
             )
-            
+
             query.edit_message_text(
                 users_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
-            
+
         elif action == 'admin_analytics_topics':
             # Популярность тем
             topics_text = (
@@ -1236,13 +1236,13 @@ class AdminPanel:
                 "5. Отмена крепостного права - 57 запросов\n\n"
                 "*Средняя оценка полезности информации:* 4.7/5"
             )
-            
+
             query.edit_message_text(
                 topics_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
-            
+
         elif action == 'admin_analytics_tests':
             # Статистика тестирования
             tests_text = (
@@ -1257,37 +1257,37 @@ class AdminPanel:
                 "1. Даты Ливонской войны (31% правильных ответов)\n"
                 "2. Условия Ништадтского мира (35% правильных ответов)\n"
             )
-            
+
             query.edit_message_text(
                 tests_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]]),
                 parse_mode='Markdown'
             )
-            
+
         elif action == 'admin_analytics_export':
             # Экспорт аналитики
             export_text = (
                 "💾 *Экспорт аналитических данных*\n\n"
                 "Выберите формат экспорта:"
             )
-            
+
             keyboard = [
                 [InlineKeyboardButton("📊 CSV", callback_data='admin_analytics_export_csv')],
                 [InlineKeyboardButton("📑 JSON", callback_data='admin_analytics_export_json')],
                 [InlineKeyboardButton("📈 Excel", callback_data='admin_analytics_export_excel')],
-                [InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
             ]
-            
+
             query.edit_message_text(
                 export_text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='Markdown'
             )
-            
+
         elif action == 'admin_analytics_settings':
             # Настройки сбора данных
             settings = self._get_analytics_settings()
-            
+
             settings_text = (
                 "⚙️ *Настройки сбора аналитических данных*\n\n"
                 f"📊 Сбор общей статистики: {'Включен' if settings.get('collect_general', True) else 'Выключен'}\n"
@@ -1296,13 +1296,13 @@ class AdminPanel:
                 f"🧪 Анализ результатов тестов: {'Включен' if settings.get('analyze_tests', True) else 'Выключен'}\n"
                 f"⏱️ Интервал агрегации данных: {settings.get('aggregation_interval', '24')} часа\n"
             )
-            
+
             keyboard = [
                 [InlineKeyboardButton("📝 Изменить настройки", callback_data='admin_analytics_edit_settings')],
                 [InlineKeyboardButton("🔄 Сбросить по умолчанию", callback_data='admin_analytics_reset_settings')],
-                [InlineKeyboardButton("🔙 Назад", callback_data='admin_analytics')]
+                [InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]
             ]
-            
+
             query.edit_message_text(
                 settings_text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
