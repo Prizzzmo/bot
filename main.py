@@ -176,22 +176,15 @@ def main():
             return
 
         # Настраиваем бота
-        logger.info("Настройка бота")
-        # Проверяем, был ли успешно инициализирован updater
-        if not hasattr(bot, 'updater') or bot.updater is None:
-            logger.error("Ошибка: updater не инициализирован, сначала вызываем bot.setup()")
-            if not bot.setup():
-                logger.error("Ошибка при настройке бота!")
-                return
-        
-        # Убеждаемся, что обработчик callback-запросов админ-панели правильно зарегистрирован
-        # Это нужно сделать явно, даже если setup() содержит подобную логику
-        dp = bot.updater.dispatcher
-        dp.add_handler(CallbackQueryHandler(bot.handlers.admin_callback, pattern='^admin_'))
-
         if not bot.setup():
             logger.error("Ошибка при настройке бота!")
             return
+
+        # Проверяем, что updater успешно инициализирован
+        if not hasattr(bot, 'updater') or bot.updater is None:
+            logger.error("Ошибка: updater не инициализирован после настройки бота")
+            return
+
 
         logger.info("Бот успешно настроен и готов к запуску")
 

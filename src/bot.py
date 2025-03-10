@@ -28,20 +28,126 @@ class Bot:
         self.service_container = None
 
     def setup(self):
-        """Настройка бота и диспетчера"""
+        """
+        Настраивает бота, инициализирует обработчики команд и сообщений.
+        Возвращает True, если настройка успешна, иначе False.
+        """
         try:
-            # Инициализируем бота и диспетчер с оптимизированными настройками
-            # Используем 8 рабочих потоков для более эффективной параллельной обработки сообщений
-            self.updater = Updater(
-                self.config.telegram_token, 
-                use_context=True, 
-                workers=8,
-                request_kwargs={'read_timeout': 6, 'connect_timeout': 7}  # Уменьшаем таймауты для более быстрого обнаружения проблем
-            )
+            # Инициализируем компоненты бота
+            if not self._initialize_components():
+                return False
+
+            # Создаем и сохраняем Updater
+            self._setup_updater()
+
+            # Настраиваем логгер
+            self.logger.setup()
+            return True
+        except Exception as e:
+            self.logger.log_error(e, "Ошибка при настройке бота")
+            return False
+
+    def run(self):
+        """Запускает бота"""
+        self.logger.info("Запуск бота...")
+
+        try:
+            # Проверка, что updater был успешно создан
+            if not self.updater:
+                self.logger.error("Ошибка запуска бота: updater не инициализирован")
+                return
+
+            # Проверка валидности токена
+            import telegram
+            try:
+                self.logger.info("Проверка соединения с Telegram API...")
+                telegram_bot = self.updater.bot
+                bot_info = telegram_bot.get_me()
+                self.logger.info(f"Соединение успешно, бот: @{bot_info.username}")
+            except telegram.error.TelegramError as e:
+                self.logger.error(f"Ошибка соединения с Telegram API: {e}")
+                self.logger.error("Проверьте корректность TELEGRAM_TOKEN в .env файле")
+                return
+
+            # Оптимизированные настройки для более эффективного сбора обновлений
+            # Уменьшен таймаут для более быстрого обнаружения ошибок
+            # Явное указание типов обновлений для обработки
+            self.logger.info("Запуск start_polling...")
+            try:
+                self.updater.start_polling(
+                    timeout=10,  # Увеличиваем таймаут для более стабильной работы
+                    drop_pending_updates=True,  # Пропуск накопившихся обновлений
+                    allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Только необходимые типы обновлений
+                    poll_interval=0.5  # Увеличиваем интервал опроса для снижения нагрузки
+                )
+                self.logger.info("Бот успешно запущен")
+                self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
+            except Exception as e:
+                self.logger.error(f"Ошибка при запуске polling: {e}")
+                return
+
+            # Вместо собственной реализации используем встроенный метод idle
+            # который более надежно обрабатывает сигналы и блокировку
+            try:
+                self.logger.info("Входим в режим idle...")
+                self.updater.idle()
+            except Exception as e:
+                self.logger.error(f"Ошибка в idle режиме: {e}")
+
+            # Если idle вернул управление, значит бот завершает работу
+            self.logger.info("Бот завершил работу")
+        except Exception as e:
+            self.logger.log_error(e, {"context": "bot.run()"})
+            # Попытка принудительного завершения updater если он был создан
+            if hasattr(self, 'updater') and self.updater:
+                try:
+                    self.updater.stop()
+                except Exception as stop_error:
+                    self.logger.error(f"Ошибка при остановке updater: {stop_error}")
+
+    def setup_log_rotation(self):
+        log_dir = "logs"
+        log_file = os.path.join(log_dir, "bot.log")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        # Configure logging
+        self.logger.setLevel(logging.INFO)  # Set logging level
+        handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5) # 10MB max file size, 5 backups
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+    def _setup_updater(self):
+        """
+        Создает и настраивает Updater и Dispatcher для бота
+        """
+        if not hasattr(self, 'updater') or self.updater is None:
+            from telegram.ext import Updater, CallbackQueryHandler
+            self.updater = Updater(self.config.telegram_token, use_context=True, workers=8, request_kwargs={'read_timeout': 6, 'connect_timeout': 7})
             dp = self.updater.dispatcher
 
-            # Создаем ConversationHandler для управления диалогом
-            conv_handler = ConversationHandler(
+            # Регистрируем обработчик callback-запросов для админки
+            if hasattr(self, 'admin_panel'):
+                dp.add_handler(CallbackQueryHandler(self.admin_panel.handle_admin_callback, pattern='^admin_'))
+                self.logger.info("Зарегистрирован обработчик админских callback-запросов")
+
+    def _initialize_components(self):
+        """
+        Инициализирует компоненты бота.
+        Возвращает True, если инициализация успешна, иначе False.
+        """
+        return True
+
+
+    def _initialize_handlers(self):
+        """Инициализирует обработчики команд и сообщений"""
+        if not self.updater:
+            self.logger.error("Updater не инициализирован, невозможно добавить обработчики")
+            return False
+
+        try:
+            self.handlers = ConversationHandler(
                 entry_points=[CommandHandler('start', self.handlers.start)],
                 states={
                     TOPIC: [
@@ -69,107 +175,14 @@ class Bot:
                 per_message=False
             )
 
-            # Добавляем обработчики
-            dp.add_error_handler(self.handlers.error_handler)
-            dp.add_handler(conv_handler)
-
-            # Добавляем обработчик для команды администратора
-            dp.add_handler(CommandHandler('admin', self.handlers.admin_command))
-
-            # Добавляем обработчик для команды очистки чата
-            dp.add_handler(CommandHandler('clear', self.handlers.clear_chat_command))
-            
-            # Добавляем обработчик только для латинской команды карты
-            # Кириллические команды не поддерживаются Telegram API
-            dp.add_handler(CommandHandler('map', self.handlers.map_command))
-            
-            # Добавляем обработчик текстовых сообщений, который будет проверять текст "/карта"
-            dp.add_handler(MessageHandler(Filters.regex(r'^/карта$'), self.handlers.map_command))
-
-            # Добавляем обработчик для обработки callback запросов администратора 
-            # с приоритетом более высоким, чем у ConversationHandler
-            dp.add_handler(CallbackQueryHandler(self.handlers.admin_callback, pattern='^admin_'), group=1)
-
-            # Добавляем контекстные данные для бота
-            self.updater.dispatcher.bot_data['api_client'] = self.api_client
-            self.updater.dispatcher.bot_data['analytics'] = self.analytics
-            self.updater.dispatcher.bot_data['text_cache_service'] = self.text_cache_service
-
+            # Добавляем ссылку на admin_panel в handlers, если она доступна
+            if hasattr(self, 'admin_panel'):
+                self.handlers.admin_panel = self.admin_panel
+                self.logger.info("Admin panel подключен к handlers")
             return True
         except Exception as e:
-            self.logger.log_error(e, "Ошибка при настройке бота")
+            self.logger.log_error(e, "Ошибка при инициализации обработчиков")
             return False
-
-    def run(self):
-        """Запускает бота"""
-        self.logger.info("Запуск бота...")
-
-        try:
-            # Проверка, что updater был успешно создан
-            if not self.updater:
-                self.logger.error("Ошибка запуска бота: updater не инициализирован")
-                return
-                
-            # Проверка валидности токена
-            import telegram
-            try:
-                self.logger.info("Проверка соединения с Telegram API...")
-                telegram_bot = self.updater.bot
-                bot_info = telegram_bot.get_me()
-                self.logger.info(f"Соединение успешно, бот: @{bot_info.username}")
-            except telegram.error.TelegramError as e:
-                self.logger.error(f"Ошибка соединения с Telegram API: {e}")
-                self.logger.error("Проверьте корректность TELEGRAM_TOKEN в .env файле")
-                return
-                
-            # Оптимизированные настройки для более эффективного сбора обновлений
-            # Уменьшен таймаут для более быстрого обнаружения ошибок
-            # Явное указание типов обновлений для обработки
-            self.logger.info("Запуск start_polling...")
-            try:
-                self.updater.start_polling(
-                    timeout=10,  # Увеличиваем таймаут для более стабильной работы
-                    drop_pending_updates=True,  # Пропуск накопившихся обновлений
-                    allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Только необходимые типы обновлений
-                    poll_interval=0.5  # Увеличиваем интервал опроса для снижения нагрузки
-                )
-                self.logger.info("Бот успешно запущен")
-                self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
-            except Exception as e:
-                self.logger.error(f"Ошибка при запуске polling: {e}")
-                return
-
-            # Вместо собственной реализации используем встроенный метод idle
-            # который более надежно обрабатывает сигналы и блокировку
-            try:
-                self.logger.info("Входим в режим idle...")
-                self.updater.idle()
-            except Exception as e:
-                self.logger.error(f"Ошибка в idle режиме: {e}")
-                
-            # Если idle вернул управление, значит бот завершает работу
-            self.logger.info("Бот завершил работу")
-        except Exception as e:
-            self.logger.log_error(e, {"context": "bot.run()"})
-            # Попытка принудительного завершения updater если он был создан
-            if hasattr(self, 'updater') and self.updater:
-                try:
-                    self.updater.stop()
-                except Exception as stop_error:
-                    self.logger.error(f"Ошибка при остановке updater: {stop_error}")
-
-    def setup_log_rotation(self):
-        log_dir = "logs"
-        log_file = os.path.join(log_dir, "bot.log")
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        # Configure logging
-        self.logger.setLevel(logging.INFO)  # Set logging level
-        handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5) # 10MB max file size, 5 backups
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
 
 
 class BotManager:

@@ -882,7 +882,6 @@ class CommandHandlers:
                                             self.message_manager.save_message_id(update, context, sent_msg.message_id)
                                         except Exception as e2:
                                             self.logger.error(f"Вторая ошибка при отправке сообщения: {e2}")
-
                                 self.logger.info(f"Отправлено {len(messages) + sum(1 for m in messages[1:] if len(m) > 4000)} сообщений по теме '{topic}'")
                             except Exception as e:
                                 self.logger.error(f"Ошибка при отправке сообщения: {e}")
@@ -1386,7 +1385,7 @@ class CommandHandlers:
             try:
                 # Отправляем простое сообщение об ошибке без редактирования старого
                 error_msg = update.message.reply_text(
-                    "Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте задать другой вопрос или вернитесь в меню.",
+                    ""Произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте задать другой вопрос или вернитесь в меню.",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
                 )
                 self.message_manager.save_message_id(update, context, error_msg.message_id)
@@ -1508,7 +1507,7 @@ class CommandHandlers:
             # Обрабатываем все callback-запросы, начинающиеся с admin_
             if query.data.startswith('admin_'):
                 self.logger.debug(f"Обработка админ-callback: {query.data}")
-                
+
                 try:
                     # Сначала отвечаем на callback query, чтобы убрать загрузку на кнопке
                     query.answer()
@@ -1578,3 +1577,59 @@ class CommandHandlers:
                 error_message,
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
             )
+
+    def handle_callback_query(self, update, context):
+        """
+        Обрабатывает callback-запросы от inline-кнопок
+
+        Args:
+            update (telegram.Update): Объект обновления
+            context (telegram.ext.CallbackContext): Контекст обработчика
+        """
+        query = update.callback_query
+        data = query.data
+
+        self.logger.info(f"Получен callback: {data}")
+
+        # Передаем админские callback-запросы в admin_panel
+        if data.startswith('admin_'):
+            if hasattr(self, 'admin_panel'):
+                self.logger.info(f"Передача admin callback в admin_panel: {data}")
+                return self.admin_panel.handle_admin_callback(update, context)
+            else:
+                self.logger.warning(f"Получен админский callback, но admin_panel не инициализирован: {data}")
+                query.answer("Административная панель недоступна")
+                return self.TOPIC
+
+        # Обрабатываем различные типы callback-запросов
+        if data == 'start_quiz':
+            query.answer()
+            return self.start_quiz(update, context)
+        elif data == 'end_test':
+            query.answer()
+            return self.end_test(update, context)
+        elif data.startswith('topic_'):
+            query.answer()
+            topic_id = data.replace('topic_', '')
+            return self.handle_topic_selection(update, context, topic_id)
+        elif data == 'back_to_menu':
+            query.answer()
+            return self.button_handler(update, context)
+        elif data == 'more_topics':
+            query.answer()
+            return self.button_handler(update, context)
+        elif data == 'enter_own_topic':
+            query.answer()
+            return self.ask_for_own_topic(update, context)
+        elif data == 'add_to_favorites':
+            query.answer()
+            return self.add_to_favorites(update, context)
+        elif data == 'view_favorites':
+            query.answer()
+            return self.view_favorites(update, context)
+        elif data == 'view_history':
+            query.answer()
+            return self.view_history_map(update, context)
+        else:
+            query.answer(f"Неизвестный callback: {data}")
+            return self.TOPIC
