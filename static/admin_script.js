@@ -378,10 +378,18 @@ function loadStats() {
                     <div class="stat-item">
                         <h3>Пользователи</h3>
                         <p>${data.user_count || 0}</p>
+                        ${data.user_count_change ? 
+                            `<span class="stat-change ${data.user_count_change > 0 ? 'positive' : 'negative'}">
+                                ${data.user_count_change > 0 ? '+' : ''}${data.user_count_change}
+                            </span>` : ''}
                     </div>
                     <div class="stat-item">
                         <h3>Сообщения</h3>
                         <p>${data.message_count || 0}</p>
+                        ${data.message_count_change ? 
+                            `<span class="stat-change ${data.message_count_change > 0 ? 'positive' : 'negative'}">
+                                ${data.message_count_change > 0 ? '+' : ''}${data.message_count_change}
+                            </span>` : ''}
                     </div>
                     <div class="stat-item">
                         <h3>Время работы</h3>
@@ -401,11 +409,87 @@ function loadStats() {
                     </div>
                 `;
             }
+            
+            // Обновляем информацию о кэше
+            updateCacheInfo(data.cache_info || {});
+            
+            // Обновляем информацию о логах
+            updateLogsInfo(data.logs_info || {});
+            
+            // Обновляем информацию о резервных копиях
+            updateBackupInfo(data.last_backup || 'Нет данных');
+            
+            // Обновляем графики статистики
+            updateStatisticsCharts(data);
         })
         .catch(error => {
             console.error('Ошибка при загрузке статистики:', error);
             showNotification('Ошибка при загрузке статистики', 'error');
         });
+}
+
+// Функция для обновления информации о кэше
+function updateCacheInfo(cacheInfo) {
+    const cacheStatus = document.getElementById('cache-status');
+    if (cacheStatus) {
+        const totalSize = formatBytes(cacheInfo.total_size || 0);
+        const types = cacheInfo.types || {};
+        
+        let typesInfo = '';
+        for (const [type, size] of Object.entries(types)) {
+            typesInfo += `${type}: ${formatBytes(size)}, `;
+        }
+        
+        if (typesInfo) {
+            typesInfo = typesInfo.slice(0, -2); // Удаляем последние запятую и пробел
+        }
+        
+        cacheStatus.innerHTML = `Общий размер: ${totalSize}${typesInfo ? ` (${typesInfo})` : ''}`;
+    }
+}
+
+// Функция для обновления информации о логах
+function updateLogsInfo(logsInfo) {
+    const logsSize = document.getElementById('logs-size');
+    if (logsSize) {
+        const totalSize = formatBytes(logsInfo.total_size || 0);
+        const oldestLog = logsInfo.oldest_log || 'Нет данных';
+        
+        logsSize.innerHTML = `${totalSize} (с ${oldestLog})`;
+    }
+}
+
+// Функция для обновления информации о резервных копиях
+function updateBackupInfo(lastBackupTime) {
+    const lastBackup = document.getElementById('last-backup-time');
+    if (lastBackup) {
+        lastBackup.textContent = lastBackupTime;
+    }
+}
+
+// Функция для обновления графиков статистики
+function updateStatisticsCharts(data) {
+    // Здесь можно добавить код для обновления графиков с помощью Chart.js или другой библиотеки
+    // Пример: если необходимо обновить график активности, можно использовать следующий код:
+    /*
+    if (window.activityChart) {
+        window.activityChart.data.datasets[0].data = data.daily_activity || [];
+        window.activityChart.update();
+    }
+    */
+}
+
+// Форматирование размера в байтах в человекочитаемый формат
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Байт';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Байт', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ', 'ЭБ', 'ЗБ', 'ЙБ'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 // Функция для загрузки списка администраторов
@@ -971,20 +1055,47 @@ function handleMaintenanceAction(action) {
     }
     
     let actionName = '';
+    let button = document.querySelector(`.maintenance-action[data-action="${action}"]`);
+    let originalButtonText = '';
+    
+    if (button) {
+        originalButtonText = button.innerHTML;
+        button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Выполнение...`;
+        button.disabled = true;
+    }
+    
     switch (action) {
         case 'clear-cache': actionName = 'Очистка кэша'; break;
         case 'backup': actionName = 'Создание резервной копии'; break;
         case 'update-api': actionName = 'Обновление данных API'; break;
         case 'clean-logs': actionName = 'Очистка логов'; break;
         case 'restart': actionName = 'Перезапуск бота'; break;
+        case 'selective-cache': 
+            actionName = 'Выборочная очистка кэша';
+            showSelectiveCacheDialog();
+            if (button) {
+                button.innerHTML = originalButtonText;
+                button.disabled = false;
+            }
+            return;
         default: actionName = 'Операция';
     }
     
     fetch(`/api/admin/maintenance/${action}`, {
         method: 'POST'
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка HTTP: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        if (button) {
+            button.innerHTML = originalButtonText;
+            button.disabled = false;
+        }
+        
         if (data.error) {
             showNotification(data.error, 'error');
             return;
@@ -995,18 +1106,119 @@ function handleMaintenanceAction(action) {
         // Обновляем данные, если необходимо
         if (action === 'clear-cache' || action === 'update-api') {
             loadStats();
+            showNotification('Обновление статистики...', 'info');
         } else if (action === 'clean-logs') {
             loadLogs();
+            showNotification('Логи очищены. Обновление данных...', 'info');
         } else if (action === 'restart') {
+            showNotification('Бот перезапускается. Страница будет перезагружена через 5 секунд...', 'info');
             setTimeout(() => {
                 window.location.reload();
             }, 5000);
-            showNotification('Страница будет перезагружена через 5 секунд...', 'info');
+        } else if (action === 'backup') {
+            showNotification('Резервная копия успешно создана', 'success');
         }
     })
     .catch(error => {
         console.error(`Ошибка при выполнении операции ${actionName}:`, error);
-        showNotification(`Ошибка при выполнении операции ${actionName}`, 'error');
+        showNotification(`Ошибка при выполнении операции ${actionName}: ${error.message}`, 'error');
+        
+        if (button) {
+            button.innerHTML = originalButtonText;
+            button.disabled = false;
+        }
+    });
+}
+
+// Функция для отображения диалога выборочной очистки кэша
+function showSelectiveCacheDialog() {
+    const dialogHtml = `
+        <div class="modal-header">
+            <h3>Выборочная очистка кэша</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Выберите типы кэша для очистки:</p>
+            <div class="setting-item">
+                <label>
+                    <input type="checkbox" id="cache-api" checked> API запросы
+                </label>
+                <div class="setting-description">
+                    Кэш запросов к внешним API
+                </div>
+            </div>
+            <div class="setting-item">
+                <label>
+                    <input type="checkbox" id="cache-events" checked> События истории
+                </label>
+                <div class="setting-description">
+                    Кэшированные исторические события
+                </div>
+            </div>
+            <div class="setting-item">
+                <label>
+                    <input type="checkbox" id="cache-user"> Пользовательские данные
+                </label>
+                <div class="setting-description">
+                    Кэш данных пользователей (может привести к сбросу состояний)
+                </div>
+            </div>
+            <div class="setting-item">
+                <label>
+                    <input type="checkbox" id="cache-images"> Сгенерированные изображения
+                </label>
+                <div class="setting-description">
+                    Карты и другие визуальные материалы
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+            <button class="btn btn-success" onclick="handleSelectiveCacheClear()">
+                <i class="fas fa-broom"></i> Очистить выбранное
+            </button>
+        </div>
+    `;
+    
+    showModal(dialogHtml);
+}
+
+// Функция для обработки выборочной очистки кэша
+function handleSelectiveCacheClear() {
+    const cacheTypes = [];
+    
+    if (document.getElementById('cache-api').checked) cacheTypes.push('api');
+    if (document.getElementById('cache-events').checked) cacheTypes.push('events');
+    if (document.getElementById('cache-user').checked) cacheTypes.push('user');
+    if (document.getElementById('cache-images').checked) cacheTypes.push('images');
+    
+    if (cacheTypes.length === 0) {
+        showNotification('Пожалуйста, выберите хотя бы один тип кэша для очистки', 'warning');
+        return;
+    }
+    
+    closeModal();
+    
+    fetch('/api/admin/maintenance/selective-cache', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ types: cacheTypes })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification(data.error, 'error');
+            return;
+        }
+        
+        showNotification(data.message || 'Выборочная очистка кэша выполнена успешно', 'success');
+        loadStats();
+    })
+    .catch(error => {
+        console.error('Ошибка при выборочной очистке кэша:', error);
+        showNotification(`Ошибка при очистке кэша: ${error.message}`, 'error');
     });
 }
 

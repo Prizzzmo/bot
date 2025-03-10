@@ -323,9 +323,15 @@
                 <div class="action-card">
                     <h3><i class="fas fa-trash-alt"></i> Очистка кэша</h3>
                     <p>Удаляет временные файлы и кэш бота для освобождения памяти</p>
-                    <button id="clear-cache" class="btn maintenance-action" data-action="clear-cache">
-                        <i class="fas fa-broom"></i> Выполнить
-                    </button>
+                    <div class="action-buttons">
+                        <button id="clear-cache" class="btn maintenance-action" data-action="clear-cache">
+                            <i class="fas fa-broom"></i> Полная очистка
+                        </button>
+                        <button id="selective-cache" class="btn btn-secondary maintenance-action" data-action="selective-cache">
+                            <i class="fas fa-filter"></i> Выборочно
+                        </button>
+                    </div>
+                    <div class="action-status" id="cache-status"></div>
                 </div>
                 
                 <div class="action-card">
@@ -334,6 +340,9 @@
                     <button id="create-backup" class="btn maintenance-action" data-action="backup">
                         <i class="fas fa-hdd"></i> Выполнить
                     </button>
+                    <div class="backup-info">
+                        <small>Последняя копия: <span id="last-backup-time">Неизвестно</span></small>
+                    </div>
                 </div>
                 
                 <div class="action-card">
@@ -342,6 +351,9 @@
                     <button id="update-api-data" class="btn maintenance-action" data-action="update-api">
                         <i class="fas fa-cloud-download-alt"></i> Выполнить
                     </button>
+                    <div class="action-progress">
+                        <div class="progress-bar" id="api-progress"></div>
+                    </div>
                 </div>
                 
                 <div class="action-card">
@@ -349,6 +361,17 @@
                     <p>Удаляет старые файлы логов для освобождения дискового пространства</p>
                     <button id="clean-logs" class="btn maintenance-action" data-action="clean-logs">
                         <i class="fas fa-eraser"></i> Выполнить
+                    </button>
+                    <div class="log-info">
+                        <small>Размер логов: <span id="logs-size">Загрузка...</span></small>
+                    </div>
+                </div>
+                
+                <div class="action-card">
+                    <h3><i class="fas fa-history"></i> Аудит изменений</h3>
+                    <p>Просмотр истории изменений в системе и действий администраторов</p>
+                    <button id="view-audit" class="btn maintenance-action" data-action="audit">
+                        <i class="fas fa-eye"></i> Просмотр
                     </button>
                 </div>
                 

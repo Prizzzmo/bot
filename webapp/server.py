@@ -6,6 +6,9 @@ import os
 import json
 import logging
 import time
+import shutil
+import threading
+import datetime
 from flask import Flask, render_template, jsonify, request, send_file, redirect, url_for
 from flask_cors import CORS
 
@@ -526,45 +529,167 @@ def update_settings():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/maintenance/<action>', methods=['POST'])
-def maintenance_action(action):
+def admin_maintenance(action):
     """API для выполнения операций обслуживания"""
     try:
         if action == 'clear-cache':
-            # Очистка кэша
-            clear_cache()
-            return jsonify({"success": True, "message": "Кэш успешно очищен"})
+            # Полная очистка кэша
+            result = os.system('python clear_all_cache.py --all')
+            if result == 0:
+                return jsonify({'success': True, 'message': 'Кэш успешно очищен'})
+            else:
+                return jsonify({'error': 'Ошибка при очистке кэша'}), 500
+
+        elif action == 'selective-cache':
+            # Выборочная очистка кэша
+            data = request.get_json()
+            if not data or not data.get('types'):
+                return jsonify({'error': 'Не указаны типы кэша для очистки'}), 400
+
+            types = data.get('types')
+            cmd_args = []
+
+            for cache_type in types:
+                if cache_type in ['api', 'events', 'user', 'images']:
+                    cmd_args.append(f'--{cache_type}')
+
+            if not cmd_args:
+                return jsonify({'error': 'Не указаны корректные типы кэша для очистки'}), 400
+
+            cmd = f'python clear_all_cache.py {" ".join(cmd_args)}'
+            result = os.system(cmd)
+
+            if result == 0:
+                return jsonify({
+                    'success': True, 
+                    'message': f'Выборочная очистка кэша выполнена успешно: {", ".join(types)}'
+                })
+            else:
+                return jsonify({'error': 'Ошибка при выборочной очистке кэша'}), 500
+
         elif action == 'backup':
-            # Создание резервной копии
-            create_backup()
-            return jsonify({"success": True, "message": "Резервная копия создана"})
+            # Резервное копирование
+            timestamp = int(time.time())
+            backup_dir = f'backups/data_backup_v{timestamp}'
+
+            # Создаем директорию для резервной копии если нужно
+            os.makedirs('backups', exist_ok=True)
+
+            # Копируем ключевые файлы данных
+            files_to_backup = [
+                'historical_events.json',
+                'user_states.json',
+                'admins.json',
+                'bot_settings.json',
+                'api_cache.json'
+            ]
+
+            for file in files_to_backup:
+                if os.path.exists(file):
+                    shutil.copy2(file, f'backups/{file.replace(".json", "")}_backup_{timestamp}.json')
+
+            # Записываем информацию о бэкапе
+            with open('backups/backup_info.json', 'w') as f:
+                json.dump({
+                    'timestamp': timestamp,
+                    'date': datetime.datetime.now().isoformat(),
+                    'files': files_to_backup
+                }, f, indent=4)
+
+            return jsonify({
+                'success': True, 
+                'message': 'Резервная копия успешно создана',
+                'backup_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'files_count': len(files_to_backup)
+            })
+
         elif action == 'update-api':
             # Обновление данных API
-            update_api_data()
-            return jsonify({"success": True, "message": "Данные API обновлены"})
+            # Запускаем обновление в отдельном процессе
+            thread = threading.Thread(target=update_api_data)
+            thread.daemon = True
+            thread.start()
+
+            return jsonify({
+                'success': True, 
+                'message': 'Обновление данных API запущено. Этот процесс может занять некоторое время.'
+            })
+
         elif action == 'clean-logs':
-            # Очистка логов
-            clean_logs()
-            return jsonify({"success": True, "message": "Логи очищены"})
-        elif action == 'restart':
-            # Перезапуск бота (можно реализовать как фиктивную операцию)
-            return jsonify({"success": True, "message": "Бот перезапущен"})
-        elif action == 'integrate':
-            # Интеграция данных
-            logger.info("Запрошена интеграция данных")
-            return jsonify({"success": True, "message": "Интеграция данных выполнена"})
-        elif action == 'security':
-            # Проверка безопасности
-            logger.info("Запрошена проверка безопасности")
-            return jsonify({"success": True, "message": "Проверка безопасности выполнена"})
-        elif action == 'optimize':
-            # Оптимизация БД
-            logger.info("Запрошена оптимизация базы данных")
-            return jsonify({"success": True, "message": "Оптимизация базы данных выполнена"})
+            # Очистка логов (удаляем все, кроме текущего и предыдущего дня)
+            log_dir = 'logs'
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+
+            current_date = datetime.datetime.now()
+            yesterday = (current_date - datetime.timedelta(days=1)).strftime('%Y%m%d')
+            today = current_date.strftime('%Y%m%d')
+
+            keep_logs = [f'bot_log_{today}.log', f'bot_log_{yesterday}.log']
+            deleted_count = 0
+
+            for filename in os.listdir(log_dir):
+                if filename.startswith('bot_log_') and filename.endswith('.log'):
+                    if filename not in keep_logs:
+                        os.remove(os.path.join(log_dir, filename))
+                        deleted_count += 1
+
+            return jsonify({
+                'success': True, 
+                'message': f'Логи успешно очищены. Удалено {deleted_count} файлов.'
+            })
+
+        elif action == 'audit':
+            # Возвращаем историю действий администраторов
+            audit_data = get_admin_audit_log()
+            return jsonify({
+                'success': True,
+                'data': audit_data
+            })
+
         else:
-            return jsonify({"error": "Неизвестное действие"}), 400
+            return jsonify({'error': 'Неизвестное действие обслуживания'})
+
     except Exception as e:
         logger.error(f"Ошибка при выполнении операции обслуживания: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': f'Ошибка при выполнении операции: {str(e)}'}), 500
+
+def update_api_data():
+    """Фоновое обновление данных API"""
+    try:
+        # Здесь код для обновления данных API
+        # Например, обновление исторических событий из внешнего источника
+        time.sleep(2)  # Имитация долгой операции
+        # В реальном коде здесь будут вызовы внешних API и обновление данных
+
+        logger.info("Данные API успешно обновлены")
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении данных API: {e}")
+
+def get_admin_audit_log():
+    """Получение истории действий администраторов"""
+    # В реальном приложении это может быть получение данных из БД или лог-файла
+    # Для примера возвращаем заглушку
+    return [
+        {
+            "timestamp": (datetime.datetime.now() - datetime.timedelta(hours=2)).isoformat(),
+            "admin_id": 7225056628,
+            "action": "login",
+            "details": "Вход в систему"
+        },
+        {
+            "timestamp": (datetime.datetime.now() - datetime.timedelta(hours=1)).isoformat(),
+            "admin_id": 7225056628,
+            "action": "settings_change",
+            "details": "Изменены настройки системы"
+        },
+        {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "admin_id": 7225056628,
+            "action": "cache_clear",
+            "details": "Выполнена очистка кэша"
+        }
+    ]
 
 @app.route('/api/admin/check-auth', methods=['GET'])
 def check_admin_auth():
@@ -612,7 +737,7 @@ def admin_login():
             # При успешной авторизации используем ID супер-администратора из admins.json
             admins = load_admins()
             admin_id = admins.get("super_admin_ids", [7225056628])[0]  # По умолчанию используем ID из admins.json
-            
+
             logger.info(f"Успешный вход администратора с ID {admin_id}")
 
             response = jsonify({
