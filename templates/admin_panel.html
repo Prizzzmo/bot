@@ -94,13 +94,22 @@
     <script>
         // Функция для скачивания документации
         function downloadDoc(docPath, fileName) {
+            // Показываем уведомление о начале загрузки
+            showNotification(`Загрузка документа ${fileName}...`, 'info');
+            
             // Создаем ссылку для скачивания
             fetch('/api/admin/get-doc?path=' + encodeURIComponent(docPath))
                 .then(response => {
                     if (response.ok) {
                         return response.blob();
                     }
-                    throw new Error('Ошибка при загрузке документа');
+                    // Если получили ошибку, пытаемся прочитать детали ошибки
+                    if (response.status === 404) {
+                        throw new Error(`Файл не найден (404): ${docPath}`);
+                    }
+                    return response.json().then(data => {
+                        throw new Error(data.error || `Ошибка ${response.status}`);
+                    });
                 })
                 .then(blob => {
                     // Создаем ссылку для скачивания
@@ -123,7 +132,11 @@
                     showNotification(`Ошибка при скачивании документа: ${error.message}`, 'error');
                     
                     // Предлагаем открыть документ для просмотра как альтернативу
-                    viewDoc(docPath);
+                    setTimeout(() => {
+                        if (confirm(`Не удалось скачать документ. Попробовать открыть его для просмотра?`)) {
+                            viewDoc(docPath);
+                        }
+                    }, 1000);
                 });
         }
         
@@ -1093,15 +1106,15 @@
             <div class="docs-category">
                 <h3>Основная документация</h3>
                 <div class="docs-list">
-                    <a href="javascript:downloadDoc('docs/README.md', 'README.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/README.md', 'README.md')" class="docs-item">
                         <i class="fas fa-file-alt"></i>
                         <span class="docs-item-title">README - Обзор проекта</span>
                     </a>
-                    <a href="javascript:downloadDoc('docs/architecture.md', 'architecture.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/architecture.md', 'architecture.md')" class="docs-item">
                         <i class="fas fa-sitemap"></i>
                         <span class="docs-item-title">Архитектура системы</span>
                     </a>
-                    <a href="javascript:downloadDoc('docs/development_guide.md', 'development_guide.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/development_guide.md', 'development_guide.md')" class="docs-item">
                         <i class="fas fa-code"></i>
                         <span class="docs-item-title">Руководство разработчика</span>
                     </a>
@@ -1111,15 +1124,15 @@
             <div class="docs-category">
                 <h3>Техническая документация</h3>
                 <div class="docs-list">
-                    <a href="javascript:downloadDoc('docs/api_components.md', 'api_components.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/api_components.md', 'api_components.md')" class="docs-item">
                         <i class="fas fa-plug"></i>
                         <span class="docs-item-title">API компоненты</span>
                     </a>
-                    <a href="javascript:downloadDoc('docs/database_structure.md', 'database_structure.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/database_structure.md', 'database_structure.md')" class="docs-item">
                         <i class="fas fa-database"></i>
                         <span class="docs-item-title">Структура базы данных</span>
                     </a>
-                    <a href="javascript:downloadDoc('docs/caching_system.md', 'caching_system.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/caching_system.md', 'caching_system.md')" class="docs-item">
                         <i class="fas fa-memory"></i>
                         <span class="docs-item-title">Система кэширования</span>
                     </a>
@@ -1129,15 +1142,15 @@
             <div class="docs-category">
                 <h3>Руководства и инструкции</h3>
                 <div class="docs-list">
-                    <a href="javascript:downloadDoc('docs/linux_installation.md', 'linux_installation.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/linux_installation.md', 'linux_installation.md')" class="docs-item">
                         <i class="fab fa-linux"></i>
                         <span class="docs-item-title">Установка на Linux</span>
                     </a>
-                    <a href="javascript:downloadDoc('docs/testing_guide.md', 'testing_guide.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/testing_guide.md', 'testing_guide.md')" class="docs-item">
                         <i class="fas fa-vial"></i>
                         <span class="docs-item-title">Руководство по тестированию</span>
                     </a>
-                    <a href="javascript:downloadDoc('detailed_presentation.md', 'detailed_presentation.md')" class="docs-item">
+                    <a href="javascript:downloadDoc('static/docs/detailed_presentation.md', 'detailed_presentation.md')" class="docs-item">
                         <i class="fas fa-file-powerpoint"></i>
                         <span class="docs-item-title">Подробная презентация</span>
                     </a>

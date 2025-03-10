@@ -1029,10 +1029,18 @@ def get_doc():
             
         # Проверка безопасности пути
         base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
+        
+        # Сначала проверяем в папке static/docs
+        static_doc_path = os.path.join(base_path, 'static', 'docs', doc_path.lstrip('/'))
+        if os.path.exists(static_doc_path):
+            absolute_path = static_doc_path
+        else:
+            # Если в static/docs нет, проверяем в исходной папке docs
+            absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
         
         # Проверяем, что путь находится в пределах разрешенных директорий
-        if not absolute_path.startswith(base_path):
+        if not (absolute_path.startswith(os.path.join(base_path, 'static')) or 
+                absolute_path.startswith(os.path.join(base_path, 'docs'))):
             return jsonify({"error": "Доступ запрещен"}), 403
             
         # Проверяем существование файла
@@ -1073,10 +1081,18 @@ def view_doc():
             
         # Проверка безопасности пути
         base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
+        
+        # Сначала проверяем в папке static/docs
+        static_doc_path = os.path.join(base_path, 'static', 'docs', doc_path.lstrip('/'))
+        if os.path.exists(static_doc_path):
+            absolute_path = static_doc_path
+        else:
+            # Если в static/docs нет, проверяем в исходной папке docs
+            absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
         
         # Проверяем, что путь находится в пределах разрешенных директорий
-        if not absolute_path.startswith(base_path):
+        if not (absolute_path.startswith(os.path.join(base_path, 'static')) or 
+                absolute_path.startswith(os.path.join(base_path, 'docs'))):
             return "Доступ запрещен", 403
             
         # Проверяем существование файла
