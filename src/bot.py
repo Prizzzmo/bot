@@ -3,6 +3,7 @@ import os
 import threading
 import json
 import time
+import logging
 from typing import Dict, List, Any, Optional, Callable
 from datetime import datetime
 import telegram
@@ -12,7 +13,7 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageH
 from src.handlers import CommandHandlers
 from src.service_container import ServiceContainer
 from src.config import Config, TOPIC, CHOOSE_TOPIC, CONVERSATION, TEST, ANSWER, MAP, ANALYTICS, ADMIN
-from src.logger import BotLogger
+from src.logger import Logger
 from src.interfaces import IBot, ILogger
 
 
@@ -213,7 +214,7 @@ class BotManager:
             config_path (str, optional): Путь к файлу конфигурации
         """
         # Инициализируем логгер
-        self.logger = BotLogger("bot.log", "INFO")
+        self.logger = Logger(log_level=logging.INFO, log_dir="logs")
         self.logger.info("Запуск историчеcкого образовательного бота")
 
         # Загружаем конфигурацию
