@@ -646,6 +646,135 @@ class CommandHandlers:
             )
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
             return self.TOPIC
+            
+        elif query_data == 'admin_download_docs':
+            # Обработка запроса на скачивание документации
+            self.logger.info(f"Пользователь {user_id} запросил скачивание документации")
+            query.answer("Подготовка документации для скачивания...")
+            
+            try:
+                # Отправляем пользователю документы из папки docs
+                import os
+                import time
+                
+                # Проверяем наличие директории с документацией
+                docs_dir = "docs"
+                if not os.path.exists(docs_dir) or not os.path.isdir(docs_dir):
+                    query.edit_message_text(
+                        "❌ Директория с документацией не найдена.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                    )
+                    return self.TOPIC
+                
+                # Получаем список файлов документации
+                doc_files = [f for f in os.listdir(docs_dir) if os.path.isfile(os.path.join(docs_dir, f)) and f.endswith(('.md', '.txt', '.pdf', '.docx'))]
+                
+                if not doc_files:
+                    query.edit_message_text(
+                        "❌ Файлы документации не найдены.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                    )
+                    return self.TOPIC
+                
+                # Обновляем сообщение о подготовке документации
+                query.edit_message_text(
+                    f"📚 Подготовка {len(doc_files)} файлов документации...",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data='back_to_menu')]])
+                )
+                
+                # Отправляем каждый файл документации отдельно
+                for i, doc_file in enumerate(doc_files, 1):
+                    try:
+                        file_path = os.path.join(docs_dir, doc_file)
+                        
+                        # Добавляем небольшую задержку между отправками файлов
+                        if i > 1:
+                            time.sleep(0.5)
+                        
+                        # Отправляем файл
+                        with open(file_path, 'rb') as doc:
+                            sent_doc = context.bot.send_document(
+                                chat_id=update.effective_chat.id,
+                                document=doc,
+                                filename=doc_file,
+                                caption=f"📄 Документация {i}/{len(doc_files)}: {doc_file}"
+                            )
+                            # Сохраняем ID сообщения
+                            self.message_manager.save_message_id(update, context, sent_doc.message_id)
+                    except Exception as file_err:
+                        self.logger.error(f"Ошибка при отправке файла документации {doc_file}: {file_err}")
+                
+                # Дополнительно отправляем презентацию, если она существует
+                try:
+                    if os.path.exists('detailed_presentation.md'):
+                        with open('detailed_presentation.md', 'rb') as md_file:
+                            sent_md = context.bot.send_document(
+                                chat_id=update.effective_chat.id,
+                                document=md_file,
+                                filename='История_России_полная_презентация.md',
+                                caption="📚 Полная презентация бота в формате Markdown"
+                            )
+                            self.message_manager.save_message_id(update, context, sent_md.message_id)
+                    
+                    if os.path.exists('История_России_подробная_презентация.docx'):
+                        with open('История_России_подробная_презентация.docx', 'rb') as docx_file:
+                            sent_docx = context.bot.send_document(
+                                chat_id=update.effective_chat.id,
+                                document=docx_file,
+                                filename='История_России_подробная_презентация.docx',
+                                caption="📚 Полная презентация бота в формате Word"
+                            )
+                            self.message_manager.save_message_id(update, context, sent_docx.message_id)
+                except Exception as pres_err:
+                    self.logger.error(f"Ошибка при отправке презентации: {pres_err}")
+                
+                # Архивируем все файлы документации в один zip-файл
+                try:
+                    import zipfile
+                    from io import BytesIO
+                    
+                    zip_buffer = BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        # Добавляем файлы из docs
+                        for doc_file in doc_files:
+                            file_path = os.path.join(docs_dir, doc_file)
+                            zip_file.write(file_path, arcname=doc_file)
+                        
+                        # Добавляем презентации если они существуют
+                        if os.path.exists('detailed_presentation.md'):
+                            zip_file.write('detailed_presentation.md', arcname='История_России_полная_презентация.md')
+                        
+                        if os.path.exists('История_России_подробная_презентация.docx'):
+                            zip_file.write('История_России_подробная_презентация.docx')
+                    
+                    # Отправляем ZIP-архив со всей документацией
+                    zip_buffer.seek(0)
+                    sent_zip = context.bot.send_document(
+                        chat_id=update.effective_chat.id,
+                        document=zip_buffer,
+                        filename='История_России_полная_документация.zip',
+                        caption="📚 Полный архив документации бота"
+                    )
+                    self.message_manager.save_message_id(update, context, sent_zip.message_id)
+                except Exception as zip_err:
+                    self.logger.error(f"Ошибка при создании и отправке ZIP-архива: {zip_err}")
+                
+                # Сообщение о завершении отправки документации
+                sent_msg = query.message.reply_text(
+                    "✅ Документация успешно отправлена!\n\nВыберите дальнейшее действие:",
+                    reply_markup=self.ui_manager.main_menu()
+                )
+                self.message_manager.save_message_id(update, context, sent_msg.message_id)
+                
+                self.logger.info(f"Пользователю {user_id} успешно отправлена документация")
+            except Exception as e:
+                self.logger.error(f"Ошибка при подготовке документации: {e}")
+                query.edit_message_text(
+                    f"❌ Произошла ошибка при подготовке документации: {e}",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 В главное меню", callback_data='back_to_menu')]])
+                )
+            
+            return self.TOPIC
 
         elif query_data == 'admin_clear_all_chats' and hasattr(self, 'admin_panel'):
             # Проверяем права администратора
@@ -1470,24 +1599,38 @@ class CommandHandlers:
             
     def neadmin_command(self, update, context):
         """
-        Обрабатывает команду /neadmin для быстрого перехода на адрес neadmika.
+        Обрабатывает команду /neadmin для быстрого перехода на адрес neadmika
+        и возможности скачать документацию.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
         """
         admin_panel_url = "http://t.me/teach_hisbot/neadmika"
+        user_id = update.message.from_user.id
         
-        # Формируем кнопку с ссылкой на админ-панель
-        keyboard = [[InlineKeyboardButton("🔧 Открыть панель администратора", url=admin_panel_url)]]
+        # Проверяем, является ли пользователь администратором, если у нас есть админ-панель
+        is_admin = hasattr(self, 'admin_panel') and self.admin_panel.is_admin(user_id)
+        
+        # Формируем кнопки для админ-панели
+        keyboard = [
+            [InlineKeyboardButton("🔧 Открыть панель администратора", url=admin_panel_url)],
+            [InlineKeyboardButton("📥 Скачать документацию", callback_data='admin_download_docs')]
+        ]
+        
+        if is_admin:
+            keyboard.append([InlineKeyboardButton("📋 Открыть панель управления", callback_data='admin_back')])
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         update.message.reply_text(
-            "🔐 *Административная панель*\n\nНажмите на кнопку ниже, чтобы открыть веб-интерфейс администратора:",
+            "🔐 *Административная панель*\n\n"
+            "Нажмите на кнопку ниже, чтобы открыть веб-интерфейс администратора "
+            "или скачать полную документацию бота:",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
-        self.logger.info(f"Пользователь {update.message.from_user.id} запросил доступ к панели через команду /neadmin")
+        self.logger.info(f"Пользователь {user_id} запросил доступ к панели через команду /neadmin")
 
     def clear_chat_command(self, update, context):
         """
