@@ -1,8 +1,12 @@
+"""
+Сервер веб-приложения для визуализации исторических данных
+"""
+
 import os
 import json
-from flask import Flask, render_template, jsonify, request, send_file, send_from_directory
-from flask_cors import CORS
 import logging
+from flask import Flask, render_template, jsonify, request, send_file
+from flask_cors import CORS
 
 # Путь к файлу с историческими данными
 HISTORY_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -397,32 +401,10 @@ def generate_report():
         logger.error(f"Ошибка при обработке запроса на генерацию реферата: {e}")
         return jsonify({'error': str(e)}), 500
 
-
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory('.', path)
-
-@app.route('/api/events')
-def get_events_simple():
-    try:
-        # Проверка наличия файла с данными
-        if not os.path.exists(HISTORY_DB_PATH):
-            return jsonify({'error': 'История не найдена', 'events': []}), 404
-
-        # Загрузка данных из файла
-        with open(HISTORY_DB_PATH, 'r', encoding='utf-8') as file:
-            data = json.load(file)
-
-        # Возвращаем данные о событиях
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({'error': str(e), 'events': []}), 500
-
 def run_server(host='0.0.0.0', port=8080):
     """Запуск веб-сервера"""
     logger.info(f"Запуск веб-сервера на {host}:{port}")
     app.run(host=host, port=port, debug=False)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    run_server(port=port)
+    run_server()

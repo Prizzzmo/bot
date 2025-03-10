@@ -62,6 +62,29 @@ def main():
     """
     Основная функция для запуска бота и веб-сервера
     """
+    # Запуск веб-сервера в отдельном потоке
+    import threading
+    from webapp.server import run_server
+    
+    # Устанавливаем переменную окружения для вебсервера
+    repl_id = os.environ.get('REPL_ID', '')
+    repl_slug = os.environ.get('REPL_SLUG', '')
+    repl_owner = os.environ.get('REPL_OWNER', '')
+    deployment_id = os.environ.get('REPL_DEPLOYMENT_ID', '')
+    
+    # Сохраняем URL в переменной окружения для использования в bot_integration.py
+    if deployment_id:
+        os.environ['WEBAPP_URL'] = f"https://{deployment_id}.deployment.repl.co"
+    elif repl_slug and repl_owner:
+        os.environ['WEBAPP_URL'] = f"https://{repl_slug}.{repl_owner}.repl.co"
+    else:
+        os.environ['WEBAPP_URL'] = f"https://{repl_id}.id.repl.co"
+    
+    # Запускаем веб-сервер
+    webapp_thread = threading.Thread(target=run_server, args=('0.0.0.0', 8080), daemon=True)
+    webapp_thread.start()
+    print(f"Веб-сервер запущен на порту 8080 с URL: {os.environ.get('WEBAPP_URL')}")
+
     logger = None
 
     try:
@@ -81,11 +104,6 @@ def main():
                 logging.StreamHandler()
             ]
         )
-        
-        # Установка логирования для telegram библиотеки
-        logging.getLogger('telegram').setLevel(logging.INFO)
-        logging.getLogger('telegram.ext').setLevel(logging.INFO)
-        
         logger = logging.getLogger(__name__)
         logger.info("Запуск историчеcкого образовательного бота")
 
@@ -136,18 +154,8 @@ def main():
         # Регистрируем очередь задач в конфигурации для доступа из других модулей
         config.set_task_queue(task_queue)
 
-        print("\n=== НАЧАЛО ЗАПУСКА TELEGRAM БОТА ===\n")
-        
-        # Проверяем наличие токена Telegram
-        if not config.telegram_token:
-            logger.error("ОШИБКА: Не найден TELEGRAM_TOKEN в .env файле!")
-            print("ОШИБКА: Не найден TELEGRAM_TOKEN в .env файле!")
-            return
-            
-        logger.info(f"Используется TELEGRAM_TOKEN: {config.telegram_token[:6]}...{config.telegram_token[-4:]}")
 
         # Запускаем бота напрямую в основном потоке
-        logger.info("Вызов метода bot.run()...")
         bot.run()
 
     except KeyboardInterrupt:

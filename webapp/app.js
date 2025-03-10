@@ -1,14 +1,19 @@
-// Инициализация Telegram WebApp
-let tg = window.Telegram.WebApp;
-tg.expand();
 
-// Переменные для работы с картой
+// Initialize Telegram WebApp
+const tgApp = window.Telegram.WebApp;
+tgApp.expand();
+
+// Apply Telegram theme
+document.documentElement.className = tgApp.colorScheme === 'dark' ? 'dark-theme' : '';
+
+// Initialize map variables
 let map;
-let markers;
-let allEvents = [];
+let markers = [];
+let markerCluster;
+let historicalEvents = [];
 let filteredEvents = [];
 
-// DOM Elements from original code
+// DOM Elements
 const categoryFilter = document.getElementById('category-filter');
 const centuryFilter = document.getElementById('century-filter');
 const resetFiltersBtn = document.getElementById('reset-filters');
@@ -19,187 +24,171 @@ const eventDate = document.getElementById('event-date');
 const eventCategory = document.getElementById('event-category');
 const eventDescription = document.getElementById('event-description');
 
-
-// Инициализация карты после загрузки страницы
-document.addEventListener('DOMContentLoaded', () => {
-    // Создание карты с центром на России
+// Initialize map
+function initMap() {
+    // Create map centered at Russia
     map = L.map('map').setView([61.5240, 105.3188], 4);
 
-    // Добавление базового слоя карты
+    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Создание группы кластеров для маркеров
-    markers = L.markerClusterGroup();
+    // Initialize marker cluster group
+    markerCluster = L.markerClusterGroup();
+    map.addLayer(markerCluster);
+    
+    // Load historical data
+    loadHistoricalData();
+}
 
-    // Загрузка исторических событий
-    loadHistoricalEvents();
-
-    // Обработчики событий для фильтров from original code
-    categoryFilter.addEventListener('change', applyFilters);
-    centuryFilter.addEventListener('change', applyFilters);
-    resetFiltersBtn.addEventListener('click', () => {
-        categoryFilter.value = 'all';
-        centuryFilter.value = 'all';
-        applyFilters();
-    });
-    closeDetailsBtn.addEventListener('click', () => {
-        eventDetails.classList.add('hidden');
-    });
-    document.getElementById('apply-filters').addEventListener('click', applyFilters);
-    document.getElementById('reset-filters').addEventListener('click', resetFilters);
-
-});
-
-// Загрузка исторических событий с сервера
-async function loadHistoricalEvents() {
+// Load historical data from JSON file
+async function loadHistoricalData() {
     try {
-        // Отображение индикатора загрузки
-        const loadingMessage = document.createElement('div');
-        loadingMessage.className = 'loading-message';
-        loadingMessage.textContent = 'Загрузка исторических данных...';
-        document.body.appendChild(loadingMessage);
-
-        // Загрузка данных из JSON файла
-        const response = await fetch('/api/events');
-        const data = await response.json();
-
-        // Сохранение загруженных событий
-        allEvents = data.events || [];
-
-        // Удаление индикатора загрузки
-        document.body.removeChild(loadingMessage);
-
-        // Отображение всех событий на карте
-        displayEvents(allEvents);
-
+        const response = await fetch('/api/historical-events');
+        historicalEvents = await response.json();
+        
+        // Process events
+        processEvents(historicalEvents);
+        
+        // Initialize filters
+        initializeFilters();
+        
+        // Apply default filters
+        applyFilters();
     } catch (error) {
-        console.error('Ошибка при загрузке исторических данных:', error);
-        alert('Не удалось загрузить исторические данные. Попробуйте обновить страницу.');
+        console.error('Error loading historical data:', error);
+        alert('Не удалось загрузить исторические данные');
     }
 }
 
-// Отображение событий на карте
-function displayEvents(events) {
-    // Очистка существующих маркеров
-    markers.clearLayers();
-
-    // Добавление новых маркеров для каждого события с координатами
-    events.forEach(event => {
-        if (event.location && event.location.lat && event.location.lng) {
-            try {
-                const lat = parseFloat(event.location.lat);
-                const lng = parseFloat(event.location.lng);
-
-                // Проверка валидности координат
-                if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-                    // Определение цвета маркера по категории
-                    const colorMap = {
-                        'Война': 'red',
-                        'Политика': 'blue',
-                        'Культура': 'green',
-                        'Наука': 'purple',
-                        'Экономика': 'orange',
-                        'Религия': 'darkblue'
-                    };
-
-                    const color = colorMap[event.category] || 'gray';
-
-                    // Создание HTML для всплывающего окна
-                    const popupContent = `
-                        <div class="event-popup">
-                            <h3>${event.title || 'Без названия'}</h3>
-                            <p><strong>Дата:</strong> ${event.date || 'Неизвестно'}</p>
-                            <p><strong>Категория:</strong> ${event.category || 'Не указана'}</p>
-                            <p>${event.description ? event.description.substring(0, 200) + '...' : 'Нет описания'}</p>
-                        </div>
-                    `;
-
-                    // Создание маркера
-                    const marker = L.marker([lat, lng], {
-                        icon: L.icon({
-                            iconUrl: `https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/images/marker-icon.png`,
-                            shadowUrl: `https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/images/marker-shadow.png`,
-                            iconSize: [25, 41],
-                            iconAnchor: [12, 41],
-                            popupAnchor: [1, -34],
-                            shadowSize: [41, 41]
-                        })
-                    }).bindPopup(popupContent);
-
-                    // Добавление маркера в группу кластеров
-                    markers.addLayer(marker);
-                }
-            } catch (e) {
-                console.error('Ошибка при создании маркера:', e, event);
-            }
-        }
+// Process events data
+function processEvents(events) {
+    // Filter out events without proper location data
+    return events.filter(event => {
+        return event.location && 
+               (typeof event.location === 'object' && event.location.lat && event.location.lng) || 
+               (typeof event.location === 'string');
     });
-
-    // Добавление группы кластеров на карту
-    map.addLayer(markers);
-
-    // Перерисовка карты для корректного отображения
-    map.invalidateSize();
 }
 
-// Применение фильтров к событиям
-function applyFilters() {
-    const categoryFilterValue = categoryFilter.value;
-    const centuryFilterValue = centuryFilter.value;
-    const startYear = parseInt(document.getElementById('start-year').value) || 800;
-    const endYear = parseInt(document.getElementById('end-year').value) || 2023;
+// Initialize filter options based on data
+function initializeFilters() {
+    // Get unique categories
+    const categories = [...new Set(historicalEvents.map(event => event.category))].sort();
+    
+    // Populate category filter
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categoryFilter.appendChild(option);
+    });
+    
+    // Get century ranges from dates
+    const centuries = new Set();
+    historicalEvents.forEach(event => {
+        const year = extractYearFromDate(event.date);
+        if (year) {
+            const century = Math.ceil(year / 100);
+            centuries.add(century);
+        }
+    });
+    
+    // Populate century filter
+    Array.from(centuries).sort((a, b) => a - b).forEach(century => {
+        const option = document.createElement('option');
+        option.value = century;
+        option.textContent = `${century} век`;
+        centuryFilter.appendChild(option);
+    });
+}
 
-    // Фильтрация событий по выбранным критериям
-    filteredEvents = allEvents.filter(event => {
-        // Фильтр по категории
-        if (categoryFilterValue !== 'all' && event.category !== categoryFilterValue) {
+// Extract year from various date formats
+function extractYearFromDate(dateStr) {
+    if (!dateStr) return null;
+    
+    // Try extracting 4-digit year
+    const yearMatch = dateStr.match(/\b(\d{3,4})\b/);
+    if (yearMatch) {
+        return parseInt(yearMatch[1]);
+    }
+    
+    return null;
+}
+
+// Apply filters to events
+function applyFilters() {
+    const selectedCategory = categoryFilter.value;
+    const selectedCentury = centuryFilter.value;
+    
+    // Filter events based on selections
+    filteredEvents = historicalEvents.filter(event => {
+        // Category filter
+        if (selectedCategory !== 'all' && event.category !== selectedCategory) {
             return false;
         }
-
-        // Фильтр по веку
-        if (centuryFilterValue !== 'all') {
+        
+        // Century filter
+        if (selectedCentury !== 'all') {
             const year = extractYearFromDate(event.date);
-            if (!year || Math.ceil(year / 100) != centuryFilterValue) {
+            if (!year || Math.ceil(year / 100) != selectedCentury) {
                 return false;
             }
         }
-
-        // Фильтр по году
-        const eventYear = extractYearFromDate(event.date);
-        if (eventYear && (eventYear < startYear || eventYear > endYear)) {
-            return false;
-        }
-
+        
         return true;
     });
-
-    // Отображение отфильтрованных событий
-    displayEvents(filteredEvents);
+    
+    // Update markers
+    updateMarkers();
 }
 
-// Сброс всех фильтров
-function resetFilters() {
-    document.getElementById('category-filter').value = 'all';
-    document.getElementById('century-filter').value = 'all';
-    document.getElementById('start-year').value = '';
-    document.getElementById('end-year').value = '';
-
-    // Отображение всех событий
-    displayEvents(allEvents);
+// Update map markers based on filtered events
+function updateMarkers() {
+    // Clear existing markers
+    markerCluster.clearLayers();
+    markers = [];
+    
+    // Add new markers
+    filteredEvents.forEach(event => {
+        let lat, lng;
+        
+        if (typeof event.location === 'object' && event.location.lat && event.location.lng) {
+            lat = event.location.lat;
+            lng = event.location.lng;
+        } else if (typeof event.location === 'string') {
+            // Skip events with string locations that don't have coordinates
+            return;
+        }
+        
+        // Skip if coordinates are invalid
+        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+            return;
+        }
+        
+        // Create marker
+        const marker = L.marker([lat, lng]);
+        
+        // Add popup with basic info
+        marker.bindPopup(`<b>${event.title}</b><br>${event.date}`);
+        
+        // Add click handler for detailed view
+        marker.on('click', () => showEventDetails(event));
+        
+        // Add to marker cluster
+        markerCluster.addLayer(marker);
+        markers.push(marker);
+    });
+    
+    // If there are markers, fit bounds to show all markers
+    if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+    }
 }
 
-// Извлечение года из строки с датой
-function extractYearFromDate(dateStr) {
-    if (!dateStr) return null;
-
-    // Поиск 3-4 значного числа в строке даты
-    const yearMatch = dateStr.match(/\b(\d{3,4})\b/);
-    return yearMatch ? parseInt(yearMatch[1]) : null;
-}
-
-// Show detailed event information from original code
+// Show detailed event information
 function showEventDetails(event) {
     eventTitle.textContent = event.title;
     eventDate.textContent = event.date;
@@ -207,3 +196,18 @@ function showEventDetails(event) {
     eventDescription.textContent = event.description;
     eventDetails.classList.remove('hidden');
 }
+
+// Event Listeners
+categoryFilter.addEventListener('change', applyFilters);
+centuryFilter.addEventListener('change', applyFilters);
+resetFiltersBtn.addEventListener('click', () => {
+    categoryFilter.value = 'all';
+    centuryFilter.value = 'all';
+    applyFilters();
+});
+closeDetailsBtn.addEventListener('click', () => {
+    eventDetails.classList.add('hidden');
+});
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', initMap);
