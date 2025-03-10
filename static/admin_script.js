@@ -2646,16 +2646,93 @@ if (window.location.hash) {
 function initMobileMenu() {
     const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
     const sidebar = document.querySelector('.sidebar');
-
-    if (mobileMenuToggle && sidebar) {
-        mobileMenuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('visible');
+    
+    // Создаем оверлей для закрытия меню при клике вне его области
+    let sidebarOverlay = document.querySelector('.sidebar-overlay');
+    if (!sidebarOverlay) {
+        sidebarOverlay = document.createElement('div');
+        sidebarOverlay.className = 'sidebar-overlay';
+        document.body.appendChild(sidebarOverlay);
+        
+        // Обработчик клика по оверлею
+        sidebarOverlay.addEventListener('click', function() {
+            sidebar.classList.remove('visible');
+            sidebarOverlay.classList.remove('visible');
         });
     }
+
+    if (mobileMenuToggle && sidebar) {
+        mobileMenuToggle.addEventListener('click', function(e) {
+            e.stopPropagation(); // Предотвращаем всплытие события
+            sidebar.classList.toggle('visible');
+            sidebarOverlay.classList.toggle('visible');
+        });
+        
+        // Закрытие меню при клике на пункт меню на мобильных устройствах
+        const navItems = sidebar.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            item.addEventListener('click', function() {
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('visible');
+                    sidebarOverlay.classList.remove('visible');
+                }
+            });
+        });
+    }
+    
+    // Добавляем обработчик изменения размера окна
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            // На больших экранах скрываем оверлей и сбрасываем состояние меню
+            sidebar.classList.remove('visible');
+            sidebarOverlay.classList.remove('visible');
+        }
+    });
 }
 
 // Настройки для мобильных устройств
 function adjustForMobile() {
     // Показываем окно документации при запуске на мобильных устройствах
-    toggleDocsModal();
+    if (window.innerWidth <= 768) {
+        toggleDocsModal();
+        
+        // Добавляем обработчики для улучшения взаимодействия на тач-устройствах
+        improveTouch();
+    }
+}
+
+// Улучшения для работы с тач-устройствами
+function improveTouch() {
+    // Улучшаем прокрутку таблиц
+    const tableContainers = document.querySelectorAll('.data-table-container');
+    tableContainers.forEach(container => {
+        // Добавляем подсказку для прокрутки
+        const scrollHint = document.createElement('div');
+        scrollHint.className = 'scroll-hint';
+        scrollHint.textContent = 'Проведите влево-вправо для просмотра всей таблицы';
+        scrollHint.style.fontSize = '0.8rem';
+        scrollHint.style.color = 'var(--medium-text)';
+        scrollHint.style.textAlign = 'center';
+        scrollHint.style.padding = '5px 0';
+        scrollHint.style.marginBottom = '5px';
+        
+        container.parentNode.insertBefore(scrollHint, container);
+        
+        // Сделаем прокрутку более заметной
+        container.style.webkitOverflowScrolling = 'touch';
+        container.style.borderLeft = '3px solid var(--light-bg)';
+        container.style.borderRight = '3px solid var(--light-bg)';
+    });
+    
+    // Увеличиваем высоту строк в таблицах для лучшего таппинга
+    const tableRows = document.querySelectorAll('.data-table tr');
+    tableRows.forEach(row => {
+        row.style.minHeight = '48px';
+    });
+    
+    // Улучшаем интерактивные элементы
+    const actionButtons = document.querySelectorAll('.btn, .btn-icon, select, input[type="checkbox"]');
+    actionButtons.forEach(button => {
+        button.classList.add('touch-friendly');
+    });
 }

@@ -107,14 +107,15 @@ a:hover {
     background-color: var(--primary-dark);
     color: white;
     border: none;
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     display: none;
     align-items: center;
     justify-content: center;
     box-shadow: var(--shadow-md);
     cursor: pointer;
+    font-size: 1.2rem;
 }
 
 @media (max-width: 768px) {
@@ -128,12 +129,14 @@ a:hover {
     
     /* Изменяем отступ контента на мобильных устройствах */
     .content {
-        padding-top: 10px;
+        padding-top: 60px; /* Увеличиваем отступ, чтобы контент не перекрывался кнопкой меню */
     }
     
     /* Убедимся, что модальные окна правильно отображаются */
     .docs-modal, .modal {
         z-index: 2000;
+        width: 95% !important;
+        max-height: 90vh !important;
     }
     
     /* Фиксируем боковое меню поверх контента на мобильных */
@@ -142,6 +145,31 @@ a:hover {
         height: 100vh;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch; /* Плавный скролл на iOS */
+        width: 85%; /* Увеличиваем ширину бокового меню на мобильных */
+        z-index: 3000; /* Повышаем уровень z-index, чтобы меню было выше других элементов */
+        transform: translateX(-100%); /* Начальное положение - за пределами экрана */
+        transition: transform 0.3s ease; /* Плавное появление/исчезновение */
+        box-shadow: var(--shadow-lg); /* Тень для выделения меню */
+    }
+    
+    .sidebar.visible {
+        transform: translateX(0); /* При добавлении класса visible меню появляется */
+    }
+    
+    /* Затемнение при открытом меню */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 2500;
+    }
+    
+    .sidebar-overlay.visible {
+        display: block;
     }
 }
 
@@ -1955,8 +1983,8 @@ input:checked + .slider:before {
     .sidebar {
         transform: translateX(-100%);
         box-shadow: var(--shadow-lg);
-        width: 250px;
-        z-index: 1100;
+        width: 280px;
+        z-index: 3000;
     }
     
     .sidebar.visible {
@@ -1971,6 +1999,11 @@ input:checked + .slider:before {
     .top-bar {
         justify-content: space-between;
         padding: 0 var(--space-md);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
     }
     
     .top-bar-actions {
@@ -1988,6 +2021,7 @@ input:checked + .slider:before {
     
     .page {
         padding: var(--space-md);
+        margin-top: var(--header-height); /* Добавляем отступ под фиксированным заголовком */
     }
     
     .page-header h1 {
@@ -2016,6 +2050,7 @@ input:checked + .slider:before {
     
     .data-table-container {
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Плавный скролл на iOS */
     }
     
     .admin-section {
@@ -2023,7 +2058,7 @@ input:checked + .slider:before {
     }
     
     .doc-viewer-content {
-        width: 95%;
+        width: 100%;
         height: 95%;
     }
     
@@ -2031,62 +2066,124 @@ input:checked + .slider:before {
         width: 95%;
         max-width: none;
         height: 90vh;
+        overflow-y: auto;
     }
     
     .docs-list {
         grid-template-columns: 1fr;
+    }
+    
+    /* Улучшения для модальных окон */
+    .modal-overlay {
+        padding: 0 var(--space-sm);
+    }
+    
+    .modal {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    /* Стилизация документации */
+    .docs-modal-body {
+        max-height: 70vh;
     }
 }
 
 /* Стили для смартфонов */
 @media (max-width: 576px) {
     body {
-        font-size: 13px;
+        font-size: 14px; /* Увеличиваем размер текста для лучшей читаемости */
     }
     
+    /* Улучшенное меню */
+    .mobile-menu-toggle {
+        width: 50px;
+        height: 50px;
+        top: 6px;
+        left: 6px;
+        font-size: 1.3rem;
+    }
+    
+    /* Стили для статистических карточек */
     .analytics-overview {
         grid-template-columns: 1fr;
+        gap: var(--space-sm);
     }
     
     .stat-card {
         max-width: 100%;
+        padding: var(--space-md);
     }
     
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+    
+    .stat-details h3 {
+        font-size: 0.8rem;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    /* Карточки дашборда */
     .dashboard-card {
         margin-bottom: var(--space-md);
+    }
+    
+    .dashboard-row {
+        gap: var(--space-md);
     }
     
     .card-actions {
         flex-direction: column;
         gap: var(--space-xs);
+        width: 100%;
+    }
+    
+    .card-actions button,
+    .card-actions select {
+        width: 100%;
     }
     
     .card-header {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--space-xs);
+        padding: var(--space-sm);
     }
     
     .card-header h2 {
         margin-bottom: var(--space-xs);
+        font-size: 1.1rem;
     }
     
+    .card-body {
+        padding: var(--space-sm);
+    }
+    
+    /* Заголовки страниц */
     .page-header {
         margin-bottom: var(--space-md);
     }
     
     .page-header h1 {
-        font-size: 1.25rem;
-        margin-bottom: 0;
+        font-size: 1.4rem;
+        margin-bottom: 4px;
     }
     
     .page-description {
         font-size: 0.9rem;
     }
     
+    /* Кнопки и формы */
     .btn {
-        padding: 6px 12px;
-        font-size: 0.9rem;
+        padding: 8px 12px;
+        font-size: 0.95rem;
     }
     
     .form-actions {
@@ -2096,8 +2193,10 @@ input:checked + .slider:before {
     
     .form-actions .btn {
         width: 100%;
+        margin-bottom: 6px;
     }
     
+    /* Пагинация */
     .pagination-container {
         flex-direction: column;
         gap: var(--space-md);
@@ -2106,18 +2205,45 @@ input:checked + .slider:before {
     
     .pagination {
         margin-bottom: var(--space-sm);
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: var(--space-xs);
     }
     
+    .pagination-button {
+        min-width: 36px;
+        height: 36px;
+    }
+    
+    /* Модальные окна */
     .docs-modal-header h2 {
         font-size: 1.2rem;
     }
     
+    .modal-header h2 {
+        font-size: 1.2rem;
+    }
+    
+    .modal-body {
+        padding: var(--space-md);
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .modal-footer {
+        padding: var(--space-md);
+    }
+    
+    /* Списки и информационные блоки */
     .stats-list {
         grid-template-columns: 1fr;
     }
     
     .activity-item {
         flex-direction: column;
+        padding: var(--space-sm);
     }
     
     .activity-icon {
@@ -2133,36 +2259,136 @@ input:checked + .slider:before {
         grid-template-columns: 1fr;
     }
     
+    /* Управление администраторами */
     .admin-item {
         flex-direction: column;
         align-items: flex-start;
+        padding: var(--space-sm);
     }
     
     .admin-info {
         margin-bottom: var(--space-sm);
+        width: 100%;
     }
     
     .admin-actions {
-        align-self: flex-end;
+        align-self: flex-start;
+        width: 100%;
+        display: flex;
+        justify-content: flex-start;
+        margin-top: var(--space-xs);
+    }
+    
+    /* Формы и элементы ввода */
+    .form-group {
+        margin-bottom: var(--space-md);
+    }
+    
+    label {
+        display: block;
+        margin-bottom: 4px;
     }
     
     /* Улучшение удобства взаимодействия для сенсорных экранов */
     .btn, .btn-icon, .pagination-button, .docs-item {
-        min-height: 44px;
+        min-height: 46px;
     }
     
     input[type="text"], 
     input[type="number"],
     input[type="password"],
-    select {
-        min-height: 44px;
+    select, 
+    textarea {
+        min-height: 46px;
         font-size: 16px; /* Предотвращает масштабирование на iOS */
+        padding: 8px 12px;
+        width: 100%;
+        box-sizing: border-box;
     }
     
-    /* Исправление проблем с модальными окнами на мобильных */
-    .modal {
-        width: 95%;
-        max-height: 80vh;
+    /* Таблицы данных */
+    .data-table th,
+    .data-table td {
+        padding: 10px 8px;
+        font-size: 0.9rem;
+    }
+    
+    .data-table td .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    
+    .data-table td .actions .btn-icon {
+        width: 38px;
+        height: 38px;
+    }
+    
+    /* Логи */
+    .logs-controls {
+        flex-direction: column;
+        gap: var(--space-md);
+    }
+    
+    .logs-filters {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .logs-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        width: 100%;
+    }
+    
+    .terminal-content {
+        font-size: 0.8rem;
+        padding: var(--space-sm);
+    }
+    
+    /* Документация */
+    .docs-category {
+        margin-bottom: var(--space-sm);
+    }
+    
+    .docs-item {
+        padding: var(--space-sm);
+    }
+}
+
+/* Стили для очень маленьких экранов */
+@media (max-width: 380px) {
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+        margin-right: var(--space-sm);
+    }
+    
+    .stat-value {
+        font-size: 1.3rem;
+    }
+    
+    .breadcrumb {
+        font-size: 0.9rem;
+    }
+    
+    .top-bar {
+        height: 50px;
+    }
+    
+    .docs-modal-header h2,
+    .modal-header h2 {
+        font-size: 1.1rem;
+    }
+    
+    .filter-panel {
+        padding: var(--space-sm);
+    }
+    
+    .page {
+        padding: var(--space-sm);
     }
 }
 
@@ -2221,6 +2447,102 @@ body.dark-theme {
 .dark-theme .data-table tr:hover td {
     background-color: #333;
 }
+
+/* Улучшенные стили для мобильных устройств */
+.touch-friendly {
+    /* Улучшаем интерактивные элементы для тач-устройств */
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.touch-friendly:active {
+    transform: scale(0.95);
+}
+
+/* Стили для кнопок на мобильных */
+@media (max-width: 768px) {
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 16px;
+        border-radius: var(--radius-md);
+        line-height: 1.2;
+    }
+    
+    .btn-icon {
+        min-width: 42px;
+        min-height: 42px;
+    }
+
+    /* Стили для мобильного меню */
+    .nav-item a {
+        padding: 14px var(--space-lg);
+    }
+    
+    .nav-item a i {
+        font-size: 1.3rem;
+    }
+    
+    /* Карточки на мобильных */
+    .stat-card, .dashboard-card, .admin-section, .maintenance-card {
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        transition: transform 0.2s ease;
+    }
+    
+    /* Анимация нажатия на карточки */
+    .stat-card:active, 
+    .dashboard-card:active, 
+    .admin-section:active, 
+    .maintenance-card:active {
+        transform: scale(0.98);
+    }
+    
+    /* Улучшение навигации в документации */
+    .docs-modal-body {
+        padding: var(--space-sm);
+    }
+    
+    .docs-item {
+        padding: 12px;
+        border-radius: var(--radius-md);
+        margin-bottom: 8px;
+        background-color: var(--lightest-bg);
+    }
+    
+    /* Адаптивные настройки для действий в таблицах */
+    .data-table td .actions {
+        display: flex;
+        flex-wrap: nowrap;
+    }
+    
+    /* Индикатор прокрутки для таблиц */
+    .scroll-hint {
+        display: none;
+    }
+    
+    /* Показываем индикатор прокрутки только на мобильных */
+    @media (max-width: 768px) {
+        .scroll-hint {
+            display: block;
+            animation: pulse 2s infinite;
+        }
+    }
+    
+    @keyframes pulse {
+        0% {
+            opacity: 0.6;
+        }
+        50% {
+            opacity: 1;
+        }
+        100% {
+            opacity: 0.6;
+        }
+    }
+}
+
 
 .dark-theme .pagination-button:hover {
     border-color: var(--primary-color);
