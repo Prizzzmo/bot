@@ -148,6 +148,13 @@ function registerEventHandlers() {
     // Обработка нажатия на выход
     document.getElementById('logout-button').addEventListener('click', handleLogout);
     
+    // Обработка нажатия на кнопку документации
+    document.getElementById('docs-button').addEventListener('click', toggleDocsModal);
+    
+    // Обработка закрытия модального окна документации
+    document.getElementById('docs-modal-close').addEventListener('click', closeDocsModal);
+    document.getElementById('docs-modal-overlay').addEventListener('click', closeDocsModal);
+    
     // Обработка переключения темы
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
     
@@ -2498,6 +2505,30 @@ function closeModal() {
     }, 300);
     
     // Разблокируем прокрутку страницы
+    document.body.style.overflow = '';
+}
+
+// Открытие/закрытие модального окна документации
+function toggleDocsModal() {
+    const docsModal = document.getElementById('docs-modal');
+    const docsOverlay = document.getElementById('docs-modal-overlay');
+    
+    if (docsModal.style.display === 'block') {
+        closeDocsModal();
+    } else {
+        docsModal.style.display = 'block';
+        docsOverlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+// Закрытие модального окна документации
+function closeDocsModal() {
+    const docsModal = document.getElementById('docs-modal');
+    const docsOverlay = document.getElementById('docs-modal-overlay');
+    
+    docsModal.style.display = 'none';
+    docsOverlay.style.display = 'none';
     document.body.style.overflow = '';
 }
 

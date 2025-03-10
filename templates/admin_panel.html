@@ -80,6 +80,10 @@
             </ul>
             
             <div class="sidebar-footer">
+                <button id="docs-button" class="btn-docs">
+                    <i class="fas fa-book"></i>
+                    <span>Документация</span>
+                </button>
                 <button id="logout-button" class="btn-logout">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Выйти</span>
@@ -1006,6 +1010,70 @@
     <div class="modal-overlay" id="modal-overlay">
         <div class="modal" id="modal-container">
             <!-- Содержимое модального окна загружается динамически -->
+        </div>
+    </div>
+    
+    <!-- Модальное окно документации -->
+    <div class="docs-modal-overlay" id="docs-modal-overlay"></div>
+    <div class="docs-modal" id="docs-modal">
+        <div class="docs-modal-header">
+            <h2><i class="fas fa-book"></i> Документация проекта</h2>
+            <button class="docs-modal-close" id="docs-modal-close">&times;</button>
+        </div>
+        <div class="docs-modal-body">
+            <div class="docs-category">
+                <h3>Основная документация</h3>
+                <div class="docs-list">
+                    <a href="/docs/README.md" target="_blank" class="docs-item">
+                        <i class="fas fa-file-alt"></i>
+                        <span class="docs-item-title">README - Обзор проекта</span>
+                    </a>
+                    <a href="/docs/architecture.md" target="_blank" class="docs-item">
+                        <i class="fas fa-sitemap"></i>
+                        <span class="docs-item-title">Архитектура системы</span>
+                    </a>
+                    <a href="/docs/development_guide.md" target="_blank" class="docs-item">
+                        <i class="fas fa-code"></i>
+                        <span class="docs-item-title">Руководство разработчика</span>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="docs-category">
+                <h3>Техническая документация</h3>
+                <div class="docs-list">
+                    <a href="/docs/api_components.md" target="_blank" class="docs-item">
+                        <i class="fas fa-plug"></i>
+                        <span class="docs-item-title">API компоненты</span>
+                    </a>
+                    <a href="/docs/database_structure.md" target="_blank" class="docs-item">
+                        <i class="fas fa-database"></i>
+                        <span class="docs-item-title">Структура базы данных</span>
+                    </a>
+                    <a href="/docs/caching_system.md" target="_blank" class="docs-item">
+                        <i class="fas fa-memory"></i>
+                        <span class="docs-item-title">Система кэширования</span>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="docs-category">
+                <h3>Руководства и инструкции</h3>
+                <div class="docs-list">
+                    <a href="/docs/linux_installation.md" target="_blank" class="docs-item">
+                        <i class="fab fa-linux"></i>
+                        <span class="docs-item-title">Установка на Linux</span>
+                    </a>
+                    <a href="/docs/testing_guide.md" target="_blank" class="docs-item">
+                        <i class="fas fa-vial"></i>
+                        <span class="docs-item-title">Руководство по тестированию</span>
+                    </a>
+                    <a href="/detailed_presentation.md" target="_blank" class="docs-item">
+                        <i class="fas fa-file-powerpoint"></i>
+                        <span class="docs-item-title">Подробная презентация</span>
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
     

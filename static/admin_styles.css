@@ -278,7 +278,13 @@ input:focus, select:focus, textarea:focus, button:focus {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.btn-logout {
+.sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.btn-logout, .btn-docs {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -292,12 +298,128 @@ input:focus, select:focus, textarea:focus, button:focus {
     transition: background-color var(--transition-speed) var(--transition-fn);
 }
 
-.btn-logout:hover {
+.btn-logout:hover, .btn-docs:hover {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
-.btn-logout i {
+.btn-logout i, .btn-docs i {
     margin-right: var(--space-sm);
+}
+
+.btn-docs {
+    background-color: rgba(76, 175, 80, 0.2);
+}
+
+.btn-docs:hover {
+    background-color: rgba(76, 175, 80, 0.3);
+}
+
+/* Документационное модальное окно */
+.docs-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    border-radius: var(--radius-lg);
+    z-index: 2000;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.dark-theme .docs-modal {
+    background-color: #2d2d2d;
+    color: var(--dark-text);
+}
+
+.docs-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--divider-color);
+}
+
+.docs-modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.docs-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--medium-text);
+}
+
+.docs-modal-close:hover {
+    color: var(--danger-color);
+}
+
+.docs-modal-body {
+    padding: var(--space-lg);
+    overflow-y: auto;
+    max-height: calc(80vh - 120px);
+}
+
+.docs-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--space-md);
+}
+
+.docs-category {
+    margin-bottom: var(--space-lg);
+}
+
+.docs-category h3 {
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--divider-color);
+}
+
+.docs-item {
+    display: flex;
+    align-items: center;
+    padding: var(--space-sm);
+    border-radius: var(--radius-md);
+    transition: background-color var(--transition-speed) var(--transition-fn);
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--dark-text);
+}
+
+.dark-theme .docs-item {
+    color: var(--dark-text);
+}
+
+.docs-item:hover {
+    background-color: var(--light-bg);
+}
+
+.docs-item i {
+    margin-right: var(--space-sm);
+    color: var(--primary-color);
+}
+
+.docs-item-title {
+    font-weight: 500;
+}
+
+.docs-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1999;
 }
 
 /* Основное содержимое */
