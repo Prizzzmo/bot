@@ -6,6 +6,7 @@
 
 # Список API ключей для модели gemini-2.0-flash
 GEMINI_API_KEYS = [
+    "AIzaSyA1wWrKHAbMx60Y2nxPgS-BmRmw7L1-QiQ",
     "AIzaSyAuAktN3PCP1EOXHvA4D-4SPvddXSOKNuU",
     "AIzaSyCvJVQnn7jAEpynQ5mToQUtYWbu_X7TUkU",
     "AIzaSyDR2MuMWLBzRPiDPg7O8sZuke77CWmzI1U"
