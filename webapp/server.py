@@ -427,12 +427,12 @@ def add_admin():
         data = request.json
         if not data or not data.get('user_id'):
             return jsonify({"error": "Недостаточно данных"}), 400
-            
+
         user_id = int(data.get('user_id'))
         is_super = data.get('is_super', False)
-        
+
         admins = load_admins()
-        
+
         if is_super:
             if user_id not in admins.get("super_admin_ids", []):
                 admins.setdefault("super_admin_ids", []).append(user_id)
@@ -441,19 +441,19 @@ def add_admin():
             if user_id not in admins.get("admin_ids", []):
                 admins.setdefault("admin_ids", []).append(user_id)
                 logger.info(f"Добавлен админ: {user_id}")
-                
+
         save_admins(admins)
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Ошибка при добавлении администратора: {e}")
         return jsonify({"error": str(e)}), 500
-        
+
 @app.route('/api/admin/admins/<int:user_id>', methods=['DELETE'])
 def remove_admin(user_id):
     """API для удаления администратора"""
     try:
         admins = load_admins()
-        
+
         if user_id in admins.get("admin_ids", []):
             admins["admin_ids"].remove(user_id)
             logger.info(f"Удален админ: {user_id}")
@@ -464,7 +464,7 @@ def remove_admin(user_id):
             logger.info(f"Удален супер-админ: {user_id}")
             save_admins(admins)
             return jsonify({"success": True})
-            
+
         return jsonify({"error": "Администратор не найден"}), 404
     except Exception as e:
         logger.error(f"Ошибка при удалении администратора: {e}")
@@ -494,7 +494,7 @@ def get_logs():
     try:
         lines = request.args.get('lines', 100, type=int)
         level = request.args.get('level', 'all')
-        
+
         logs = get_last_logs(lines, level)
         return jsonify(logs)
     except Exception as e:
@@ -518,7 +518,7 @@ def update_settings():
         settings = request.json
         if not settings:
             return jsonify({"error": "Недостаточно данных"}), 400
-            
+
         save_bot_settings(settings)
         return jsonify({"success": True})
     except Exception as e:
@@ -565,22 +565,22 @@ def maintenance_action(action):
     except Exception as e:
         logger.error(f"Ошибка при выполнении операции обслуживания: {e}")
         return jsonify({"error": str(e)}), 500
-        
+
 @app.route('/api/admin/check-auth', methods=['GET'])
 def check_admin_auth():
     """Проверка аутентификации администратора"""
     try:
         user_id = request.cookies.get('admin_id')
-        
+
         if not user_id:
             return jsonify({"authenticated": False})
-        
+
         admins = load_admins()
         user_id = int(user_id)
-        
+
         is_admin = user_id in admins.get("admin_ids", []) or user_id in admins.get("super_admin_ids", [])
         is_super_admin = user_id in admins.get("super_admin_ids", [])
-        
+
         if is_admin:
             return jsonify({
                 "authenticated": True,
@@ -589,7 +589,7 @@ def check_admin_auth():
                     "is_super_admin": is_super_admin
                 }
             })
-        
+
         return jsonify({"authenticated": False})
     except Exception as e:
         logger.error(f"Ошибка при проверке аутентификации: {e}")
@@ -600,29 +600,31 @@ def admin_login():
     """Авторизация администратора"""
     try:
         data = request.json
-        admin_id = int(data.get('admin_id', 0))
-        
-        if not admin_id:
-            return jsonify({"success": False, "message": "ID администратора не указан"})
-        
-        admins = load_admins()
-        
-        is_admin = admin_id in admins.get("admin_ids", []) or admin_id in admins.get("super_admin_ids", [])
-        is_super_admin = admin_id in admins.get("super_admin_ids", [])
-        
-        if is_admin:
+        admin_password = data.get('admin_password', '')
+
+        if not admin_password:
+            return jsonify({"success": False, "message": "Пароль администратора не указан"})
+
+        # Проверяем пароль - используем фиксированный пароль "nnkhqjm"
+        correct_password = "nnkhqjm"
+
+        if admin_password == correct_password:
+            # При успешной авторизации используем ID супер-администратора из admins.json
+            admins = load_admins()
+            admin_id = admins.get("super_admin_ids", [7225056628])[0]  # По умолчанию используем ID из admins.json
+
             response = jsonify({
                 "success": True,
                 "user": {
                     "id": admin_id,
-                    "is_super_admin": is_super_admin
+                    "is_super_admin": True  # Авторизация по паролю дает права супер-администратора
                 }
             })
             response.set_cookie('admin_id', str(admin_id), max_age=86400)  # 24 часа
             return response
-        
-        logger.warning(f"Неудачная попытка входа администратора с ID {admin_id}")
-        return jsonify({"success": False, "message": "Неверный ID администратора"})
+
+        logger.warning(f"Неудачная попытка входа администратора с паролем '{admin_password}'")
+        return jsonify({"success": False, "message": "Неверный пароль администратора"})
     except Exception as e:
         logger.error(f"Ошибка при авторизации администратора: {e}")
         return jsonify({"success": False, "message": "Ошибка при авторизации"})
@@ -640,7 +642,7 @@ def get_users():
             {"id": 111111111, "name": "Елена", "status": "active", "last_activity": "2023-03-09 14:20", "messages": 37},
             {"id": 222222222, "name": "Сергей", "status": "blocked", "last_activity": "2023-02-15 08:30", "messages": 5}
         ]
-        
+
         return jsonify(sample_users)
     except Exception as e:
         logger.error(f"Ошибка при получении списка пользователей: {e}")
@@ -662,7 +664,7 @@ def get_user(user_id):
             "tests_completed": 5,
             "favorite_topics": ["Революции", "Война 1812 года"]
         }
-        
+
         return jsonify(sample_user)
     except Exception as e:
         logger.error(f"Ошибка при получении информации о пользователе: {e}")
@@ -698,19 +700,19 @@ def export_logs():
         level = request.args.get('level', 'all')
         lines = request.args.get('lines', 1000, type=int)
         logs = get_last_logs(lines, level)
-        
+
         # Создаем временный файл для записи логов
         temp_file = f"logs_export_{int(time.time())}.txt"
         with open(temp_file, 'w', encoding='utf-8') as f:
             f.write('\n'.join(logs))
-        
+
         # Отправляем файл
         response = send_file(
             temp_file,
             as_attachment=True,
             download_name=f"logs_export_{time.strftime('%Y%m%d_%H%M%S')}.txt"
         )
-        
+
         # Удаляем временный файл после отправки
         @response.call_on_close
         def remove_file():
@@ -718,7 +720,7 @@ def export_logs():
                 os.remove(temp_file)
             except:
                 pass
-        
+
         return response
     except Exception as e:
         logger.error(f"Ошибка при экспорте логов: {e}")
@@ -775,18 +777,18 @@ def get_last_logs(lines=100, level='all'):
 
         # Берем самый свежий файл логов
         latest_log = log_files[0]
-        
+
         log_lines = []
         with open(latest_log, 'r', encoding='utf-8') as f:
             # Читаем все строки файла
             all_lines = f.readlines()
-            
+
         # Фильтруем по уровню, если указан не 'all'
         if level != 'all':
             filtered_lines = [line for line in all_lines if f" - {level.upper()} - " in line]
         else:
             filtered_lines = all_lines
-            
+
         # Берем последние N строк
         return filtered_lines[-lines:]
     except Exception as e:
@@ -842,9 +844,9 @@ def create_backup():
         backup_dir = 'backups'
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
-            
+
         timestamp = int(time.time())
-        
+
         # Резервное копирование файлов данных
         files_to_backup = ['admins.json', 'user_states.json', 'historical_events.json']
         for file in files_to_backup:
@@ -852,12 +854,12 @@ def create_backup():
                 backup_path = os.path.join(backup_dir, f"{os.path.splitext(file)[0]}_backup_{timestamp}{os.path.splitext(file)[1]}")
                 with open(file, 'r', encoding='utf-8') as src, open(backup_path, 'w', encoding='utf-8') as dst:
                     dst.write(src.read())
-                    
+
         # Создаем файл метаданных резервной копии
         backup_meta = os.path.join(backup_dir, f"data_backup_v{len(os.listdir(backup_dir))}_{timestamp}")
         with open(backup_meta, 'w', encoding='utf-8') as f:
             f.write(f"Backup created at {time.ctime(timestamp)}")
-            
+
         return True
     except Exception as e:
         logger.error(f"Ошибка при создании резервной копии: {e}")

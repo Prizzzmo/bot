@@ -81,10 +81,10 @@ function showAdminPanel() {
 function handleLogin(e) {
     e.preventDefault();
     
-    const adminId = document.getElementById('admin-id').value;
+    const adminPassword = document.getElementById('admin-password').value;
     
-    if (!adminId) {
-        showAuthError('Введите ID администратора');
+    if (!adminPassword) {
+        showAuthError('Введите пароль администратора');
         return;
     }
     
@@ -93,7 +93,7 @@ function handleLogin(e) {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ admin_id: adminId })
+        body: JSON.stringify({ admin_password: adminPassword })
     })
     .then(response => response.json())
     .then(data => {
@@ -105,7 +105,7 @@ function handleLogin(e) {
             updateUserInfo();
             showNotification('Вы успешно вошли в систему', 'success');
         } else {
-            showAuthError(data.message || 'Неверный ID администратора');
+            showAuthError(data.message || 'Неверный пароль администратора');
         }
     })
     .catch(error => {
