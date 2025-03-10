@@ -3,17 +3,17 @@ import os
 import threading
 import json
 import time
-import logging
 from typing import Dict, List, Any, Optional, Callable
 from datetime import datetime
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatAction
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
 
-from src.handlers import CommandHandlers
+from src.handlers import Handler
 from src.service_container import ServiceContainer
+from src.factory import BotFactory
 from src.config import Config, TOPIC, CHOOSE_TOPIC, CONVERSATION, TEST, ANSWER, MAP, ANALYTICS, ADMIN
-from src.logger import Logger
+from src.logger import BotLogger
 from src.interfaces import IBot, ILogger
 
 
@@ -22,7 +22,7 @@ class Bot(IBot):
     Основной класс бота, реализующий основные функции взаимодействия с Telegram API.
     """
 
-    def __init__(self, config: Config, handlers: CommandHandlers, logger: ILogger, web_server=None):
+    def __init__(self, config: Config, handlers: Handler, logger: ILogger, web_server=None):
         """
         Инициализация бота.
 
@@ -109,7 +109,7 @@ class Bot(IBot):
 
             return True
         except Exception as e:
-            self.logger.log_error(e, {"context": "Ошибка при настройке бота"})
+            self.logger.log_error(e, "Ошибка при настройке бота")
             return False
 
     def start(self, use_webhook: bool = False, webhook_url: str = "", port: int = 8443) -> bool:
@@ -150,18 +150,9 @@ class Bot(IBot):
 
             return True
         except Exception as e:
-            self.logger.log_error(e, {"context": "Ошибка при запуске бота"})
+            self.logger.log_error(e, "Ошибка при запуске бота")
             return False
 
-    def run(self) -> bool:
-        """
-        Запуск бота с использованием стандартных настроек.
-        
-        Returns:
-            bool: True, если запуск успешен
-        """
-        return self.start(use_webhook=False)
-        
     def stop(self) -> bool:
         """
         Остановка бота.
@@ -177,7 +168,7 @@ class Bot(IBot):
                 return True
             return False
         except Exception as e:
-            self.logger.log_error(e, {"context": "Ошибка при остановке бота"})
+            self.logger.log_error(e, "Ошибка при остановке бота")
             return False
 
     def _update_startup_info(self) -> None:
@@ -223,7 +214,7 @@ class BotManager:
             config_path (str, optional): Путь к файлу конфигурации
         """
         # Инициализируем логгер
-        self.logger = Logger(log_level=logging.INFO, log_dir="logs")
+        self.logger = BotLogger("bot.log", "INFO")
         self.logger.info("Запуск историчеcкого образовательного бота")
 
         # Загружаем конфигурацию
