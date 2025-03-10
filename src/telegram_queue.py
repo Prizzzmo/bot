@@ -21,115 +21,68 @@ class TelegramRequestQueue:
         self.worker_thread.start()
     
     def _process_queue(self):
-        """Обрабатывает очередь запросов с учетом ограничений частоты - оптимизированная версия"""
-        consecutive_errors = 0
-        max_consecutive_errors = 5
-        backoff_factor = 1.5  # Множитель для экспоненциального отступа
-        
+        """Обрабатывает очередь запросов с учетом ограничений частоты"""
         while self.running:
             try:
-                # Адаптивный таймаут: меньше при наличии запросов, больше при пустой очереди
-                queue_size = self.queue.qsize()
-                timeout = 0.1 if queue_size > 0 else 0.5
-                
+                # Получаем запрос из очереди с меньшим таймаутом для более быстрой обработки
                 try:
-                    func, args, kwargs, callback = self.queue.get(block=True, timeout=timeout)
+                    func, args, kwargs, callback = self.queue.get(block=True, timeout=0.2)
                 except queue.Empty:
+                    # Очередь пуста, продолжаем цикл без дополнительных действий
                     continue
                 
-                # Проверяем интервал между запросами с минимальной блокировкой
-                current_time = time.time()
-                
+                # Проверяем интервал между запросами
                 with self.lock:
+                    current_time = time.time()
                     time_since_last = current_time - self.last_request_time
+                    
+                    # Оптимизированная проверка и ожидание
                     if time_since_last < self.min_interval:
-                        wait_time = self.min_interval - time_since_last
-                    else:
-                        wait_time = 0
-                
-                # Ожидаем без блокировки, если необходимо
-                if wait_time > 0:
-                    time.sleep(wait_time)
-                
-                # Выполняем запрос с минимальной блокировкой
-                try:
-                    result = func(*args, **kwargs)
-                    success = True
-                    # Сбрасываем счетчик ошибок при успехе
-                    consecutive_errors = 0
-                except telegram.error.RetryAfter as e:
-                    retry_after = e.retry_after
+                        sleep_time = self.min_interval - time_since_last
+                        # Выходим из блокировки на время ожидания
+                        self.lock.release()
+                        time.sleep(sleep_time)
+                        self.lock.acquire()
                     
-                    # Логируем с минимальной частотой
-                    if self.logger:
-                        self.logger.warning(f"Превышен лимит запросов. Ожидание {retry_after} секунд. Очередь: {queue_size}")
+                    # Выполняем запрос
+                    try:
+                        result = func(*args, **kwargs)
+                        success = True
+                    except telegram.error.RetryAfter as e:
+                        # Оптимизированная обработка RetryAfter
+                        if self.logger:
+                            self.logger.warning(f"Превышен лимит запросов. Ожидание {e.retry_after} секунд")
+                        
+                        # Возвращаем элемент в очередь и ждем
+                        self.queue.put((func, args, kwargs, callback))
+                        self.lock.release()
+                        time.sleep(e.retry_after)
+                        self.lock.acquire()
+                        # Сообщаем о завершении обработки текущего элемента очереди
+                        self.queue.task_done()
+                        continue
+                    except Exception as e:
+                        if self.logger:
+                            self.logger.error(f"Ошибка при выполнении запроса к Telegram API: {e}")
+                        success = False
+                        result = e
                     
-                    # Приоритизируем запросы с RetryAfter
-                    # Возвращаем в начало очереди для повторной попытки после задержки
-                    temp_queue = queue.Queue()
-                    temp_queue.put((func, args, kwargs, callback))
-                    
-                    # Переносим до 10 элементов из основной очереди во временную
-                    for _ in range(min(10, self.queue.qsize())):
-                        try:
-                            temp_queue.put(self.queue.get_nowait())
-                            self.queue.task_done()
-                        except queue.Empty:
-                            break
-                    
-                    # Возвращаем все элементы обратно после задержки
-                    time.sleep(retry_after + 0.1)  # Небольшой дополнительный запас
-                    
-                    # Возвращаем элементы в основную очередь
-                    while not temp_queue.empty():
-                        self.queue.put(temp_queue.get_nowait())
-                    
-                    # Завершаем текущую итерацию
-                    self.queue.task_done()
-                    continue
-                    
-                except Exception as e:
-                    if self.logger:
-                        self.logger.error(f"Ошибка при выполнении запроса к Telegram API: {e}")
-                    success = False
-                    result = e
-                    consecutive_errors += 1
-                    
-                    # Экспоненциальный отступ при повторяющихся ошибках
-                    if consecutive_errors > 1:
-                        backoff_time = min(30, backoff_factor ** (consecutive_errors - 1))
-                        time.sleep(backoff_time)
-                
-                # Обновляем время последнего запроса с минимальной блокировкой
-                with self.lock:
+                    # Обновляем время последнего запроса
                     self.last_request_time = time.time()
                 
-                # Вызываем callback вне блокировки
+                # Вызываем callback вне блокировки для повышения производительности
                 if callback:
-                    try:
-                        if success:
-                            callback(result, None)
-                        else:
-                            callback(None, result)
-                    except Exception as callback_error:
-                        if self.logger:
-                            self.logger.error(f"Ошибка в callback-функции: {callback_error}")
+                    if success:
+                        callback(result, None)
+                    else:
+                        callback(None, result)
                 
-                # Сообщаем о завершении обработки
+                # Сообщаем о завершении обработки элемента очереди
                 self.queue.task_done()
-                
-                # Останавливаем работу потока при множественных ошибках
-                if consecutive_errors >= max_consecutive_errors:
-                    if self.logger:
-                        self.logger.critical(f"Превышено максимальное количество ошибок ({max_consecutive_errors}), перезапуск очереди")
-                    # Перезапуск потока
-                    return
                 
             except Exception as e:
                 if self.logger:
-                    self.logger.error(f"Критическая ошибка в обработчике очереди: {e}")
-                # Небольшая пауза перед продолжением при ошибке
-                time.sleep(0.5)
+                    self.logger.error(f"Ошибка в обработчике очереди: {e}")
     
     def enqueue(self, func, *args, callback=None, **kwargs):
         """Добавляет запрос в очередь"""

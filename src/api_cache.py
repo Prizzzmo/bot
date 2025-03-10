@@ -280,65 +280,55 @@ class APICache(ICache):
     def _cleanup_cache(self):
         """
         Очищает кэш, если он превышает лимит памяти.
-        Использует оптимизированную проверку размера объектов в памяти.
+        Использует проверку реального размера объектов в памяти.
         """
         with self.lock:
             import sys
             
-            # Проверка по количеству элементов - быстрая первичная проверка
+            # Проверка по количеству элементов
             if len(self.cache) > self.max_size:
                 self._evict_lru()
                 return
             
-            # Проверка по примерному использованию памяти
-            # Используем выборочную проверку размера для скорости
+            # Проверка по фактическому использованию памяти
             try:
-                # Проверяем только до 100 элементов для оценки среднего размера
-                sample_keys = list(self.cache.keys())[:min(100, len(self.cache))]
-                if not sample_keys:
-                    return
-                
-                sample_size = 0
-                for key in sample_keys:
-                    item = self.cache[key]
-                    key_size = sys.getsizeof(key)
-                    value_size = sys.getsizeof(item.get('value', ''))
-                    item_size = key_size + value_size + sys.getsizeof(item)
-                    sample_size += item_size
-                
-                # Оцениваем средний размер элемента
-                avg_item_size = sample_size / len(sample_keys)
-                # Оцениваем общий размер кэша
-                estimated_total_size = avg_item_size * len(self.cache)
+                total_size_bytes = 0
                 memory_limit_bytes = self.memory_limit_mb * 1024 * 1024
                 
-                # Если превысили лимит, удаляем по LRU
-                if estimated_total_size > memory_limit_bytes * 0.8:  # 80% от лимита
-                    # Получаем 25% самых старых элементов
-                    items_to_evict = max(1, len(self.cache) // 4)
+                # Оцениваем размер в памяти
+                for key, item in list(self.cache.items()):
+                    # Оценка размера ключа и значения
+                    key_size = sys.getsizeof(key)
+                    value_size = sys.getsizeof(item.get('value', ''))
                     
-                    # Находим N самых старых элементов без полной сортировки
-                    lru_keys = sorted(
-                        self.cache.keys(),
-                        key=lambda k: self.cache[k].get('last_accessed', 0),
-                        reverse=False
-                    )[:items_to_evict]
+                    # Добавляем размер метаданных
+                    item_size = key_size + value_size + sys.getsizeof(item)
+                    total_size_bytes += item_size
                     
-                    # Удаляем старые элементы
-                    for key in lru_keys:
-                        if key in self.cache:
-                            del self.cache[key]
-                            if key in self.access_counter:
-                                del self.access_counter[key]
-                            self.stats["evictions"] += 1
-                    
-                    if self.logger:
-                        self.logger.info(f"Очищено {len(lru_keys)} элементов кэша из-за превышения лимита памяти")
-                    return
+                    # Если превысили лимит, удаляем по LRU
+                    if total_size_bytes > memory_limit_bytes:
+                        # Сортируем по времени последнего доступа
+                        lru_items = sorted(
+                            self.cache.items(), 
+                            key=lambda x: x[1].get('last_accessed', 0)
+                        )
+                        
+                        # Удаляем 25% самых старых элементов для снижения частоты очистки
+                        items_to_remove = max(1, len(lru_items) // 4)
+                        for i in range(items_to_remove):
+                            if i < len(lru_items):
+                                key_to_remove = lru_items[i][0]
+                                if key_to_remove in self.cache:
+                                    del self.cache[key_to_remove]
+                                    if key_to_remove in self.access_counter:
+                                        del self.access_counter[key_to_remove]
+                                    self.stats["evictions"] += 1
+                        
+                        self._logger.info(f"Очищено {items_to_remove} элементов кэша из-за превышения лимита памяти")
+                        return
 
             except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Ошибка при проверке размера кэша: {e}")
-                # Более агрессивная очистка при ошибке
-                if len(self.cache) > self.max_size * 0.8:  # 80% заполнения
+                self._logger.error(f"Ошибка при проверке размера кэша: {e}")
+                # Если произошла ошибка, используем простую очистку по размеру
+                if len(self.cache) > self.max_size * 0.9:  # 90% заполнения
                     self._evict_lru()
