@@ -2,8 +2,15 @@ import os
 import json
 import logging
 import time
+import shutil
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext
+# Импортируем библиотеку для работы с Word документами
+try:
+    from docx import Document
+except ImportError:
+    # Если библиотека не установлена, добавляем заглушку для предотвращения критических ошибок
+    Document = None
 
 class AdminPanel:
     """Класс для управления админ-панелью бота"""
@@ -117,7 +124,8 @@ class AdminPanel:
             [InlineKeyboardButton("📊 Статистика", callback_data='admin_stats')],
             [InlineKeyboardButton("👥 Управление админами", callback_data='admin_manage')],
             [InlineKeyboardButton("📝 Просмотр логов", callback_data='admin_logs')],
-            [InlineKeyboardButton("🔄 Перезапустить бота", callback_data='admin_restart')]
+            [InlineKeyboardButton("🔄 Перезапустить бота", callback_data='admin_restart')],
+            [InlineKeyboardButton("📖 Документация", callback_data='admin_documentation')]
         ]
 
         # Добавляем специальные функции для супер-админа
@@ -171,6 +179,8 @@ class AdminPanel:
             self._show_tests_management(query, context)
         elif action == 'admin_analytics' and self.is_super_admin(user_id):
             self._show_analytics_management(query, context)
+        elif action == 'admin_documentation':
+            self._show_documentation(query, context)
         elif action == 'admin_back':
             # Возврат в главное меню админ-панели
             self._back_to_admin_menu(query, context)
@@ -189,6 +199,9 @@ class AdminPanel:
         elif action.startswith('admin_analytics_'):
             # Обработка действий с аналитикой
             self._handle_analytics_action(query, context, action)
+        elif action.startswith('admin_doc_'):
+            # Обработка действий с документацией
+            self._handle_documentation_action(query, context, action)
 
     def _show_stats(self, query, context):
         """Показывает статистику бота"""
@@ -416,7 +429,8 @@ class AdminPanel:
             [InlineKeyboardButton("📊 Статистика", callback_data='admin_stats')],
             [InlineKeyboardButton("👥 Управление админами", callback_data='admin_manage')],
             [InlineKeyboardButton("📝 Просмотр логов", callback_data='admin_logs')],
-            [InlineKeyboardButton("🔄 Перезапустить бота", callback_data='admin_restart')]
+            [InlineKeyboardButton("🔄 Перезапустить бота", callback_data='admin_restart')],
+            [InlineKeyboardButton("📖 Документация", callback_data='admin_documentation')]
         ]
 
         # Добавляем специальные функции для супер-админа
@@ -662,6 +676,241 @@ class AdminPanel:
                 f"❌ Ошибка при добавлении {admin_type}. Попробуйте снова позже.",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 К админ-панели", callback_data='admin_back')]])
             )
+
+
+    def _show_documentation(self, query, context):
+        """Показывает интерфейс документации проекта"""
+        try:
+            docs_text = "📖 *Документация проекта*\n\n"
+            docs_text += "Выберите документ для просмотра или скачивания:"
+
+            # Список MD-файлов документации
+            docs_dir = "docs"
+            doc_files = []
+            
+            if os.path.exists(docs_dir) and os.path.isdir(docs_dir):
+                doc_files = [f for f in os.listdir(docs_dir) if f.endswith('.md')]
+            
+            # Создаем кнопки для документов
+            keyboard = []
+            
+            # Документация в TXT формате
+            for doc_file in doc_files:
+                file_name = doc_file.replace('.md', '')
+                keyboard.append([InlineKeyboardButton(f"📄 {file_name} (TXT)", callback_data=f'admin_doc_txt_{file_name}')])
+            
+            # Документация в формате Word
+            for doc_file in doc_files:
+                file_name = doc_file.replace('.md', '')
+                keyboard.append([InlineKeyboardButton(f"📑 {file_name} (Word)", callback_data=f'admin_doc_word_{file_name}')])
+            
+            # Дополнительные файлы документации
+            keyboard.append([InlineKeyboardButton("📋 Полная документация (TXT)", callback_data='admin_doc_full_txt')])
+            keyboard.append([InlineKeyboardButton("📚 Полная документация (Word)", callback_data='admin_doc_full_word')])
+            
+            # Кнопка назад
+            keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data='admin_back')])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            query.edit_message_text(
+                docs_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            
+            self.logger.info(f"Админ {query.from_user.id} открыл доступ к документации")
+        except Exception as e:
+            self.logger.error(f"Ошибка при отображении документации: {e}")
+            query.edit_message_text(
+                f"Ошибка при загрузке документации: {e}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='admin_back')]])
+            )
+
+    def _handle_documentation_action(self, query, context, action):
+        """Обрабатывает действия с документацией"""
+        user_id = query.from_user.id
+        
+        # Проверяем наличие директории для создания временных файлов
+        temp_dir = "temp_docs"
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        try:
+            # Обработка запроса на получение документа в TXT формате
+            if action.startswith('admin_doc_txt_'):
+                file_name = action.replace('admin_doc_txt_', '')
+                doc_path = os.path.join("docs", f"{file_name}.md")
+                
+                if os.path.exists(doc_path):
+                    # Конвертируем MD в TXT (просто копируем содержимое)
+                    with open(doc_path, 'r', encoding='utf-8') as md_file:
+                        content = md_file.read()
+                        
+                    txt_path = os.path.join(temp_dir, f"{file_name}.txt")
+                    with open(txt_path, 'w', encoding='utf-8') as txt_file:
+                        txt_file.write(content)
+                        
+                    # Отправляем файл
+                    with open(txt_path, 'rb') as document:
+                        context.bot.send_document(
+                            chat_id=query.message.chat_id,
+                            document=document,
+                            filename=f"{file_name}.txt",
+                            caption=f"📄 Документация '{file_name}' в формате TXT"
+                        )
+                    
+                    # Удаляем временный файл
+                    os.remove(txt_path)
+                    
+                    query.answer(f"Документ {file_name}.txt отправлен")
+                else:
+                    query.answer(f"Файл {file_name}.md не найден")
+                    
+            # Обработка запроса на получение документа в Word формате
+            elif action.startswith('admin_doc_word_'):
+                file_name = action.replace('admin_doc_word_', '')
+                doc_path = os.path.join("docs", f"{file_name}.md")
+                
+                if os.path.exists(doc_path):
+                    # Создаем Word документ
+                    from docx import Document
+                    doc = Document()
+                    
+                    # Добавляем заголовок
+                    doc.add_heading(file_name, 0)
+                    
+                    # Читаем содержимое MD файла
+                    with open(doc_path, 'r', encoding='utf-8') as md_file:
+                        content = md_file.read()
+                        
+                    # Добавляем содержимое в документ (простое добавление)
+                    doc.add_paragraph(content)
+                    
+                    # Сохраняем документ
+                    docx_path = os.path.join(temp_dir, f"{file_name}.docx")
+                    doc.save(docx_path)
+                    
+                    # Отправляем файл
+                    with open(docx_path, 'rb') as document:
+                        context.bot.send_document(
+                            chat_id=query.message.chat_id,
+                            document=document,
+                            filename=f"{file_name}.docx",
+                            caption=f"📑 Документация '{file_name}' в формате Word"
+                        )
+                    
+                    # Удаляем временный файл
+                    os.remove(docx_path)
+                    
+                    query.answer(f"Документ {file_name}.docx отправлен")
+                else:
+                    query.answer(f"Файл {file_name}.md не найден")
+                    
+            # Обработка запроса на получение полной документации в TXT формате
+            elif action == 'admin_doc_full_txt':
+                # Проверяем наличие директории документации
+                docs_dir = "docs"
+                if os.path.exists(docs_dir) and os.path.isdir(docs_dir):
+                    # Создаем общий TXT файл со всей документацией
+                    full_txt_path = os.path.join(temp_dir, "Полная_документация.txt")
+                    
+                    with open(full_txt_path, 'w', encoding='utf-8') as txt_file:
+                        # Перебираем все MD файлы
+                        doc_files = [f for f in os.listdir(docs_dir) if f.endswith('.md')]
+                        doc_files.sort()  # Сортируем для порядка
+                        
+                        for doc_file in doc_files:
+                            file_path = os.path.join(docs_dir, doc_file)
+                            title = doc_file.replace('.md', '')
+                            
+                            # Добавляем заголовок и разделитель
+                            txt_file.write(f"{'=' * 80}\n")
+                            txt_file.write(f"{title.upper()}\n")
+                            txt_file.write(f"{'=' * 80}\n\n")
+                            
+                            # Добавляем содержимое файла
+                            with open(file_path, 'r', encoding='utf-8') as md_file:
+                                txt_file.write(md_file.read())
+                                
+                            # Добавляем разделитель между документами
+                            txt_file.write(f"\n\n{'=' * 80}\n\n")
+                    
+                    # Отправляем файл
+                    with open(full_txt_path, 'rb') as document:
+                        context.bot.send_document(
+                            chat_id=query.message.chat_id,
+                            document=document,
+                            filename="Полная_документация.txt",
+                            caption="📋 Полная документация проекта в формате TXT"
+                        )
+                    
+                    # Удаляем временный файл
+                    os.remove(full_txt_path)
+                    
+                    query.answer("Полная документация в TXT формате отправлена")
+                else:
+                    query.answer("Директория документации не найдена")
+                    
+            # Обработка запроса на получение полной документации в Word формате
+            elif action == 'admin_doc_full_word':
+                # Проверяем наличие директории документации
+                docs_dir = "docs"
+                if os.path.exists(docs_dir) and os.path.isdir(docs_dir):
+                    # Создаем Word документ
+                    from docx import Document
+                    doc = Document()
+                    
+                    # Добавляем титульный лист
+                    doc.add_heading("Полная документация проекта", 0)
+                    
+                    # Перебираем все MD файлы
+                    doc_files = [f for f in os.listdir(docs_dir) if f.endswith('.md')]
+                    doc_files.sort()  # Сортируем для порядка
+                    
+                    for doc_file in doc_files:
+                        file_path = os.path.join(docs_dir, doc_file)
+                        title = doc_file.replace('.md', '')
+                        
+                        # Добавляем заголовок раздела
+                        doc.add_heading(title, 1)
+                        
+                        # Добавляем содержимое файла
+                        with open(file_path, 'r', encoding='utf-8') as md_file:
+                            content = md_file.read()
+                            doc.add_paragraph(content)
+                        
+                        # Добавляем разрыв страницы после каждого документа
+                        doc.add_page_break()
+                    
+                    # Сохраняем документ
+                    docx_path = os.path.join(temp_dir, "Полная_документация.docx")
+                    doc.save(docx_path)
+                    
+                    # Отправляем файл
+                    with open(docx_path, 'rb') as document:
+                        context.bot.send_document(
+                            chat_id=query.message.chat_id,
+                            document=document,
+                            filename="Полная_документация.docx",
+                            caption="📚 Полная документация проекта в формате Word"
+                        )
+                    
+                    # Удаляем временный файл
+                    os.remove(docx_path)
+                    
+                    query.answer("Полная документация в Word формате отправлена")
+                else:
+                    query.answer("Директория документации не найдена")
+            
+            # Возвращаемся обратно к выбору документации
+            self._show_documentation(query, context)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке документации: {e}")
+            query.answer(f"Ошибка при обработке документации: {e}")
+            # Возвращаемся в главное меню при ошибке
+            self._back_to_admin_menu(query, context)
 
     def handle_delete_admin_callback(self, update, context, admin_id_to_delete):
         """Обрабатывает удаление администратора по callback"""
