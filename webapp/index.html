@@ -47,8 +47,17 @@
     <script src="app.js"></script>
     <script>
         // Обработчик кнопки администрирования
-        document.getElementById('admin-button').addEventListener('click', function() {
-            window.location.href = '/admin-panel';
+        document.addEventListener('DOMContentLoaded', function() {
+            var adminButton = document.getElementById('admin-button');
+            if (adminButton) {
+                adminButton.style.display = 'block';
+                adminButton.addEventListener('click', function() {
+                    window.location.href = '/admin-panel';
+                });
+                console.log('Кнопка администрирования инициализирована');
+            } else {
+                console.error('Кнопка администрирования не найдена!');
+            }
         });
     </script>
     
@@ -67,6 +76,8 @@
             text-align: right;
             padding: 10px 20px;
             margin-bottom: 10px;
+            display: block !important;
+            z-index: 1100;
         }
         
         .admin-button {
