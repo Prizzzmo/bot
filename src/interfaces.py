@@ -4,6 +4,29 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional, Tuple, Callable
 
+class IBot(ABC):
+    """Интерфейс для основного класса бота"""
+    
+    @abstractmethod
+    def setup(self) -> bool:
+        """Настройка бота и диспетчера"""
+        pass
+        
+    @abstractmethod
+    def start(self, use_webhook: bool = False, webhook_url: str = "", port: int = 8443) -> bool:
+        """Запуск бота"""
+        pass
+        
+    @abstractmethod
+    def run(self) -> bool:
+        """Запуск бота с использованием стандартных настроек"""
+        pass
+        
+    @abstractmethod
+    def stop(self) -> bool:
+        """Остановка бота"""
+        pass
+
 class ILogger(ABC):
     """Интерфейс для системы логирования"""
     
