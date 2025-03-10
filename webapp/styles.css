@@ -151,3 +151,261 @@ body {
     --tg-theme-button-color: #5288c1;
     --tg-theme-button-text-color: #ffffff;
 }
+/* Стили для кнопки администрирования */
+.admin-button-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+#admin-button {
+    background-color: #2c3e50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: background-color 0.3s;
+}
+
+#admin-button:hover {
+    background-color: #1a2533;
+}
+
+/* Стили для админ-панели */
+#admin-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.95);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.dark-theme #admin-panel {
+    background-color: rgba(33, 33, 33, 0.95);
+    color: #e0e0e0;
+}
+
+.admin-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background-color: #2c3e50;
+    color: white;
+}
+
+.admin-panel-header h2 {
+    margin: 0;
+}
+
+#close-admin-panel {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.admin-tabs {
+    display: flex;
+    background-color: #34495e;
+    padding: 0 10px;
+}
+
+.tab-button {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-button.active {
+    border-bottom-color: #3498db;
+}
+
+.tab-button:hover {
+    background-color: #2c3e50;
+}
+
+.admin-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.tab-content {
+    display: none;
+    height: 100%;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.admin-data-container {
+    background-color: #f5f5f5;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+    min-height: 200px;
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+}
+
+.dark-theme .admin-data-container {
+    background-color: #333;
+    color: #e0e0e0;
+}
+
+.logs-container {
+    font-family: monospace;
+    white-space: pre-wrap;
+    font-size: 12px;
+}
+
+.admin-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.admin-controls button,
+.admin-controls select,
+.admin-controls input {
+    padding: 8px 15px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+.admin-controls button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.admin-controls button:hover {
+    background-color: #2980b9;
+}
+
+.setting-item {
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.dark-theme .setting-item {
+    background-color: #444;
+}
+
+.maintenance-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.maintenance-action {
+    background-color: white;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.dark-theme .maintenance-action {
+    background-color: #444;
+}
+
+.maintenance-action h4 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+.dark-theme .maintenance-action h4 {
+    color: #3498db;
+}
+
+.maintenance-action button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.maintenance-action button:hover {
+    background-color: #2980b9;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Стили для модальных окон */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 3000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 5px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.dark-theme .modal-content {
+    background-color: #333;
+    color: #e0e0e0;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.modal-buttons button {
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.modal-buttons .confirm {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+}
+
+.modal-buttons .cancel {
+    background-color: #7f8c8d;
+    color: white;
+    border: none;
+}
