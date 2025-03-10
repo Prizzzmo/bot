@@ -4,414 +4,1012 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель администратора | История России</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>История России • Админ панель</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/admin_styles.css">
+    <link rel="icon" type="image/png" href="/static/favicon.png">
 </head>
 <body>
-    <div class="admin-container">
-        <header class="admin-header">
-            <h1><i class="fas fa-shield-alt"></i> Панель администратора</h1>
+    <div class="app-container">
+        <!-- Боковая панель навигации -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-landmark"></i>
+                    <span>HistoryAdmin</span>
+                </div>
+                <button id="sidebar-toggle" class="sidebar-toggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
             <div class="user-info">
-                <span id="user-name">ID: ...</span>
-                <span id="user-role" class="user-role">...</span>
-                <button id="logout-button" class="btn btn-small btn-outline btn-danger">
-                    <i class="fas fa-sign-out-alt"></i> Выход
+                <div class="user-avatar">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="user-details">
+                    <span id="user-name">Администратор</span>
+                    <span id="user-role" class="user-role">Супер-администратор</span>
+                </div>
+            </div>
+            
+            <ul class="nav-links">
+                <li class="nav-item active" data-page="dashboard">
+                    <a href="#dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Обзор</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="events">
+                    <a href="#events">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>События истории</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="users">
+                    <a href="#users">
+                        <i class="fas fa-users"></i>
+                        <span>Пользователи</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="admins">
+                    <a href="#admins">
+                        <i class="fas fa-user-shield"></i>
+                        <span>Администраторы</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="logs">
+                    <a href="#logs">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Логи</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="settings">
+                    <a href="#settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Настройки</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="maintenance">
+                    <a href="#maintenance">
+                        <i class="fas fa-tools"></i>
+                        <span>Обслуживание</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer">
+                <button id="logout-button" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Выйти</span>
                 </button>
             </div>
-        </header>
+        </nav>
         
-        <div class="admin-tabs">
-            <button class="tab-button active" data-tab="dashboard">
-                <i class="fas fa-tachometer-alt"></i> Дашборд
-            </button>
-            <button class="tab-button" data-tab="stats">
-                <i class="fas fa-chart-line"></i> Статистика
-            </button>
-            <button class="tab-button" data-tab="users">
-                <i class="fas fa-users"></i> Пользователи
-            </button>
-            <button class="tab-button" data-tab="events">
-                <i class="fas fa-calendar-alt"></i> События
-            </button>
-            <button class="tab-button" data-tab="admins">
-                <i class="fas fa-user-shield"></i> Администраторы
-            </button>
-            <button class="tab-button" data-tab="logs">
-                <i class="fas fa-file-alt"></i> Логи
-            </button>
-            <button class="tab-button" data-tab="settings">
-                <i class="fas fa-cog"></i> Настройки
-            </button>
-            <button class="tab-button" data-tab="maintenance">
-                <i class="fas fa-tools"></i> Обслуживание
-            </button>
-        </div>
-        
-        <!-- Дашборд -->
-        <div class="tab-content active" id="dashboard-tab">
-            <h2><i class="fas fa-tachometer-alt"></i> Панель мониторинга</h2>
-            <div id="dashboard-data">
-                <div class="loader"></div> Загрузка данных...
-            </div>
-        </div>
-        
-        <!-- Статистика -->
-        <div class="tab-content" id="stats-tab">
-            <h2><i class="fas fa-chart-line"></i> Статистика бота</h2>
-            <div class="stats-container">
-                <div id="stats-data" class="stats-data">
-                    <div class="loader"></div> Загрузка статистики...
-                </div>
-                <div class="stats-chart">
-                    <h3>Активность пользователей</h3>
-                    <img src="/api/chart/daily_activity" alt="График активности" width="100%">
-                </div>
-            </div>
-        </div>
-        
-        <!-- Пользователи -->
-        <div class="tab-content" id="users-tab">
-            <h2><i class="fas fa-users"></i> Управление пользователями</h2>
+        <!-- Основной контент -->
+        <main class="content">
+            <!-- Панель уведомлений -->
+            <div id="notifications-container" class="notifications-container"></div>
             
-            <div class="search-filters">
-                <div class="search-input">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="user-search" placeholder="Поиск по ID или имени...">
+            <!-- Верхняя панель -->
+            <header class="top-bar">
+                <div class="breadcrumb">
+                    <i id="current-section-icon" class="fas fa-tachometer-alt"></i>
+                    <span id="current-section-name">Обзор</span>
                 </div>
-                <div class="filter-group">
-                    <span class="filter-label">Статус:</span>
-                    <select id="user-status-filter">
-                        <option value="all">Все</option>
-                        <option value="active">Активные</option>
-                        <option value="inactive">Неактивные</option>
-                        <option value="blocked">Заблокированные</option>
-                    </select>
-                </div>
-                <button class="btn btn-small" id="refresh-users">
-                    <i class="fas fa-sync-alt"></i> Обновить
-                </button>
-            </div>
-            
-            <div id="users-data" class="users-list">
-                <div class="loader"></div> Загрузка пользователей...
-            </div>
-            
-            <div class="pagination">
-                <button disabled>&laquo;</button>
-                <button class="active">1</button>
-                <button>2</button>
-                <button>3</button>
-                <button>&raquo;</button>
-            </div>
-        </div>
-        
-        <!-- События -->
-        <div class="tab-content" id="events-tab">
-            <h2><i class="fas fa-calendar-alt"></i> Исторические события</h2>
-            
-            <div class="search-filters">
-                <div class="search-input">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="event-search" placeholder="Поиск по названию, дате или категории...">
-                </div>
-                <div class="filter-group">
-                    <span class="filter-label">Категория:</span>
-                    <select id="event-category-filter">
-                        <option value="all">Все категории</option>
-                        <option value="Войны и сражения">Войны и сражения</option>
-                        <option value="Политические реформы">Политические реформы</option>
-                        <option value="Культура и религия">Культура и религия</option>
-                        <option value="Экономические события">Экономические события</option>
-                    </select>
-                </div>
-                <button class="btn btn-small" id="refresh-events">
-                    <i class="fas fa-sync-alt"></i> Обновить
-                </button>
-            </div>
-            
-            <div id="events-data">
-                <div class="loader"></div> Загрузка событий...
-            </div>
-            
-            <div class="pagination">
-                <button disabled>&laquo;</button>
-                <button class="active">1</button>
-                <button>2</button>
-                <button>3</button>
-                <button>&raquo;</button>
-            </div>
-        </div>
-        
-        <!-- Администраторы -->
-        <div class="tab-content" id="admins-tab">
-            <h2><i class="fas fa-user-shield"></i> Управление администраторами</h2>
-            <div class="admin-list">
-                <h3><i class="fas fa-star"></i> Супер-администраторы</h3>
-                <ul id="super-admin-list">
-                    <div class="loader"></div> Загрузка списка супер-администраторов...
-                </ul>
                 
-                <h3><i class="fas fa-user-tie"></i> Администраторы</h3>
-                <ul id="admin-list">
-                    <div class="loader"></div> Загрузка списка администраторов...
-                </ul>
-                
-                <div class="admin-actions super-admin-only">
-                    <h3><i class="fas fa-user-plus"></i> Добавить администратора</h3>
-                    <form id="add-admin-form">
-                        <div class="form-group">
-                            <label for="new-admin-id">ID пользователя Telegram</label>
-                            <input type="number" id="new-admin-id" placeholder="Введите ID пользователя" required>
-                        </div>
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="is-super-admin">
-                            <label for="is-super-admin">Супер-администратор</label>
-                        </div>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-plus"></i> Добавить
-                        </button>
-                    </form>
+                <div class="top-bar-actions">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Поиск по панели..." id="global-search">
+                    </div>
                     
-                    <h3><i class="fas fa-user-minus"></i> Удалить администратора</h3>
-                    <form id="remove-admin-form">
-                        <div class="form-group">
-                            <label for="admin-to-remove">Выберите администратора</label>
-                            <select id="admin-to-remove" required>
-                                <option value="">Выберите администратора</option>
+                    <div class="actions-menu">
+                        <button id="refresh-data" class="btn-icon" title="Обновить данные">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        
+                        <button id="theme-toggle" class="btn-icon" title="Сменить тему">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                        
+                        <button id="fullscreen-toggle" class="btn-icon" title="Полноэкранный режим">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Страницы содержимого -->
+            <div class="page-container">
+                <!-- Страница обзора -->
+                <div class="page active" id="dashboard-page">
+                    <div class="page-header">
+                        <h1>Обзор системы</h1>
+                        <p class="page-description">Мониторинг ключевых метрик и аналитики.</p>
+                    </div>
+                    
+                    <div class="analytics-overview">
+                        <div class="stat-card primary">
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Пользователи</h3>
+                                <div class="stat-value" id="user-count">0</div>
+                                <div class="stat-change positive" id="user-change">+0%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card secondary">
+                            <div class="stat-icon">
+                                <i class="fas fa-comment"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Сообщения</h3>
+                                <div class="stat-value" id="message-count">0</div>
+                                <div class="stat-change positive" id="message-change">+0%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card success">
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>События</h3>
+                                <div class="stat-value" id="events-count">0</div>
+                                <div class="stat-change" id="events-change">+0%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card info">
+                            <div class="stat-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Время работы</h3>
+                                <div class="stat-value" id="uptime">00:00:00</div>
+                                <div class="stat-label">С момента запуска</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-row">
+                        <div class="dashboard-card span-2">
+                            <div class="card-header">
+                                <h2>Активность пользователей</h2>
+                                <div class="card-actions">
+                                    <select id="activity-period">
+                                        <option value="day">За день</option>
+                                        <option value="week" selected>За неделю</option>
+                                        <option value="month">За месяц</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <img src="/api/chart/daily_activity" alt="График активности" width="100%" id="activity-chart">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h2>Статистика запросов</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="stats-list" id="queries-stats">
+                                    <div class="stat-item">
+                                        <div class="stat-label">Запросов сегодня</div>
+                                        <div class="stat-value">0</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-label">Запросов всего</div>
+                                        <div class="stat-value">0</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-label">Запросов в минуту</div>
+                                        <div class="stat-value">0</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-label">Среднее время ответа</div>
+                                        <div class="stat-value">0 мс</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-row">
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h2>Последние действия</h2>
+                            </div>
+                            <div class="card-body">
+                                <ul class="activity-list" id="recent-activities">
+                                    <!-- Список будет заполнен через JavaScript -->
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-outline btn-sm" id="view-all-activities">
+                                    Просмотреть все
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h2>Системная информация</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="system-info" id="system-info">
+                                    <div class="info-item">
+                                        <div class="info-label">Версия бота</div>
+                                        <div class="info-value">1.2.0</div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label">API запросы</div>
+                                        <div class="info-value">Активны</div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label">Кэш</div>
+                                        <div class="info-value">250 МБ</div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label">Обновлено</div>
+                                        <div class="info-value">2 часа назад</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-primary btn-sm" id="check-system">
+                                    Проверить систему
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Страница исторических событий -->
+                <div class="page" id="events-page">
+                    <div class="page-header">
+                        <h1>Управление историческими событиями</h1>
+                        <p class="page-description">Просмотр, редактирование и анализ исторических событий.</p>
+                    </div>
+                    
+                    <div class="filter-panel">
+                        <div class="search-container">
+                            <input type="text" id="event-search" class="search-input" placeholder="Поиск по событиям...">
+                            <button id="event-search-btn" class="btn btn-icon">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="filters">
+                            <div class="filter-group">
+                                <label for="event-category-filter">Категория:</label>
+                                <select id="event-category-filter">
+                                    <option value="all">Все категории</option>
+                                    <!-- Заполняется из JS -->
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="event-century-filter">Век:</label>
+                                <select id="event-century-filter">
+                                    <option value="all">Все века</option>
+                                    <!-- Заполняется из JS -->
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="event-location-filter">Регион:</label>
+                                <select id="event-location-filter">
+                                    <option value="all">Все регионы</option>
+                                    <!-- Заполняется из JS -->
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="filter-actions">
+                            <button id="filter-apply" class="btn btn-primary">
+                                <i class="fas fa-filter"></i> Применить
+                            </button>
+                            <button id="filter-reset" class="btn btn-outline">
+                                <i class="fas fa-times"></i> Сбросить
+                            </button>
+                            <button id="add-new-event" class="btn btn-success">
+                                <i class="fas fa-plus"></i> Добавить событие
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="data-table-container">
+                        <table class="data-table" id="events-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Название</th>
+                                    <th>Дата</th>
+                                    <th>Категория</th>
+                                    <th>Координаты</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-table-body">
+                                <!-- Заполняется из JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="pagination-container">
+                        <div class="pagination" id="events-pagination">
+                            <!-- Заполняется из JS -->
+                        </div>
+                        <div class="items-per-page">
+                            <label for="events-per-page">Событий на странице:</label>
+                            <select id="events-per-page">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-trash-alt"></i> Удалить
-                        </button>
+                    </div>
+                </div>
+                
+                <!-- Страница пользователей -->
+                <div class="page" id="users-page">
+                    <div class="page-header">
+                        <h1>Управление пользователями</h1>
+                        <p class="page-description">Мониторинг и управление пользователями системы.</p>
+                    </div>
+                    
+                    <div class="filter-panel">
+                        <div class="search-container">
+                            <input type="text" id="user-search" class="search-input" placeholder="Поиск по ID или имени...">
+                            <button id="user-search-btn" class="btn btn-icon">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="filters">
+                            <div class="filter-group">
+                                <label for="user-status-filter">Статус:</label>
+                                <select id="user-status-filter">
+                                    <option value="all">Все статусы</option>
+                                    <option value="active">Активные</option>
+                                    <option value="inactive">Неактивные</option>
+                                    <option value="blocked">Заблокированные</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="user-activity-filter">Активность:</label>
+                                <select id="user-activity-filter">
+                                    <option value="all">Любая активность</option>
+                                    <option value="today">Сегодня</option>
+                                    <option value="week">За неделю</option>
+                                    <option value="month">За месяц</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="filter-actions">
+                            <button id="users-filter-apply" class="btn btn-primary">
+                                <i class="fas fa-filter"></i> Применить
+                            </button>
+                            <button id="users-filter-reset" class="btn btn-outline">
+                                <i class="fas fa-times"></i> Сбросить
+                            </button>
+                            <button id="export-users" class="btn btn-secondary">
+                                <i class="fas fa-download"></i> Экспорт
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="data-table-container">
+                        <table class="data-table" id="users-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Имя</th>
+                                    <th>Статус</th>
+                                    <th>Последняя активность</th>
+                                    <th>Сообщений</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- Заполняется из JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="pagination-container">
+                        <div class="pagination" id="users-pagination">
+                            <!-- Заполняется из JS -->
+                        </div>
+                        <div class="items-per-page">
+                            <label for="users-per-page">Пользователей на странице:</label>
+                            <select id="users-per-page">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Страница администраторов -->
+                <div class="page" id="admins-page">
+                    <div class="page-header">
+                        <h1>Управление администраторами</h1>
+                        <p class="page-description">Настройка прав доступа и управление администраторами системы.</p>
+                    </div>
+                    
+                    <div class="admins-container">
+                        <div class="admin-lists">
+                            <div class="admin-section">
+                                <h2><i class="fas fa-star"></i> Супер-администраторы</h2>
+                                <p class="section-description">Администраторы с полным доступом ко всем функциям системы.</p>
+                                
+                                <ul class="admin-list" id="super-admin-list">
+                                    <!-- Заполняется из JS -->
+                                </ul>
+                            </div>
+                            
+                            <div class="admin-section">
+                                <h2><i class="fas fa-user-tie"></i> Администраторы</h2>
+                                <p class="section-description">Пользователи с расширенными правами управления системой.</p>
+                                
+                                <ul class="admin-list" id="admin-list">
+                                    <!-- Заполняется из JS -->
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="admin-management super-admin-only">
+                            <div class="admin-form-card">
+                                <h2><i class="fas fa-user-plus"></i> Добавить администратора</h2>
+                                
+                                <form id="add-admin-form">
+                                    <div class="form-group">
+                                        <label for="new-admin-id">ID пользователя Telegram</label>
+                                        <input type="number" id="new-admin-id" placeholder="Введите ID пользователя" required>
+                                    </div>
+                                    
+                                    <div class="form-check">
+                                        <input type="checkbox" id="is-super-admin">
+                                        <label for="is-super-admin">Супер-администратор</label>
+                                        <small class="form-help">Имеет полный доступ ко всем функциям системы</small>
+                                    </div>
+                                    
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="fas fa-plus"></i> Добавить
+                                        </button>
+                                        <button type="reset" class="btn btn-outline">
+                                            <i class="fas fa-eraser"></i> Очистить
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <div class="admin-form-card">
+                                <h2><i class="fas fa-user-minus"></i> Удалить администратора</h2>
+                                
+                                <form id="remove-admin-form">
+                                    <div class="form-group">
+                                        <label for="admin-to-remove">Выберите администратора</label>
+                                        <select id="admin-to-remove" required>
+                                            <option value="">Выберите администратора</option>
+                                            <!-- Заполняется из JS -->
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-alert warning">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <span>Удаление администратора отзовет все его права доступа.</span>
+                                    </div>
+                                    
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="fas fa-trash-alt"></i> Удалить
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Страница логов -->
+                <div class="page" id="logs-page">
+                    <div class="page-header">
+                        <h1>Системные логи</h1>
+                        <p class="page-description">Просмотр и анализ журналов работы системы.</p>
+                    </div>
+                    
+                    <div class="logs-controls">
+                        <div class="logs-filters">
+                            <div class="filter-group">
+                                <label for="log-level">Уровень:</label>
+                                <select id="log-level">
+                                    <option value="all">Все уровни</option>
+                                    <option value="info">Информация</option>
+                                    <option value="warning">Предупреждения</option>
+                                    <option value="error">Ошибки</option>
+                                    <option value="debug">Отладка</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="log-component">Компонент:</label>
+                                <select id="log-component">
+                                    <option value="all">Все компоненты</option>
+                                    <option value="api">API</option>
+                                    <option value="bot">Бот</option>
+                                    <option value="database">База данных</option>
+                                    <option value="server">Сервер</option>
+                                    <option value="admin">Админ-панель</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="log-limit">Кол-во строк:</label>
+                                <input type="number" id="log-limit" value="100" min="10" max="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="logs-actions">
+                            <button id="refresh-logs" class="btn btn-primary">
+                                <i class="fas fa-sync-alt"></i> Обновить
+                            </button>
+                            
+                            <button id="export-logs" class="btn btn-secondary">
+                                <i class="fas fa-file-download"></i> Экспорт
+                            </button>
+                            
+                            <button id="clear-logs" class="btn btn-outline">
+                                <i class="fas fa-trash"></i> Очистить
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="logs-terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-title">Системные логи</span>
+                            <div class="terminal-controls">
+                                <button id="auto-scroll" class="btn-icon active" title="Автопрокрутка">
+                                    <i class="fas fa-angle-double-down"></i>
+                                </button>
+                                <button id="copy-logs" class="btn-icon" title="Копировать">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                                <button id="expand-logs" class="btn-icon" title="Развернуть">
+                                    <i class="fas fa-expand-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <pre id="logs-container" class="terminal-content"></pre>
+                        
+                        <div class="terminal-footer">
+                            <span id="log-stats">Загружено строк: 0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Страница настроек -->
+                <div class="page" id="settings-page">
+                    <div class="page-header">
+                        <h1>Настройки системы</h1>
+                        <p class="page-description">Конфигурация параметров работы бота и системы.</p>
+                    </div>
+                    
+                    <form id="settings-form" class="settings-form">
+                        <div class="settings-container">
+                            <div class="settings-card">
+                                <div class="card-header">
+                                    <h2><i class="fas fa-sliders-h"></i> Основные настройки</h2>
+                                </div>
+                                
+                                <div class="card-body">
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="auto-update-topics">
+                                                Автоматическое обновление тем
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <label class="switch">
+                                                <input type="checkbox" id="auto-update-topics" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="setting-description">
+                                            Автоматически обновлять темы из базы данных
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="collect-statistics">
+                                                Сбор статистики
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <label class="switch">
+                                                <input type="checkbox" id="collect-statistics" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="setting-description">
+                                            Собирать данные об использовании бота
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="developer-mode">
+                                                Режим разработчика
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <label class="switch">
+                                                <input type="checkbox" id="developer-mode">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="setting-description">
+                                            Включает расширенные возможности отладки
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="private-mode">
+                                                Приватный режим
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <label class="switch">
+                                                <input type="checkbox" id="private-mode">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="setting-description">
+                                            Бот доступен только администраторам
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-card super-admin-only">
+                                <div class="card-header">
+                                    <h2><i class="fas fa-cloud"></i> Настройки API</h2>
+                                </div>
+                                
+                                <div class="card-body">
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="api-request-limit">
+                                                Лимит запросов API (в день)
+                                            </label>
+                                        </div>
+                                        <div class="setting-control range-control">
+                                            <input type="range" id="api-request-limit-range" min="10" max="1000" value="100" step="10">
+                                            <input type="number" id="api-request-limit" min="10" max="1000" value="100">
+                                        </div>
+                                        <div class="setting-description">
+                                            Максимальное количество запросов к API в день
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="cache-duration">
+                                                Продолжительность кэширования (часы)
+                                            </label>
+                                        </div>
+                                        <div class="setting-control range-control">
+                                            <input type="range" id="cache-duration-range" min="1" max="72" value="24" step="1">
+                                            <input type="number" id="cache-duration" min="1" max="72" value="24">
+                                        </div>
+                                        <div class="setting-description">
+                                            Время хранения данных в кэше в часах
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="api-model">
+                                                Модель API
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select id="api-model">
+                                                <option value="gemini-pro">Gemini Pro</option>
+                                                <option value="gemini-pro-vision">Gemini Pro Vision</option>
+                                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                                <option value="gpt-4">GPT-4</option>
+                                            </select>
+                                        </div>
+                                        <div class="setting-description">
+                                            Выберите модель, используемую для генерации контента
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="api-key">
+                                                Ключ API
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <div class="input-group">
+                                                <input type="password" id="api-key" placeholder="Введите ключ API">
+                                                <button type="button" id="toggle-api-key" class="btn-icon">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="setting-description">
+                                            Ключ для доступа к API генерации контента
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-card super-admin-only">
+                                <div class="card-header">
+                                    <h2><i class="fas fa-bell"></i> Уведомления</h2>
+                                </div>
+                                
+                                <div class="card-body">
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="notification-level">
+                                                Уровень уведомлений
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select id="notification-level">
+                                                <option value="all">Все сообщения</option>
+                                                <option value="important">Только важные</option>
+                                                <option value="errors">Только ошибки</option>
+                                                <option value="none">Отключить</option>
+                                            </select>
+                                        </div>
+                                        <div class="setting-description">
+                                            Какие типы уведомлений отправлять администраторам
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="notification-channel">
+                                                Канал уведомлений
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select id="notification-channel">
+                                                <option value="telegram">Telegram</option>
+                                                <option value="email">Email</option>
+                                                <option value="both">Оба канала</option>
+                                            </select>
+                                        </div>
+                                        <div class="setting-description">
+                                            Способ доставки системных уведомлений
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="setting-item">
+                                        <div class="setting-title">
+                                            <label for="notification-schedule">
+                                                Расписание отчетов
+                                            </label>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select id="notification-schedule">
+                                                <option value="daily">Ежедневно</option>
+                                                <option value="weekly">Еженедельно</option>
+                                                <option value="monthly">Ежемесячно</option>
+                                                <option value="none">Не отправлять</option>
+                                            </select>
+                                        </div>
+                                        <div class="setting-description">
+                                            Периодичность отправки сводных отчетов
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> Сохранить настройки
+                            </button>
+                            <button type="reset" class="btn btn-secondary">
+                                <i class="fas fa-undo"></i> Сбросить
+                            </button>
+                        </div>
                     </form>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Логи -->
-        <div class="tab-content" id="logs-tab">
-            <h2><i class="fas fa-file-alt"></i> Просмотр логов</h2>
-            <div class="logs-filter">
-                <div class="filter-group">
-                    <label for="log-level">Уровень:</label>
-                    <select id="log-level">
-                        <option value="all">Все уровни</option>
-                        <option value="info">Информация</option>
-                        <option value="warning">Предупреждения</option>
-                        <option value="error">Ошибки</option>
-                        <option value="debug">Отладка</option>
-                    </select>
-                </div>
                 
-                <div class="filter-group">
-                    <label for="log-limit">Кол-во строк:</label>
-                    <input type="number" id="log-limit" value="100" min="10" max="1000">
-                </div>
-                
-                <button id="refresh-logs" class="btn">
-                    <i class="fas fa-sync-alt"></i> Обновить
-                </button>
-                
-                <button id="export-logs" class="btn btn-secondary">
-                    <i class="fas fa-file-download"></i> Экспорт
-                </button>
-            </div>
-            <pre id="logs-container" class="logs-container">Загрузка логов...</pre>
-        </div>
-        
-        <!-- Настройки -->
-        <div class="tab-content" id="settings-tab">
-            <h2><i class="fas fa-cog"></i> Настройки бота</h2>
-            
-            <form id="bot-settings-form">
-                <div class="settings-container">
-                    <div class="setting-card">
-                        <h3><i class="fas fa-sliders-h"></i> Основные настройки</h3>
-                        
-                        <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="auto-update-topics"> Автоматическое обновление тем
-                            </label>
-                            <div class="setting-description">
-                                Автоматически обновлять темы из базы данных
-                            </div>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="collect-statistics"> Сбор статистики
-                            </label>
-                            <div class="setting-description">
-                                Собирать данные об использовании бота
-                            </div>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="developer-mode"> Режим разработчика
-                            </label>
-                            <div class="setting-description">
-                                Включает расширенные возможности отладки
-                            </div>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="private-mode"> Приватный режим
-                            </label>
-                            <div class="setting-description">
-                                Бот доступен только администраторам
-                            </div>
-                        </div>
+                <!-- Страница обслуживания -->
+                <div class="page" id="maintenance-page">
+                    <div class="page-header">
+                        <h1>Обслуживание системы</h1>
+                        <p class="page-description">Инструменты для технического обслуживания и поддержки системы.</p>
                     </div>
                     
-                    <div class="setting-card super-admin-only">
-                        <h3><i class="fas fa-cloud"></i> Настройки API</h3>
-                        
-                        <div class="setting-item">
-                            <label for="api-request-limit">Лимит запросов API (в день)</label>
-                            <input type="number" id="api-request-limit" min="10" max="1000" value="100">
-                            <div class="setting-description">
-                                Максимальное количество запросов к API в день
+                    <div class="maintenance-cards">
+                        <div class="maintenance-card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-trash-alt"></i> Очистка кэша</h2>
+                                <p>Удаляет временные файлы и кэш бота для освобождения памяти</p>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="card-status" id="cache-status">
+                                    Размер кэша: <span class="status-value">0 КБ</span>
+                                </div>
+                                
+                                <div class="card-actions">
+                                    <button id="clear-cache" class="btn btn-primary maintenance-action" data-action="clear-cache">
+                                        <i class="fas fa-broom"></i> Полная очистка
+                                    </button>
+                                    
+                                    <button id="selective-cache" class="btn btn-outline maintenance-action" data-action="selective-cache">
+                                        <i class="fas fa-filter"></i> Выборочно
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="setting-item">
-                            <label for="cache-duration">Продолжительность кэширования (часы)</label>
-                            <input type="number" id="cache-duration" min="1" max="72" value="24">
-                            <div class="setting-description">
-                                Время хранения данных в кэше в часах
+                        <div class="maintenance-card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-save"></i> Резервное копирование</h2>
+                                <p>Создает полную резервную копию данных и настроек</p>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="card-status">
+                                    Последняя копия: <span class="status-value" id="last-backup-time">Неизвестно</span>
+                                </div>
+                                
+                                <div class="card-actions">
+                                    <button id="create-backup" class="btn btn-primary maintenance-action" data-action="backup">
+                                        <i class="fas fa-hdd"></i> Выполнить
+                                    </button>
+                                    
+                                    <button id="restore-backup" class="btn btn-outline">
+                                        <i class="fas fa-upload"></i> Восстановить
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="setting-card super-admin-only">
-                        <h3><i class="fas fa-bell"></i> Уведомления</h3>
                         
-                        <div class="setting-item">
-                            <label for="notification-level">Уровень уведомлений</label>
-                            <select id="notification-level">
-                                <option value="all">Все сообщения</option>
-                                <option value="important">Только важные</option>
-                                <option value="errors">Только ошибки</option>
-                                <option value="none">Отключить</option>
-                            </select>
-                            <div class="setting-description">
-                                Какие типы уведомлений отправлять администраторам
+                        <div class="maintenance-card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-sync-alt"></i> Обновление данных API</h2>
+                                <p>Обновляет данные из внешних API и синхронизирует базу</p>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="card-status">
+                                    Статус: <span class="status-value">Не выполнялось</span>
+                                </div>
+                                
+                                <div class="card-actions">
+                                    <button id="update-api-data" class="btn btn-primary maintenance-action" data-action="update-api">
+                                        <i class="fas fa-cloud-download-alt"></i> Выполнить
+                                    </button>
+                                </div>
+                                
+                                <div class="progress-container">
+                                    <div class="progress">
+                                        <div class="progress-bar" id="api-progress" style="width: 0%"></div>
+                                    </div>
+                                    <span class="progress-text">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="maintenance-card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-file-alt"></i> Очистка логов</h2>
+                                <p>Удаляет старые файлы логов для освобождения дискового пространства</p>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="card-status">
+                                    Размер логов: <span class="status-value" id="logs-size">Загрузка...</span>
+                                </div>
+                                
+                                <div class="card-actions">
+                                    <button id="clean-logs" class="btn btn-primary maintenance-action" data-action="clean-logs">
+                                        <i class="fas fa-eraser"></i> Выполнить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="maintenance-card super-admin-only">
+                            <div class="card-header">
+                                <h2><i class="fas fa-power-off"></i> Перезапуск бота</h2>
+                                <p>Выполняет полный перезапуск бота и всех его компонентов</p>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="card-status">
+                                    Статус: <span class="status-value">Работает</span>
+                                </div>
+                                
+                                <div class="card-actions">
+                                    <button id="restart-bot" class="btn btn-warning maintenance-action" data-action="restart">
+                                        <i class="fas fa-redo"></i> Выполнить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="maintenance-card super-admin-only">
+                            <div class="card-header">
+                                <h2><i class="fas fa-database"></i> Интеграция данных</h2>
+                                <p>Сверяет и обновляет данные из различных источников</p>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="card-status">
+                                    Статус: <span class="status-value">Не выполнялось</span>
+                                </div>
+                                
+                                <div class="card-actions">
+                                    <button id="integrate-data" class="btn btn-primary maintenance-action" data-action="integrate">
+                                        <i class="fas fa-exchange-alt"></i> Выполнить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="maintenance-card super-admin-only">
+                            <div class="card-header">
+                                <h2><i class="fas fa-shield-alt"></i> Проверка безопасности</h2>
+                                <p>Выполняет проверку системы безопасности и целостности данных</p>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="card-status">
+                                    Статус: <span class="status-value">Не выполнялось</span>
+                                </div>
+                                
+                                <div class="card-actions">
+                                    <button id="security-check" class="btn btn-primary maintenance-action" data-action="security">
+                                        <i class="fas fa-tasks"></i> Выполнить
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-save"></i> Сохранить настройки
-                    </button>
-                    <button type="reset" class="btn btn-secondary">
-                        <i class="fas fa-undo"></i> Сбросить
-                    </button>
-                </div>
-            </form>
-        </div>
-        
-        <!-- Техническое обслуживание -->
-        <div class="tab-content" id="maintenance-tab">
-            <h2><i class="fas fa-tools"></i> Техническое обслуживание</h2>
-            <div class="maintenance-actions">
-                <div class="action-card">
-                    <h3><i class="fas fa-trash-alt"></i> Очистка кэша</h3>
-                    <p>Удаляет временные файлы и кэш бота для освобождения памяти</p>
-                    <div class="action-buttons">
-                        <button id="clear-cache" class="btn maintenance-action" data-action="clear-cache">
-                            <i class="fas fa-broom"></i> Полная очистка
-                        </button>
-                        <button id="selective-cache" class="btn btn-secondary maintenance-action" data-action="selective-cache">
-                            <i class="fas fa-filter"></i> Выборочно
-                        </button>
-                    </div>
-                    <div class="action-status" id="cache-status"></div>
-                </div>
-                
-                <div class="action-card">
-                    <h3><i class="fas fa-save"></i> Резервное копирование</h3>
-                    <p>Создает полную резервную копию данных и настроек</p>
-                    <button id="create-backup" class="btn maintenance-action" data-action="backup">
-                        <i class="fas fa-hdd"></i> Выполнить
-                    </button>
-                    <div class="backup-info">
-                        <small>Последняя копия: <span id="last-backup-time">Неизвестно</span></small>
-                    </div>
-                </div>
-                
-                <div class="action-card">
-                    <h3><i class="fas fa-sync-alt"></i> Обновление данных API</h3>
-                    <p>Обновляет данные из внешних API и синхронизирует базу</p>
-                    <button id="update-api-data" class="btn maintenance-action" data-action="update-api">
-                        <i class="fas fa-cloud-download-alt"></i> Выполнить
-                    </button>
-                    <div class="action-progress">
-                        <div class="progress-bar" id="api-progress"></div>
-                    </div>
-                </div>
-                
-                <div class="action-card">
-                    <h3><i class="fas fa-file-alt"></i> Очистка логов</h3>
-                    <p>Удаляет старые файлы логов для освобождения дискового пространства</p>
-                    <button id="clean-logs" class="btn maintenance-action" data-action="clean-logs">
-                        <i class="fas fa-eraser"></i> Выполнить
-                    </button>
-                    <div class="log-info">
-                        <small>Размер логов: <span id="logs-size">Загрузка...</span></small>
-                    </div>
-                </div>
-                
-                <div class="action-card">
-                    <h3><i class="fas fa-history"></i> Аудит изменений</h3>
-                    <p>Просмотр истории изменений в системе и действий администраторов</p>
-                    <button id="view-audit" class="btn maintenance-action" data-action="audit">
-                        <i class="fas fa-eye"></i> Просмотр
-                    </button>
-                </div>
-                
-                <div class="action-card super-admin-only">
-                    <h3><i class="fas fa-power-off"></i> Перезапуск бота</h3>
-                    <p>Выполняет полный перезапуск бота и всех его компонентов</p>
-                    <button id="restart-bot" class="btn btn-warning maintenance-action" data-action="restart">
-                        <i class="fas fa-redo"></i> Выполнить
-                    </button>
-                </div>
-                
-                <div class="action-card super-admin-only">
-                    <h3><i class="fas fa-database"></i> Интеграция данных</h3>
-                    <p>Сверяет и обновляет данные из различных источников</p>
-                    <button id="integrate-data" class="btn maintenance-action" data-action="integrate">
-                        <i class="fas fa-exchange-alt"></i> Выполнить
-                    </button>
-                </div>
-                
-                <div class="action-card super-admin-only">
-                    <h3><i class="fas fa-shield-alt"></i> Проверка безопасности</h3>
-                    <p>Выполняет проверку системы безопасности и целостности данных</p>
-                    <button id="security-check" class="btn maintenance-action" data-action="security">
-                        <i class="fas fa-tasks"></i> Выполнить
-                    </button>
-                </div>
-                
-                <div class="action-card super-admin-only">
-                    <h3><i class="fas fa-sitemap"></i> Оптимизация БД</h3>
-                    <p>Оптимизирует структуру базы данных и выполняет очистку</p>
-                    <button id="optimize-db" class="btn maintenance-action" data-action="optimize">
-                        <i class="fas fa-wrench"></i> Выполнить
-                    </button>
                 </div>
             </div>
+        </main>
+    </div>
+    
+    <!-- Модальные окна -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal" id="modal-container">
+            <!-- Содержимое модального окна загружается динамически -->
         </div>
     </div>
     
-    <!-- Форма авторизации удалена -->
-
+    <!-- Подключение скрипта -->
     <script src="/static/admin_script.js"></script>
 </body>
 </html>
