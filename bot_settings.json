@@ -5,3 +5,9 @@
     "developer_mode": false,
     "private_mode": false
 }
+{
+    "auto_update_topics": true,
+    "collect_statistics": true,
+    "developer_mode": false,
+    "private_mode": false
+}

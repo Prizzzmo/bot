@@ -1,0 +1,154 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель администратора</title>
+    <link rel="stylesheet" href="/static/admin_styles.css">
+</head>
+<body>
+    <div class="admin-container">
+        <h1>Панель администратора</h1>
+        
+        <div class="admin-tabs">
+            <button class="tab-button active" data-tab="stats">Статистика</button>
+            <button class="tab-button" data-tab="admins">Управление администраторами</button>
+            <button class="tab-button" data-tab="logs">Просмотр логов</button>
+            <button class="tab-button" data-tab="settings">Настройки</button>
+            <button class="tab-button" data-tab="maintenance">Техническое обслуживание</button>
+        </div>
+        
+        <div class="tab-content active" id="stats-tab">
+            <h2>Статистика бота</h2>
+            <div class="stats-container">
+                <div id="stats-data" class="stats-data">
+                    <p>Загрузка статистики...</p>
+                </div>
+                <div class="stats-chart">
+                    <h3>Активность пользователей</h3>
+                    <img src="/api/chart/daily_activity" alt="График активности">
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="admins-tab">
+            <h2>Управление администраторами</h2>
+            <div class="admin-list">
+                <h3>Администраторы</h3>
+                <ul id="admin-list"></ul>
+                
+                <h3>Супер-администраторы</h3>
+                <ul id="super-admin-list"></ul>
+                
+                <div class="admin-actions">
+                    <h3>Добавить администратора</h3>
+                    <form id="add-admin-form">
+                        <input type="number" id="new-admin-id" placeholder="ID пользователя Telegram" required>
+                        <label>
+                            <input type="checkbox" id="is-super-admin"> Супер-администратор
+                        </label>
+                        <button type="submit" class="btn">Добавить</button>
+                    </form>
+                    
+                    <h3>Удалить администратора</h3>
+                    <form id="remove-admin-form">
+                        <select id="admin-to-remove">
+                            <option value="">Выберите администратора</option>
+                        </select>
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="logs-tab">
+            <h2>Просмотр логов</h2>
+            <div class="logs-filter">
+                <select id="log-level">
+                    <option value="all">Все уровни</option>
+                    <option value="info">Информация</option>
+                    <option value="warning">Предупреждения</option>
+                    <option value="error">Ошибки</option>
+                </select>
+                <input type="number" id="log-limit" value="100" min="10" max="1000">
+                <button id="refresh-logs" class="btn">Обновить</button>
+            </div>
+            <pre id="logs-container" class="logs-container">Загрузка логов...</pre>
+        </div>
+        
+        <div class="tab-content" id="settings-tab">
+            <h2>Настройки бота</h2>
+            <form id="bot-settings-form">
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="auto-update-topics"> Автоматическое обновление тем
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="collect-statistics"> Сбор статистики
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="developer-mode"> Режим разработчика
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="private-mode"> Приватный режим
+                    </label>
+                </div>
+                <button type="submit" class="btn">Сохранить настройки</button>
+            </form>
+        </div>
+        
+        <div class="tab-content" id="maintenance-tab">
+            <h2>Техническое обслуживание</h2>
+            <div class="maintenance-actions">
+                <div class="action-card">
+                    <h3>Очистка кэша</h3>
+                    <p>Удаляет временные файлы и кэш бота</p>
+                    <button id="clear-cache" class="btn">Выполнить</button>
+                </div>
+                <div class="action-card">
+                    <h3>Резервное копирование</h3>
+                    <p>Создает резервную копию данных</p>
+                    <button id="create-backup" class="btn">Выполнить</button>
+                </div>
+                <div class="action-card">
+                    <h3>Обновление данных API</h3>
+                    <p>Обновляет данные из внешних API</p>
+                    <button id="update-api-data" class="btn">Выполнить</button>
+                </div>
+                <div class="action-card">
+                    <h3>Очистка логов</h3>
+                    <p>Удаляет старые файлы логов</p>
+                    <button id="clean-logs" class="btn">Выполнить</button>
+                </div>
+                <div class="action-card">
+                    <h3>Перезапуск бота</h3>
+                    <p>Перезапускает бота</p>
+                    <button id="restart-bot" class="btn btn-warning">Выполнить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="admin-auth" id="admin-auth">
+        <div class="auth-container">
+            <h2>Авторизация администратора</h2>
+            <form id="admin-login-form">
+                <div class="form-group">
+                    <label for="admin-id">ID администратора</label>
+                    <input type="number" id="admin-id" required>
+                </div>
+                <button type="submit" class="btn">Войти</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/admin_script.js"></script>
+</body>
+</html>

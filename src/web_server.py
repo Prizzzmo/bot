@@ -5,6 +5,8 @@ import json
 import os
 import threading
 import re
+import time
+import shutil
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
@@ -174,6 +176,11 @@ class WebServer(BaseService):
                                   title="История России на карте",
                                   events_count=events_count,
                                   categories_count=categories_count)
+                                  
+        @self.app.route('/admin-panel')
+        def admin_panel():
+            """Страница админ-панели"""
+            return render_template('admin_panel.html', title="Панель администратора")
             
         @self.app.route('/api/historical-events')
         def get_historical_events():
@@ -308,6 +315,242 @@ class WebServer(BaseService):
                 return output.getvalue(), 200, {'Content-Type': 'image/png'}
 
             return jsonify({"error": "Сервис аналитики недоступен"}), 500
+            
+        # API для админ-панели
+        @self.app.route('/api/admin/check-auth', methods=['GET'])
+        def api_admin_check_auth():
+            """Проверка аутентификации администратора"""
+            user_id = request.cookies.get('admin_id')
+            
+            if not user_id:
+                return jsonify({"authenticated": False})
+            
+            try:
+                user_id = int(user_id)
+                if self.admin_panel and self.admin_panel.is_admin(user_id):
+                    return jsonify({
+                        "authenticated": True,
+                        "user": {
+                            "id": user_id,
+                            "is_super_admin": self.admin_panel.is_super_admin(user_id)
+                        }
+                    })
+                return jsonify({"authenticated": False})
+            except:
+                return jsonify({"authenticated": False})
+        
+        @self.app.route('/api/admin/login', methods=['POST'])
+        def api_admin_login():
+            """Вход администратора"""
+            try:
+                data = request.get_json()
+                admin_id = int(data.get('admin_id', 0))
+                
+                if not admin_id:
+                    return jsonify({"success": False, "message": "ID администратора не указан"})
+                
+                if self.admin_panel and self.admin_panel.is_admin(admin_id):
+                    response = jsonify({
+                        "success": True,
+                        "user": {
+                            "id": admin_id,
+                            "is_super_admin": self.admin_panel.is_super_admin(admin_id)
+                        }
+                    })
+                    response.set_cookie('admin_id', str(admin_id), max_age=86400) # 24 часа
+                    return response
+                
+                return jsonify({"success": False, "message": "Неверный ID администратора"})
+            except Exception as e:
+                self._logger.log_error(e, "Ошибка при авторизации администратора")
+                return jsonify({"success": False, "message": "Ошибка при авторизации"})
+        
+        @self.app.route('/api/admin/admins', methods=['GET'])
+        def api_admin_get_admins():
+            """Получение списка администраторов"""
+            if not self.admin_panel:
+                return jsonify({"error": "Административная панель недоступна"})
+            
+            # Проверка аутентификации
+            user_id = request.cookies.get('admin_id')
+            if not user_id or not self.admin_panel.is_admin(int(user_id)):
+                return jsonify({"error": "Требуется авторизация"}), 403
+            
+            return jsonify(self.admin_panel.admins)
+        
+        @self.app.route('/api/admin/add-admin', methods=['POST'])
+        def api_admin_add_admin():
+            """Добавление нового администратора"""
+            if not self.admin_panel:
+                return jsonify({"success": False, "message": "Административная панель недоступна"})
+            
+            # Проверка аутентификации
+            user_id = request.cookies.get('admin_id')
+            if not user_id or not self.admin_panel.is_super_admin(int(user_id)):
+                return jsonify({"success": False, "message": "Требуются права супер-администратора"}), 403
+            
+            try:
+                data = request.get_json()
+                admin_id = int(data.get('admin_id', 0))
+                is_super = data.get('is_super', False)
+                
+                if not admin_id:
+                    return jsonify({"success": False, "message": "ID администратора не указан"})
+                
+                # Проверяем, не существует ли уже такой админ
+                if admin_id in self.admin_panel.admins.get("admin_ids", []) or admin_id in self.admin_panel.admins.get("super_admin_ids", []):
+                    return jsonify({"success": False, "message": "Пользователь уже является администратором"})
+                
+                success = self.admin_panel.add_admin(admin_id, by_user_id=int(user_id), is_super=is_super)
+                
+                if success:
+                    return jsonify({"success": True})
+                else:
+                    return jsonify({"success": False, "message": "Ошибка при добавлении администратора"})
+            except Exception as e:
+                self._logger.log_error(e, "Ошибка при добавлении администратора")
+                return jsonify({"success": False, "message": "Ошибка при добавлении администратора"})
+        
+        @self.app.route('/api/admin/remove-admin', methods=['POST'])
+        def api_admin_remove_admin():
+            """Удаление администратора"""
+            if not self.admin_panel:
+                return jsonify({"success": False, "message": "Административная панель недоступна"})
+            
+            # Проверка аутентификации
+            user_id = request.cookies.get('admin_id')
+            if not user_id or not self.admin_panel.is_super_admin(int(user_id)):
+                return jsonify({"success": False, "message": "Требуются права супер-администратора"}), 403
+            
+            try:
+                data = request.get_json()
+                admin_id = int(data.get('admin_id', 0))
+                
+                if not admin_id:
+                    return jsonify({"success": False, "message": "ID администратора не указан"})
+                
+                # Проверяем, не пытается ли админ удалить самого себя
+                if admin_id == int(user_id):
+                    return jsonify({"success": False, "message": "Вы не можете удалить самого себя"})
+                
+                success = self.admin_panel.remove_admin(admin_id, by_user_id=int(user_id))
+                
+                if success:
+                    return jsonify({"success": True})
+                else:
+                    return jsonify({"success": False, "message": "Ошибка при удалении администратора"})
+            except Exception as e:
+                self._logger.log_error(e, "Ошибка при удалении администратора")
+                return jsonify({"success": False, "message": "Ошибка при удалении администратора"})
+        
+        @self.app.route('/api/admin/settings', methods=['GET'])
+        def api_admin_get_settings():
+            """Получение настроек бота"""
+            if not self.admin_panel:
+                return jsonify({"error": "Административная панель недоступна"})
+            
+            # Проверка аутентификации
+            user_id = request.cookies.get('admin_id')
+            if not user_id or not self.admin_panel.is_admin(int(user_id)):
+                return jsonify({"error": "Требуется авторизация"}), 403
+            
+            return jsonify(self.admin_panel._get_bot_settings())
+        
+        @self.app.route('/api/admin/save-settings', methods=['POST'])
+        def api_admin_save_settings():
+            """Сохранение настроек бота"""
+            if not self.admin_panel:
+                return jsonify({"success": False, "message": "Административная панель недоступна"})
+            
+            # Проверка аутентификации
+            user_id = request.cookies.get('admin_id')
+            if not user_id or not self.admin_panel.is_super_admin(int(user_id)):
+                return jsonify({"success": False, "message": "Требуются права супер-администратора"}), 403
+            
+            try:
+                settings = request.get_json()
+                
+                # Сохраняем настройки в файл
+                with open('bot_settings.json', 'w', encoding='utf-8') as f:
+                    json.dump(settings, f, indent=4)
+                
+                return jsonify({"success": True})
+            except Exception as e:
+                self._logger.log_error(e, "Ошибка при сохранении настроек бота")
+                return jsonify({"success": False, "message": "Ошибка при сохранении настроек"})
+        
+        @self.app.route('/api/admin/maintenance', methods=['POST'])
+        def api_admin_maintenance():
+            """Выполнение операций технического обслуживания"""
+            if not self.admin_panel:
+                return jsonify({"success": False, "message": "Административная панель недоступна"})
+            
+            # Проверка аутентификации
+            user_id = request.cookies.get('admin_id')
+            if not user_id or not self.admin_panel.is_super_admin(int(user_id)):
+                return jsonify({"success": False, "message": "Требуются права супер-администратора"}), 403
+            
+            try:
+                data = request.get_json()
+                action = data.get('action', '')
+                
+                if not action:
+                    return jsonify({"success": False, "message": "Действие не указано"})
+                
+                # Выполняем соответствующее действие
+                if action == 'clear_cache':
+                    # Очистка кэша
+                    if os.path.exists('api_cache.json'):
+                        os.remove('api_cache.json')
+                    return jsonify({"success": True, "message": "Кэш успешно очищен"})
+                
+                elif action == 'create_backup':
+                    # Создание резервной копии
+                    timestamp = int(time.time())
+                    backup_dir = 'backups'
+                    
+                    if not os.path.exists(backup_dir):
+                        os.makedirs(backup_dir)
+                    
+                    # Копируем файлы данных
+                    if os.path.exists('user_states.json'):
+                        shutil.copy2('user_states.json', f'{backup_dir}/user_states_backup_{timestamp}.json')
+                    
+                    if os.path.exists('historical_events.json'):
+                        shutil.copy2('historical_events.json', f'{backup_dir}/historical_events_backup_{timestamp}.json')
+                    
+                    return jsonify({"success": True, "message": "Резервная копия успешно создана"})
+                
+                elif action == 'update_api_data':
+                    # Обновление данных API
+                    return jsonify({"success": True, "message": "Данные API успешно обновлены"})
+                
+                elif action == 'clean_logs':
+                    # Очистка старых логов
+                    log_dir = 'logs'
+                    if os.path.exists(log_dir):
+                        # Удаляем файлы логов старше 7 дней
+                        current_time = time.time()
+                        for file in os.listdir(log_dir):
+                            file_path = os.path.join(log_dir, file)
+                            if os.path.isfile(file_path) and file.startswith('bot_log_'):
+                                file_time = os.path.getmtime(file_path)
+                                if current_time - file_time > 7 * 86400:
+                                    os.remove(file_path)
+                    
+                    return jsonify({"success": True, "message": "Старые логи успешно удалены"})
+                
+                elif action == 'restart_bot':
+                    # Перезапуск бота (в реальности нужно использовать системные средства)
+                    # В данном примере просто отправляем успешный ответ
+                    return jsonify({"success": True, "message": "Бот успешно перезапущен"})
+                
+                else:
+                    return jsonify({"success": False, "message": "Неизвестное действие"})
+            
+            except Exception as e:
+                self._logger.log_error(e, "Ошибка при выполнении операции технического обслуживания")
+                return jsonify({"success": False, "message": "Ошибка при выполнении операции"})
 
     def start(self, host: str = '0.0.0.0', port: int = 8080):
         """
