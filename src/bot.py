@@ -39,9 +39,9 @@ class Bot:
 
             # Создаем и сохраняем Updater
             self._setup_updater()
-
-            # Настраиваем логгер
-            self.logger.setup()
+            
+            # Логгер уже настроен при инициализации
+            self.logger.info("Настройка бота завершена успешно")
             return True
         except Exception as e:
             self.logger.log_error(e, "Ошибка при настройке бота")
