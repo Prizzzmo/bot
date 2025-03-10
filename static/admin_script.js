@@ -26,129 +26,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Функция для проверки аутентификации
+// Функция для проверки аутентификации (автоматически аутентифицирует)
 function checkAuthentication() {
-    fetch('/api/admin/check-auth')
-        .then(response => response.json())
-        .then(data => {
-            if (data.authenticated) {
-                isAuthenticated = true;
-                currentUser = data.user;
-                showAdminPanel();
-                loadAdminData();
-                updateUserInfo();
-            } else {
-                isAuthenticated = false;
-                showLoginForm();
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка при проверке аутентификации:', error);
-            isAuthenticated = false;
-            showLoginForm();
-        });
-}
-
-// Показываем форму входа
-function showLoginForm() {
-    const adminAuth = document.getElementById('admin-auth');
-    const adminContainer = document.querySelector('.admin-container');
+    // Автоматически аутентифицируем пользователя
+    isAuthenticated = true;
+    // Создаем дефолтного пользователя
+    currentUser = {
+        id: 7225056628, // ID из admins.json
+        is_super_admin: true
+    };
     
-    if (adminAuth && adminContainer) {
-        adminAuth.style.display = 'flex';
-        adminContainer.style.display = 'none';
-        
-        // Добавляем обработчик для формы входа
-        const loginForm = document.getElementById('admin-login-form');
-        if (loginForm) {
-            loginForm.addEventListener('submit', handleLogin);
-        }
-    }
+    // Показываем админ-панель и загружаем данные
+    showAdminPanel();
+    loadAdminData();
+    updateUserInfo();
 }
 
 // Показываем админ-панель
 function showAdminPanel() {
-    const adminAuth = document.getElementById('admin-auth');
     const adminContainer = document.querySelector('.admin-container');
-    
-    if (adminAuth && adminContainer) {
-        adminAuth.style.display = 'none';
+    if (adminContainer) {
         adminContainer.style.display = 'block';
-    }
-}
-
-// Обработчик входа в систему
-function handleLogin(e) {
-    e.preventDefault();
-    
-    const adminPassword = document.getElementById('admin-password').value;
-    const loginButton = document.querySelector('#admin-login-form button');
-    const originalButtonText = loginButton.innerHTML;
-    
-    if (!adminPassword) {
-        showAuthError('Введите пароль администратора');
-        return;
-    }
-    
-    // Показываем индикатор загрузки
-    loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Вход...';
-    loginButton.disabled = true;
-    
-    fetch('/api/admin/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ admin_password: adminPassword })
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Ошибка HTTP: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            showAuthError('Вход выполнен успешно!', true);
-            setTimeout(() => {
-                isAuthenticated = true;
-                currentUser = data.user;
-                showAdminPanel();
-                loadAdminData();
-                updateUserInfo();
-                showNotification('Вы успешно вошли в систему', 'success');
-            }, 1000);
-        } else {
-            loginButton.innerHTML = originalButtonText;
-            loginButton.disabled = false;
-            showAuthError(data.message || 'Неверный пароль администратора');
-        }
-    })
-    .catch(error => {
-        console.error('Ошибка при входе:', error);
-        loginButton.innerHTML = originalButtonText;
-        loginButton.disabled = false;
-        showAuthError('Ошибка при авторизации: ' + error.message);
-    });
-}
-
-// Показываем ошибку или сообщение авторизации
-function showAuthError(message, isSuccess = false) {
-    const authError = document.querySelector('.auth-error');
-    if (authError) {
-        authError.textContent = message;
-        
-        // Удаляем все классы стилей
-        authError.classList.remove('visible', 'success', 'error');
-        
-        // Добавляем соответствующие классы
-        authError.classList.add('visible');
-        authError.classList.add(isSuccess ? 'success' : 'error');
-        
-        // Скрываем сообщение через 3 секунды
-        setTimeout(() => {
-            authError.classList.remove('visible');
-        }, 3000);
     }
 }
 
