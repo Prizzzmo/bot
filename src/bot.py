@@ -57,6 +57,16 @@ class Bot:
                 self.logger.error("Ошибка запуска бота: updater не инициализирован")
                 return
 
+            # Проверка наличия обработчиков
+            if not hasattr(self, 'handlers') or self.handlers is None:
+                self.logger.error("Ошибка запуска бота: handlers не инициализированы")
+                return
+                
+            # Инициализируем обработчики, если это не было сделано ранее
+            if not hasattr(self.updater.dispatcher, 'handlers') or not self.updater.dispatcher.handlers:
+                self.logger.info("Инициализируем обработчики команд...")
+                self._initialize_handlers()
+
             # Проверка валидности токена
             import telegram
             try:
@@ -69,35 +79,53 @@ class Bot:
                 self.logger.error("Проверьте корректность TELEGRAM_TOKEN в .env файле")
                 return
 
+            # Проверяем, что все необходимые обработчики добавлены
+            if not self.updater.dispatcher.handlers:
+                self.logger.error("Обработчики не добавлены в диспетчер")
+                return
+
             # Оптимизированные настройки для более эффективного сбора обновлений
-            # Уменьшен таймаут для более быстрого обнаружения ошибок
-            # Явное указание типов обновлений для обработки
             self.logger.info("Запуск start_polling...")
             try:
                 self.updater.start_polling(
-                    timeout=10,  # Увеличиваем таймаут для более стабильной работы
+                    timeout=10,  # Таймаут для стабильной работы
                     drop_pending_updates=True,  # Пропуск накопившихся обновлений
-                    allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Только необходимые типы обновлений
-                    poll_interval=0.5  # Увеличиваем интервал опроса для снижения нагрузки
+                    allowed_updates=['message', 'callback_query', 'chat_member', 'chosen_inline_result'],  # Необходимые типы обновлений
+                    poll_interval=0.5  # Интервал опроса для снижения нагрузки
                 )
                 self.logger.info("Бот успешно запущен")
                 self.logger.info(f"Dispatcher running: {self.updater.dispatcher.running}")
             except Exception as e:
                 self.logger.error(f"Ошибка при запуске polling: {e}")
+                import traceback
+                self.logger.error(f"Стек вызовов: {traceback.format_exc()}")
                 return
 
-            # Вместо собственной реализации используем встроенный метод idle
-            # который более надежно обрабатывает сигналы и блокировку
+            # Используем встроенный метод idle для блокировки
             try:
                 self.logger.info("Входим в режим idle...")
+                # Добавляем обработку сигналов
+                import signal
+                def signal_handler(signum, frame):
+                    self.logger.info(f"Получен сигнал {signum}, останавливаем бота...")
+                    self.updater.stop()
+                
+                # Регистрируем обработчики сигналов
+                signal.signal(signal.SIGINT, signal_handler)
+                signal.signal(signal.SIGTERM, signal_handler)
+                
                 self.updater.idle()
             except Exception as e:
                 self.logger.error(f"Ошибка в idle режиме: {e}")
+                import traceback
+                self.logger.error(f"Стек вызовов: {traceback.format_exc()}")
 
             # Если idle вернул управление, значит бот завершает работу
             self.logger.info("Бот завершил работу")
         except Exception as e:
+            import traceback
             self.logger.log_error(e, {"context": "bot.run()"})
+            self.logger.error(f"Полный стек вызовов: {traceback.format_exc()}")
             # Попытка принудительного завершения updater если он был создан
             if hasattr(self, 'updater') and self.updater:
                 try:
@@ -128,9 +156,14 @@ class Bot:
             dp = self.updater.dispatcher
 
             # Регистрируем обработчик callback-запросов для админки
-            if hasattr(self, 'admin_panel'):
-                dp.add_handler(CallbackQueryHandler(self.admin_panel.handle_admin_callback, pattern='^admin_'))
-                self.logger.info("Зарегистрирован обработчик админских callback-запросов")
+            if hasattr(self, 'admin_panel') and self.admin_panel:
+                try:
+                    dp.add_handler(CallbackQueryHandler(self.admin_panel.handle_admin_callback, pattern='^admin_'))
+                    self.logger.info("Зарегистрирован обработчик админских callback-запросов")
+                except Exception as e:
+                    self.logger.error(f"Ошибка при регистрации обработчика админских callback-запросов: {e}")
+            else:
+                self.logger.warning("Админ-панель не инициализирована, обработчик не добавлен")
 
     def _initialize_components(self):
         """
