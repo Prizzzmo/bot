@@ -6,7 +6,7 @@ import json
 load_dotenv()
 
 # Константы для состояний ConversationHandler
-TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION = range(5)
+TOPIC, CHOOSE_TOPIC, TEST, ANSWER, CONVERSATION, MAP, ANALYTICS, ADMIN = range(8)
 
 # Словарь с описаниями ошибок для расширенного логирования
 ERROR_DESCRIPTIONS = {
