@@ -101,27 +101,43 @@ a:hover {
 /* Мобильное меню */
 .mobile-menu-toggle {
     position: fixed;
-    top: 10px;
-    left: 10px;
+    bottom: 20px;
+    right: 20px;
     z-index: 1200;
     background-color: var(--primary-dark);
     color: white;
     border: none;
-    width: 50px;
-    height: 50px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     display: none;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-lg);
     cursor: pointer;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     transition: all 0.3s ease;
+    animation: float 3s ease-in-out infinite;
 }
 
 .mobile-menu-toggle:active {
     transform: scale(0.95);
     background-color: var(--primary-color);
+}
+
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+        box-shadow: 0 5px 15px 0px rgba(0,0,0,0.4);
+    }
+    50% {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 20px 0px rgba(0,0,0,0.2);
+    }
+    100% {
+        transform: translateY(0px);
+        box-shadow: 0 5px 15px 0px rgba(0,0,0,0.4);
+    }
 }
 
 /* Добавляем индикатор свайпа для открытия меню */

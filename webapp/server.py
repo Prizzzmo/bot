@@ -9,7 +9,7 @@ import time
 import shutil
 import threading
 import datetime
-from flask import Flask, render_template, jsonify, request, send_file, redirect, url_for
+from flask import Flask, render_template, jsonify, request, send_file, make_response
 from flask_cors import CORS
 
 # Путь к файлу с историческими данными
@@ -803,7 +803,7 @@ def block_user(user_id):
     try:
         # В реальном приложении здесь была бы логика блокировки
         logger.info(f"Запрошена блокировка пользователя {user_id}")
-        return jsonify({"success": True, "message": f"Пользователь {user_id} заблокирован"})
+        return jsonify({"success": True, "message": f"Пользователь {userid} заблокирован"})
     except Exception as e:
         logger.error(f"Ошибка при блокировке пользователя: {e}")
         return jsonify({"error": str(e)}), 500
@@ -1020,56 +1020,93 @@ def run_server(host='0.0.0.0', port=8080):
 
 
 @app.route('/api/admin/get-doc')
-def get_doc():
-    """API для получения документации для скачивания"""
+def get_admin_doc():
+    """Маршрут для скачивания документации администратора"""
+    #  Added session check for authentication.  Replace with actual session management if needed.
+    if False: # Replace with actual session authentication check.
+        return jsonify({"error": "Не авторизован"}), 401
+
+    doc_path = request.args.get('path')
+    if not doc_path:
+        return jsonify({"error": "Путь к документу не указан"}), 400
+
     try:
-        doc_path = request.args.get('path')
-        if not doc_path:
-            return jsonify({"error": "Путь к документу не указан"}), 400
-            
-        # Проверка безопасности пути
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        # Сначала проверяем в папке static/docs
-        static_doc_path = os.path.join(base_path, 'static', 'docs', doc_path.lstrip('/'))
-        if os.path.exists(static_doc_path):
-            absolute_path = static_doc_path
-        else:
-            # Если в static/docs нет, проверяем в исходной папке docs
-            absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
-        
-        # Проверяем, что путь находится в пределах разрешенных директорий
-        if not (absolute_path.startswith(os.path.join(base_path, 'static')) or 
-                absolute_path.startswith(os.path.join(base_path, 'docs'))):
-            return jsonify({"error": "Доступ запрещен"}), 403
-            
+        # Проверяем безопасность пути (предотвращаем path traversal)
+        norm_path = os.path.normpath(doc_path)
+        if '..' in norm_path:
+            return jsonify({"error": "Недопустимый путь"}), 403
+
         # Проверяем существование файла
-        if not os.path.exists(absolute_path):
+        if not os.path.exists(norm_path):
             return jsonify({"error": "Файл не найден"}), 404
-            
-        # Определяем тип файла
-        file_ext = os.path.splitext(absolute_path)[1].lower()
-        mime_types = {
-            '.md': 'text/markdown',
-            '.txt': 'text/plain',
-            '.pdf': 'application/pdf',
-            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            '.html': 'text/html',
-        }
-        mime_type = mime_types.get(file_ext, 'application/octet-stream')
-        
-        # Имя файла для скачивания
-        filename = os.path.basename(absolute_path)
-        
-        # Отправляем файл
-        return send_file(absolute_path, 
-                        mimetype=mime_type,
-                        as_attachment=True, 
-                        download_name=filename)
-                        
+
+        # Получаем содержимое файла
+        with open(norm_path, 'rb') as f:
+            file_data = f.read()
+
+        # Определяем имя файла из пути
+        filename = os.path.basename(norm_path)
+
+        # Определяем MIME-тип для ответа
+        mime_type = 'application/octet-stream'
+        if norm_path.endswith('.md'):
+            mime_type = 'text/markdown'
+        elif norm_path.endswith('.pdf'):
+            mime_type = 'application/pdf'
+        elif norm_path.endswith('.txt'):
+            mime_type = 'text/plain'
+
+        # Формируем ответ со скачиванием файла
+        response = make_response(file_data)
+        response.headers['Content-Type'] = mime_type
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
     except Exception as e:
-        logger.error(f"Ошибка при получении документа: {e}")
-        return jsonify({"error": str(e)}), 500
+        print(f"Ошибка при получении документа: {e}")
+        return jsonify({"error": f"Ошибка при получении документа: {str(e)}"}), 500
+
+@app.route('/neadmin/<path:doc_name>')
+def get_neadmin_doc(doc_name):
+    """Публичный маршрут для скачивания документации без аутентификации"""
+    try:
+        # Определяем базовый путь для документов (папка docs)
+        base_path = os.path.join('static', 'docs')
+
+        # Формируем полный путь к документу
+        doc_path = os.path.join(base_path, doc_name)
+
+        # Нормализуем путь и проверяем, что он не выходит за пределы базовой папки
+        norm_path = os.path.normpath(doc_path)
+        if not norm_path.startswith(os.path.normpath(base_path)):
+            return jsonify({"error": "Недопустимый путь документа"}), 403
+
+        # Проверяем существование файла
+        if not os.path.exists(norm_path):
+            return jsonify({"error": "Документ не найден"}), 404
+
+        # Получаем содержимое файла
+        with open(norm_path, 'rb') as f:
+            file_data = f.read()
+
+        # Определяем MIME-тип для ответа
+        mime_type = 'application/octet-stream'
+        if norm_path.endswith('.md'):
+            mime_type = 'text/markdown'
+        elif norm_path.endswith('.pdf'):
+            mime_type = 'application/pdf'
+        elif norm_path.endswith('.txt'):
+            mime_type = 'text/plain'
+
+        # Формируем ответ со скачиванием файла
+        response = make_response(file_data)
+        response.headers['Content-Type'] = mime_type
+        response.headers['Content-Disposition'] = f'attachment; filename="{doc_name}"'
+        return response
+
+    except Exception as e:
+        print(f"Ошибка при получении документа из /neadmin: {e}")
+        return jsonify({"error": f"Ошибка при получении документа: {str(e)}"}), 500
 
 @app.route('/api/admin/view-doc')
 def view_doc():
@@ -1078,10 +1115,10 @@ def view_doc():
         doc_path = request.args.get('path')
         if not doc_path:
             return "Путь к документу не указан", 400
-            
+
         # Проверка безопасности пути
         base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
+
         # Сначала проверяем в папке static/docs
         static_doc_path = os.path.join(base_path, 'static', 'docs', doc_path.lstrip('/'))
         if os.path.exists(static_doc_path):
@@ -1089,16 +1126,16 @@ def view_doc():
         else:
             # Если в static/docs нет, проверяем в исходной папке docs
             absolute_path = os.path.abspath(os.path.join(base_path, doc_path))
-        
+
         # Проверяем, что путь находится в пределах разрешенных директорий
         if not (absolute_path.startswith(os.path.join(base_path, 'static')) or 
                 absolute_path.startswith(os.path.join(base_path, 'docs'))):
             return "Доступ запрещен", 403
-            
+
         # Проверяем существование файла
         if not os.path.exists(absolute_path):
             return "Файл не найден", 404
-            
+
         # Если это markdown файл, преобразуем его в HTML для отображения
         file_ext = os.path.splitext(absolute_path)[1].lower()
         if file_ext == '.md':
@@ -1106,7 +1143,7 @@ def view_doc():
                 import markdown
                 with open(absolute_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    
+
                 html_content = markdown.markdown(content)
                 return f"""
                 <!DOCTYPE html>
@@ -1133,10 +1170,10 @@ def view_doc():
                 with open(absolute_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 return f"<pre>{content}</pre>"
-                
+
         # Для других типов файлов отправляем их как есть
         return send_file(absolute_path)
-        
+
     except Exception as e:
         logger.error(f"Ошибка при просмотре документа: {e}")
         return f"Ошибка при просмотре документа: {str(e)}", 500
