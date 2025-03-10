@@ -1,213 +1,325 @@
 
-// Initialize Telegram WebApp
-const tgApp = window.Telegram.WebApp;
-tgApp.expand();
+// Инициализация Telegram WebApp
+let tg = window.Telegram.WebApp;
+tg.expand();
 
-// Apply Telegram theme
-document.documentElement.className = tgApp.colorScheme === 'dark' ? 'dark-theme' : '';
+// Применяем темную тему, если она установлена в Telegram
+if (tg.colorScheme === 'dark') {
+    document.body.classList.add('dark-theme');
+}
 
-// Initialize map variables
+// Глобальные переменные
 let map;
 let markers = [];
-let markerCluster;
-let historicalEvents = [];
-let filteredEvents = [];
+let events = [];
+let categories = [];
+let currentPeriod = '';
 
-// DOM Elements
-const categoryFilter = document.getElementById('category-filter');
-const centuryFilter = document.getElementById('century-filter');
-const resetFiltersBtn = document.getElementById('reset-filters');
-const eventDetails = document.getElementById('event-details');
-const closeDetailsBtn = document.getElementById('close-details');
-const eventTitle = document.getElementById('event-title');
-const eventDate = document.getElementById('event-date');
-const eventCategory = document.getElementById('event-category');
-const eventDescription = document.getElementById('event-description');
+// DOM элементы
+const mapContainer = document.getElementById('map');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const categorySelect = document.getElementById('categorySelect');
+const searchInput = document.getElementById('searchInput');
+const searchButton = document.getElementById('searchButton');
+const eventList = document.getElementById('eventList');
+const periodButtons = document.querySelectorAll('.period-button');
+const eventDetailsPanel = document.getElementById('eventDetailsPanel');
+const eventDetailsContent = document.getElementById('eventDetailsContent');
+const closeEventDetails = document.getElementById('closeEventDetails');
+const backToBot = document.getElementById('backToBot');
 
-// Initialize map
+// Инициализация карты
 function initMap() {
-    // Create map centered at Russia
-    map = L.map('map').setView([61.5240, 105.3188], 4);
-
-    // Add OpenStreetMap tiles
+    showLoading();
+    
+    // Создаем карту с центром в России
+    map = L.map('map').setView([55.751244, 37.618423], 4);
+    
+    // Добавляем тайлы OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
-
-    // Initialize marker cluster group
-    markerCluster = L.markerClusterGroup();
-    map.addLayer(markerCluster);
     
-    // Load historical data
-    loadHistoricalData();
+    hideLoading();
+    
+    // Загружаем данные
+    loadCategories();
+    loadEvents();
 }
 
-// Load historical data from JSON file
-async function loadHistoricalData() {
-    try {
-        const response = await fetch('/api/historical-events');
-        historicalEvents = await response.json();
-        
-        // Process events
-        processEvents(historicalEvents);
-        
-        // Initialize filters
-        initializeFilters();
-        
-        // Apply default filters
-        applyFilters();
-    } catch (error) {
-        console.error('Error loading historical data:', error);
-        alert('Не удалось загрузить исторические данные');
-    }
+// Функции для управления индикатором загрузки
+function showLoading() {
+    loadingOverlay.style.display = 'flex';
 }
 
-// Process events data
-function processEvents(events) {
-    // Filter out events without proper location data
-    return events.filter(event => {
-        return event.location && 
-               (typeof event.location === 'object' && event.location.lat && event.location.lng) || 
-               (typeof event.location === 'string');
-    });
+function hideLoading() {
+    loadingOverlay.style.display = 'none';
 }
 
-// Initialize filter options based on data
-function initializeFilters() {
-    // Get unique categories
-    const categories = [...new Set(historicalEvents.map(event => event.category))].sort();
-    
-    // Populate category filter
-    categories.forEach(category => {
-        const option = document.createElement('option');
-        option.value = category;
-        option.textContent = category;
-        categoryFilter.appendChild(option);
-    });
-    
-    // Get century ranges from dates
-    const centuries = new Set();
-    historicalEvents.forEach(event => {
-        const year = extractYearFromDate(event.date);
-        if (year) {
-            const century = Math.ceil(year / 100);
-            centuries.add(century);
-        }
-    });
-    
-    // Populate century filter
-    Array.from(centuries).sort((a, b) => a - b).forEach(century => {
-        const option = document.createElement('option');
-        option.value = century;
-        option.textContent = `${century} век`;
-        centuryFilter.appendChild(option);
-    });
+// Загружаем категории
+function loadCategories() {
+    fetch('/api/categories')
+        .then(response => response.json())
+        .then(data => {
+            categories = data;
+            console.log('Загружено категорий из API:', categories.length);
+            
+            // Очищаем текущие опции
+            while (categorySelect.options.length > 1) {
+                categorySelect.remove(1);
+            }
+            
+            // Добавляем новые категории
+            categories.forEach(category => {
+                console.log('Добавлена категория:', category);
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categorySelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке категорий:', error);
+        });
 }
 
-// Extract year from various date formats
-function extractYearFromDate(dateStr) {
-    if (!dateStr) return null;
+// Загружаем события
+function loadEvents() {
+    showLoading();
     
-    // Try extracting 4-digit year
-    const yearMatch = dateStr.match(/\b(\d{3,4})\b/);
-    if (yearMatch) {
-        return parseInt(yearMatch[1]);
-    }
-    
-    return null;
+    fetch('/api/events')
+        .then(response => response.json())
+        .then(data => {
+            events = data;
+            console.log('Загружено событий из API:', events.length);
+            hideLoading();
+            
+            // Проверяем URL-параметры для фильтрации
+            const urlParams = new URLSearchParams(window.location.search);
+            const eventId = urlParams.get('event');
+            const periodParam = urlParams.get('period');
+            const categoryParam = urlParams.get('category');
+            const searchParam = urlParams.get('search');
+            
+            // Применяем фильтры из URL
+            if (eventId) {
+                showEventDetails(events.find(e => e.id === eventId));
+            }
+            if (periodParam) {
+                setPeriod(periodParam);
+            }
+            if (categoryParam) {
+                categorySelect.value = categoryParam;
+            }
+            if (searchParam) {
+                searchInput.value = searchParam;
+            }
+            
+            // Фильтруем и отображаем события
+            filterAndDisplayEvents();
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке событий:', error);
+            hideLoading();
+        });
 }
 
-// Apply filters to events
-function applyFilters() {
-    const selectedCategory = categoryFilter.value;
-    const selectedCentury = centuryFilter.value;
+// Фильтрация и отображение событий
+function filterAndDisplayEvents() {
+    showLoading();
     
-    // Filter events based on selections
-    filteredEvents = historicalEvents.filter(event => {
-        // Category filter
-        if (selectedCategory !== 'all' && event.category !== selectedCategory) {
+    // Получаем значения фильтров
+    const selectedCategory = categorySelect.value;
+    const searchTerm = searchInput.value.toLowerCase();
+    
+    // Фильтруем события
+    const filteredEvents = events.filter(event => {
+        // Фильтр по категории
+        if (selectedCategory && event.category !== selectedCategory) {
             return false;
         }
         
-        // Century filter
-        if (selectedCentury !== 'all') {
-            const year = extractYearFromDate(event.date);
-            if (!year || Math.ceil(year / 100) != selectedCentury) {
-                return false;
+        // Фильтр по периоду
+        if (currentPeriod) {
+            switch (currentPeriod) {
+                case 'ancient':
+                    if (event.year > 1300) return false;
+                    break;
+                case 'middle':
+                    if (event.year < 1300 || event.year > 1700) return false;
+                    break;
+                case 'empire':
+                    if (event.year < 1700 || event.year > 1917) return false;
+                    break;
+                case 'soviet':
+                    if (event.year < 1917 || event.year > 1991) return false;
+                    break;
+                case 'modern':
+                    if (event.year < 1991) return false;
+                    break;
             }
+        }
+        
+        // Фильтр по поисковому запросу
+        if (searchTerm && !event.name.toLowerCase().includes(searchTerm) && 
+            !event.description.toLowerCase().includes(searchTerm)) {
+            return false;
         }
         
         return true;
     });
     
-    // Update markers
-    updateMarkers();
-}
-
-// Update map markers based on filtered events
-function updateMarkers() {
-    // Clear existing markers
-    markerCluster.clearLayers();
+    // Очищаем текущие маркеры
+    markers.forEach(marker => map.removeLayer(marker));
     markers = [];
     
-    // Add new markers
+    // Обновляем список событий
+    updateEventList(filteredEvents);
+    
+    // Добавляем маркеры на карту
     filteredEvents.forEach(event => {
-        let lat, lng;
-        
-        if (typeof event.location === 'object' && event.location.lat && event.location.lng) {
-            lat = event.location.lat;
-            lng = event.location.lng;
-        } else if (typeof event.location === 'string') {
-            // Skip events with string locations that don't have coordinates
-            return;
+        if (event.coordinates && event.coordinates.length === 2) {
+            const marker = L.marker(event.coordinates)
+                .addTo(map)
+                .bindPopup(`<b>${event.name}</b><br>${event.year}`);
+                
+            marker.on('click', () => {
+                showEventDetails(event);
+            });
+            
+            markers.push(marker);
         }
-        
-        // Skip if coordinates are invalid
-        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
-            return;
-        }
-        
-        // Create marker
-        const marker = L.marker([lat, lng]);
-        
-        // Add popup with basic info
-        marker.bindPopup(`<b>${event.title}</b><br>${event.date}`);
-        
-        // Add click handler for detailed view
-        marker.on('click', () => showEventDetails(event));
-        
-        // Add to marker cluster
-        markerCluster.addLayer(marker);
-        markers.push(marker);
     });
     
-    // If there are markers, fit bounds to show all markers
+    // Если есть маркеры, подгоняем карту под них
     if (markers.length > 0) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+        const group = new L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [50, 50] });
     }
+    
+    hideLoading();
 }
 
-// Show detailed event information
+// Обновляем список событий
+function updateEventList(filteredEvents) {
+    eventList.innerHTML = '';
+    
+    if (filteredEvents.length === 0) {
+        const placeholder = document.createElement('p');
+        placeholder.className = 'placeholder-text';
+        placeholder.textContent = 'События не найдены. Попробуйте изменить параметры поиска.';
+        eventList.appendChild(placeholder);
+        return;
+    }
+    
+    filteredEvents.forEach(event => {
+        const eventItem = document.createElement('div');
+        eventItem.className = 'event-item';
+        eventItem.innerHTML = `
+            <div class="event-title">${event.name}</div>
+            <div class="event-date">${event.year}</div>
+        `;
+        
+        eventItem.addEventListener('click', () => {
+            showEventDetails(event);
+            
+            // Если есть координаты, находим нужный маркер и открываем его
+            if (event.coordinates && event.coordinates.length === 2) {
+                const foundMarker = markers.find(marker => {
+                    const latLng = marker.getLatLng();
+                    return latLng.lat === event.coordinates[0] && latLng.lng === event.coordinates[1];
+                });
+                
+                if (foundMarker) {
+                    map.setView(foundMarker.getLatLng(), 8);
+                    foundMarker.openPopup();
+                }
+            }
+        });
+        
+        eventList.appendChild(eventItem);
+    });
+}
+
+// Показываем детали события
 function showEventDetails(event) {
-    eventTitle.textContent = event.title;
-    eventDate.textContent = event.date;
-    eventCategory.textContent = event.category;
-    eventDescription.textContent = event.description;
-    eventDetails.classList.remove('hidden');
+    if (!event) return;
+    
+    eventDetailsContent.innerHTML = `
+        <h2 class="event-details-title">${event.name}</h2>
+        <div class="event-details-date">${event.year}</div>
+        <div class="event-details-description">${event.description}</div>
+    `;
+    
+    eventDetailsPanel.style.display = 'block';
 }
 
-// Event Listeners
-categoryFilter.addEventListener('change', applyFilters);
-centuryFilter.addEventListener('change', applyFilters);
-resetFiltersBtn.addEventListener('click', () => {
-    categoryFilter.value = 'all';
-    centuryFilter.value = 'all';
-    applyFilters();
-});
-closeDetailsBtn.addEventListener('click', () => {
-    eventDetails.classList.add('hidden');
+// Устанавливаем активный период
+function setPeriod(period) {
+    currentPeriod = period;
+    
+    // Обновляем активные кнопки
+    periodButtons.forEach(button => {
+        if (button.dataset.period === period) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    });
+    
+    // Фильтруем события
+    filterAndDisplayEvents();
+}
+
+// Инициализация событий
+document.addEventListener('DOMContentLoaded', () => {
+    // Инициализируем карту
+    initMap();
+    
+    // Слушатели событий для фильтров
+    categorySelect.addEventListener('change', filterAndDisplayEvents);
+    searchButton.addEventListener('click', filterAndDisplayEvents);
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            filterAndDisplayEvents();
+        }
+    });
+    
+    // Слушатели для кнопок периодов
+    periodButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            setPeriod(button.dataset.period);
+        });
+    });
+    
+    // Кнопка закрытия панели деталей
+    closeEventDetails.addEventListener('click', () => {
+        eventDetailsPanel.style.display = 'none';
+    });
+    
+    // Кнопка возврата в бота
+    backToBot.addEventListener('click', () => {
+        tg.close();
+    });
 });
 
-// Initialize the app
-document.addEventListener('DOMContentLoaded', initMap);
+// Обработка сообщений от бота
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.action) {
+        switch (event.data.action) {
+            case 'showEvent':
+                if (event.data.eventId) {
+                    const foundEvent = events.find(e => e.id === event.data.eventId);
+                    if (foundEvent) {
+                        showEventDetails(foundEvent);
+                    }
+                }
+                break;
+            case 'setPeriod':
+                if (event.data.period) {
+                    setPeriod(event.data.period);
+                }
+                break;
+        }
+    }
+});

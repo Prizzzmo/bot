@@ -4,41 +4,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>История России на карте</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-    <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <title>Интерактивные исторические карты России</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="
+    crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+    integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+    crossorigin=""></script>
 </head>
 <body>
-    <div id="app">
-        <div class="header">
-            <h1>История России на карте</h1>
-            <div class="filter-controls">
-                <select id="category-filter">
-                    <option value="all">Все категории</option>
-                </select>
-                <select id="century-filter">
-                    <option value="all">Все века</option>
-                </select>
-                <button id="reset-filters">Сбросить фильтры</button>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Интерактивные исторические карты России</h1>
+            <p class="subtitle">Визуализация ключевых исторических событий и периодов</p>
+        </header>
+
+        <div class="map-container" id="mapContainer">
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loader"></div>
+                <p>Загрузка карты...</p>
             </div>
-        </div>
-        
-        <div id="map-container">
             <div id="map"></div>
         </div>
-        
-        <div id="event-details" class="hidden">
-            <button id="close-details">✕</button>
-            <h2 id="event-title"></h2>
-            <div id="event-date"></div>
-            <div id="event-category"></div>
-            <p id="event-description"></p>
+
+        <div class="controls-panel">
+            <div class="search-section">
+                <h2>Поиск исторических событий</h2>
+                <div class="search-controls">
+                    <select id="categorySelect" class="category-select">
+                        <option value="">Все категории</option>
+                        <!-- Категории будут добавлены с помощью JavaScript -->
+                    </select>
+                    <div class="search-input-container">
+                        <input type="text" id="searchInput" placeholder="Введите исторический период или событие...">
+                        <button id="searchButton">Поиск</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="time-period-section">
+                <h2>Временные периоды</h2>
+                <div class="time-periods">
+                    <button class="period-button" data-period="ancient">Древняя Русь</button>
+                    <button class="period-button" data-period="middle">Московское царство</button>
+                    <button class="period-button" data-period="empire">Российская империя</button>
+                    <button class="period-button" data-period="soviet">Советский период</button>
+                    <button class="period-button" data-period="modern">Современная Россия</button>
+                </div>
+            </div>
+
+            <div class="event-list-container">
+                <h2>События на карте</h2>
+                <div id="eventList" class="event-list">
+                    <!-- События будут добавлены с помощью JavaScript -->
+                    <p class="placeholder-text">Выберите категорию или период для отображения событий</p>
+                </div>
+            </div>
         </div>
+
+        <div class="event-details-panel" id="eventDetailsPanel">
+            <button class="close-button" id="closeEventDetails">×</button>
+            <div class="event-details-content" id="eventDetailsContent">
+                <!-- Детали события будут добавлены с помощью JavaScript -->
+            </div>
+        </div>
+
+        <footer class="app-footer">
+            <p>© 2025 Образовательный бот по истории России</p>
+            <button id="backToBot" class="back-to-bot-button">Вернуться в бота</button>
+        </footer>
     </div>
 
     <script src="app.js"></script>
