@@ -75,88 +75,70 @@ def setup_logger():
 
 def main():
     """
-    Основная функция для инициализации и запуска бота
+    Основная функция для инициализации и запуска бота - оптимизированная версия
     """
-    # Настройка логгера
-    logger = setup_logger()
-    logger.info("Запуск программы")
+    # Проверяем, не запущен ли уже бот
+    if not check_running_bot():
+        print("Бот уже запущен в другом процессе. Завершение работы.")
+        sys.exit(1)
 
-    # Загружаем конфигурацию
-    config = Config()
+    # Регистрируем обработчик при завершении для гарантированной очистки
+    @atexit.register
+    def cleanup():
+        if os.path.exists("bot.lock"):
+            try:
+                os.remove("bot.lock")
+            except:
+                pass
 
-    # Создаем фабрику с использованием переданного логгера
-    factory = BotFactory(logger)
+    # Загружаем переменные окружения из .env файла один раз
+    load_dotenv()
 
-    # Создаем бота и все необходимые сервисы
-    bot = BotFactory.create_bot(config)
+    # Настраиваем базовое логирование с оптимизированными параметрами
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler()
+        ]
+    )
+    logger = logging.getLogger(__name__)
+    logger.info("Запуск историчеcкого образовательного бота")
 
-    # Проверяем наличие админ-панели в обработчиках
-    if hasattr(bot.handlers, 'admin_panel'):
-        logger.info("Админ-панель успешно инициализирована")
-    else:
-        logger.warning("Админ-панель не инициализирована")
+    # Предварительно проверяем и создаем необходимые директории
+    for directory in ["logs", "generated_maps"]:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
-    try:
-        # Запускаем бота
-        bot.run()
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем")
-    except Exception as e:
-        logger.error(f"Неожиданная ошибка при запуске бота: {e}")
-        raise
+    # Инициализируем веб-сервер в фоновом режиме параллельно с запуском бота
+    def start_web_server():
+        try:
+            from webapp.server import run_server
+            
+            # Определяем URL для веб-сервера
+            repl_id = os.environ.get('REPL_ID', '')
+            repl_slug = os.environ.get('REPL_SLUG', '')
+            repl_owner = os.environ.get('REPL_OWNER', '')
+            deployment_id = os.environ.get('REPL_DEPLOYMENT_ID', '')
+            
+            # Устанавливаем URL веб-сервера
+            if deployment_id:
+                os.environ['WEBAPP_URL'] = f"https://{deployment_id}.deployment.repl.co"
+            elif repl_slug and repl_owner:
+                os.environ['WEBAPP_URL'] = f"https://{repl_slug}.{repl_owner}.repl.co"
+            else:
+                os.environ['WEBAPP_URL'] = f"https://{repl_id}.id.repl.co"
+                
+            print(f"Веб-сервер запускается на порту 8080 с URL: {os.environ.get('WEBAPP_URL')}")
+            run_server('0.0.0.0', 8080)
+        except Exception as e:
+            logger.error(f"Ошибка при запуске веб-сервера: {e}")
 
-
-    # Запуск веб-сервера в отдельном потоке
-    import threading
-    from webapp.server import run_server
-
-    # Устанавливаем переменную окружения для вебсервера
-    repl_id = os.environ.get('REPL_ID', '')
-    repl_slug = os.environ.get('REPL_SLUG', '')
-    repl_owner = os.environ.get('REPL_OWNER', '')
-    deployment_id = os.environ.get('REPL_DEPLOYMENT_ID', '')
-
-    # Сохраняем URL в переменной окружения для использования в bot_integration.py
-    if deployment_id:
-        os.environ['WEBAPP_URL'] = f"https://{deployment_id}.deployment.repl.co"
-    elif repl_slug and repl_owner:
-        os.environ['WEBAPP_URL'] = f"https://{repl_slug}.{repl_owner}.repl.co"
-    else:
-        os.environ['WEBAPP_URL'] = f"https://{repl_id}.id.repl.co"
-
-    # Запускаем веб-сервер
-    webapp_thread = threading.Thread(target=run_server, args=('0.0.0.0', 8080), daemon=True)
+    # Запускаем веб-сервер в отдельном потоке
+    webapp_thread = threading.Thread(target=start_web_server, daemon=True)
     webapp_thread.start()
-    print(f"Веб-сервер запущен на порту 8080 с URL: {os.environ.get('WEBAPP_URL')}")
-
-    logger = None
 
     try:
-        # Проверяем, не запущен ли уже бот
-        if not check_running_bot():
-            print("Бот уже запущен в другом процессе. Завершение работы.")
-            sys.exit(1)
-
-        # Загружаем переменные окружения из .env файла
-        load_dotenv()
-
-        # Настраиваем базовое логирование с оптимизированными параметрами
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.StreamHandler()
-            ]
-        )
-        logger = logging.getLogger(__name__)
-        logger.info("Запуск историчеcкого образовательного бота")
-
-        # Предварительно проверяем наличие всех необходимых директорий
-        # для предотвращения ошибок при параллельной работе
-        for directory in ["logs", "generated_maps"]:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-
         # Загружаем конфигурацию
         logger.info("Загрузка конфигурации")
         config = Config()
@@ -165,6 +147,14 @@ def main():
         if not config.validate():
             logger.error("Ошибка в конфигурации! Проверьте .env файл.")
             return
+
+        # Инициализируем очередь отложенных задач заранее
+        task_queue = TaskQueue(num_workers=2, logger=logger)
+        task_queue.start()
+        logger.info("Инициализирована система отложенных задач")
+        
+        # Регистрируем очередь задач в конфигурации
+        config.set_task_queue(task_queue)
 
         # Создаем экземпляр бота через фабрику
         logger.info("Создание бота через фабрику")
@@ -175,69 +165,52 @@ def main():
             logger.error("Не удалось создать экземпляр бота!")
             return
 
+        # Проверяем необходимость миграции данных параллельно с настройкой бота
+        def run_data_migration():
+            try:
+                data_migration = DataMigration(logger)
+                if data_migration.check_and_migrate():
+                    logger.info("Миграция данных успешно завершена или не требовалась")
+                else:
+                    logger.warning("Возникли проблемы при миграции данных, проверьте логи")
+            except Exception as e:
+                logger.error(f"Ошибка при миграции данных: {e}")
+        
+        # Запускаем миграцию данных в фоновом режиме
+        migration_thread = threading.Thread(target=run_data_migration, daemon=True)
+        migration_thread.start()
+
         # Настраиваем бота
         logger.info("Настройка бота")
-        # Проверяем, был ли успешно инициализирован updater
+        
+        # Проверяем, был ли успешно инициализирован updater и настраиваем бота
         if not hasattr(bot, 'updater') or bot.updater is None:
-            logger.error("Ошибка: updater не инициализирован, сначала вызываем bot.setup()")
+            logger.info("Updater не инициализирован, вызываем bot.setup()")
             if not bot.setup():
                 logger.error("Ошибка при настройке бота!")
                 return
         
-        # Убеждаемся, что обработчик callback-запросов админ-панели правильно зарегистрирован
-        # Это нужно сделать явно, даже если setup() содержит подобную логику
+        # Регистрируем обработчик callback-запросов админ-панели
         dp = bot.updater.dispatcher
         dp.add_handler(CallbackQueryHandler(bot.handlers.admin_callback, pattern='^admin_'))
 
-        if not bot.setup():
-            logger.error("Ошибка при настройке бота!")
-            return
-
+        # Проверяем наличие админ-панели в обработчиках
+        if hasattr(bot.handlers, 'admin_panel'):
+            logger.info("Админ-панель успешно инициализирована")
+        else:
+            logger.warning("Админ-панель не инициализирована")
+        
         logger.info("Бот успешно настроен и готов к запуску")
 
-        # Проверяем необходимость миграции данных
-        data_migration = DataMigration(logger)
-        if data_migration.check_and_migrate():
-            logger.info("Миграция данных успешно завершена или не требовалась")
-        else:
-            logger.warning("Возникли проблемы при миграции данных, проверьте логи")
-
-        # Инициализируем очередь отложенных задач
-        task_queue = TaskQueue(num_workers=2, logger=logger)
-        task_queue.start()
-        logger.info("Инициализирована система отложенных задач")
-
-        # Регистрируем очередь задач в конфигурации для доступа из других модулей
-        config.set_task_queue(task_queue)
-
-
-        # Запускаем бота напрямую в основном потоке
+        # Запускаем бота в основном потоке
         bot.run()
 
     except KeyboardInterrupt:
-        if logger:
-            logger.info("Бот остановлен пользователем")
-        # Удаляем lock-файл при завершении работы
-        if os.path.exists("bot.lock"):
-            os.remove("bot.lock")
+        logger.info("Бот остановлен пользователем")
     except Exception as e:
-        if logger:
-            logger.error(f"Критическая ошибка: {e}")
-            logger.error(traceback.format_exc())
-        else:
-            print(f"Критическая ошибка: {e}")
-            print(traceback.format_exc())
-
-        # Удаляем lock-файл при завершении работы с ошибкой
-        if os.path.exists("bot.lock"):
-            os.remove("bot.lock")
-
-        # Завершаем процесс с кодом ошибки
+        logger.error(f"Критическая ошибка: {e}")
+        logger.error(traceback.format_exc())
         sys.exit(1)
-    finally:
-        # Гарантированное удаление lock-файла в любом случае
-        if os.path.exists("bot.lock"):
-            os.remove("bot.lock")
 
 if __name__ == "__main__":
     main()

@@ -131,22 +131,35 @@ class TaskQueue:
                 self.logger.info("Очередь задач остановлена")
 
     def _worker_loop(self):
-        """Основной цикл рабочего потока"""
+        """Оптимизированный основной цикл рабочего потока"""
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+        
         while self.running:
             try:
+                # Адаптивный таймаут: меньше в активном режиме, больше при простое
+                task_count = self.task_queue.qsize()
+                timeout = 0.2 if task_count > 0 else 1.0
+                
                 # Получаем задачу из очереди
-                task = self.task_queue.get(block=True, timeout=1.0)
+                task = self.task_queue.get(block=True, timeout=timeout)
                 
                 # None используется как сигнал для остановки
                 if task is None:
                     self.task_queue.task_done()
                     break
                 
+                # Сбрасываем счетчик ошибок при успешном получении задачи
+                consecutive_errors = 0
+                
                 # Выполняем задачу
                 try:
                     task.run()
+                    # Используем локальную переменную для уменьшения времени блокировки
+                    status = task.status
+                    # Минимизируем время блокировки
                     with self.lock:
-                        if task.status == "completed":
+                        if status == "completed":
                             self.stats["completed"] += 1
                         else:
                             self.stats["failed"] += 1
@@ -154,7 +167,10 @@ class TaskQueue:
                 except Exception as e:
                     # Обработка исключений при выполнении задачи
                     task.status = "failed"
-                    task.error = f"Unhandled exception: {str(e)}\n{traceback.format_exc()}"
+                    task.error = f"Unhandled exception: {str(e)}"
+                    if self.logger and self.logger.level <= logging.DEBUG:
+                        # Полный стек трассировки только в режиме отладки
+                        task.error += f"\n{traceback.format_exc()}"
                     task.completed_at = time.time()
                     
                     with self.lock:
@@ -172,9 +188,22 @@ class TaskQueue:
                 continue
             except Exception as e:
                 # Обработка других исключений в цикле обработчика
+                consecutive_errors += 1
+                
                 if self.logger:
                     self.logger.error(f"Ошибка в цикле обработчика задач: {str(e)}")
-                time.sleep(1.0)  # Небольшая пауза перед продолжением
+                
+                # Адаптивное время ожидания при ошибках
+                wait_time = min(consecutive_errors * 0.5, 5.0)
+                
+                # Безопасное завершение работы при множественных ошибках
+                if consecutive_errors >= max_consecutive_errors:
+                    if self.logger:
+                        self.logger.critical(f"Превышено максимальное количество ошибок ({max_consecutive_errors}), перезапуск потока")
+                    # Важно не останавливать все потоки, а только перезапустить проблемный
+                    return
+                    
+                time.sleep(wait_time)
 
     def add_task(self, func: Callable, args: List = None, kwargs: Dict = None) -> str:
         """
