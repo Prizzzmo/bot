@@ -107,8 +107,8 @@ a:hover {
     background-color: var(--primary-dark);
     color: white;
     border: none;
-    width: 46px;
-    height: 46px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     display: none;
     align-items: center;
@@ -116,6 +116,54 @@ a:hover {
     box-shadow: var(--shadow-md);
     cursor: pointer;
     font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-toggle:active {
+    transform: scale(0.95);
+    background-color: var(--primary-color);
+}
+
+/* Добавляем индикатор свайпа для открытия меню */
+.swipe-indicator {
+    position: fixed;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) translateX(-100%);
+    background-color: var(--primary-dark);
+    color: white;
+    padding: 15px 8px;
+    border-radius: 0 5px 5px 0;
+    box-shadow: var(--shadow-md);
+    z-index: 1100;
+    opacity: 0;
+    transition: all 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.swipe-indicator.visible {
+    transform: translateY(-50%) translateX(0);
+    opacity: 1;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(63, 81, 181, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(63, 81, 181, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(63, 81, 181, 0);
+    }
+}
+
+/* Блокировка прокрутки при открытом меню */
+body.menu-open {
+    overflow: hidden;
 }
 
 @media (max-width: 768px) {
@@ -129,7 +177,7 @@ a:hover {
     
     /* Изменяем отступ контента на мобильных устройствах */
     .content {
-        padding-top: 60px; /* Увеличиваем отступ, чтобы контент не перекрывался кнопкой меню */
+        padding-top: 70px; /* Увеличиваем отступ, чтобы контент не перекрывался кнопкой меню */
     }
     
     /* Убедимся, что модальные окна правильно отображаются */
@@ -146,9 +194,10 @@ a:hover {
         overflow-y: auto;
         -webkit-overflow-scrolling: touch; /* Плавный скролл на iOS */
         width: 85%; /* Увеличиваем ширину бокового меню на мобильных */
+        max-width: 320px; /* Максимальная ширина на случай больших телефонов */
         z-index: 3000; /* Повышаем уровень z-index, чтобы меню было выше других элементов */
-        transform: translateX(-100%); /* Начальное положение - за пределами экрана */
-        transition: transform 0.3s ease; /* Плавное появление/исчезновение */
+        transform: translateX(-105%); /* Начальное положение - за пределами экрана (с небольшим запасом) */
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); /* Улучшенная анимация */
         box-shadow: var(--shadow-lg); /* Тень для выделения меню */
     }
     
@@ -166,10 +215,62 @@ a:hover {
         bottom: 0;
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 2500;
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
     
     .sidebar-overlay.visible {
         display: block;
+        opacity: 1;
+    }
+    
+    /* Улучшаем стили для навигационных элементов в мобильном меню */
+    .sidebar .nav-item a {
+        padding: 15px var(--space-lg);
+        font-size: 1.05rem;
+    }
+    
+    .sidebar .nav-item i {
+        font-size: 1.3rem;
+        min-width: 30px;
+    }
+    
+    /* Улучшаем отступы и читаемость на мобильных */
+    .sidebar-header {
+        height: 70px;
+        padding: 0 var(--space-lg);
+    }
+    
+    .sidebar .logo {
+        font-size: 1.3rem;
+    }
+    
+    .sidebar .logo i {
+        font-size: 1.6rem;
+    }
+    
+    .sidebar-footer {
+        padding: var(--space-lg);
+    }
+    
+    .sidebar-footer .btn-docs,
+    .sidebar-footer .btn-logout {
+        padding: 12px var(--space-md);
+        font-size: 1rem;
+    }
+}
+
+/* Дополнительные стили для маленьких экранов */
+@media (max-width: 380px) {
+    .mobile-menu-toggle {
+        top: 8px;
+        left: 8px;
+        width: 45px;
+        height: 45px;
+    }
+    
+    .sidebar {
+        width: 90%;
     }
 }
 

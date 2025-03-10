@@ -1166,5 +1166,67 @@
     
     <!-- Подключение скрипта -->
     <script src="/static/admin_script.js"></script>
+<script>
+    // Добавляем поддержку жестов свайпа для вызова мобильного меню
+    document.addEventListener('DOMContentLoaded', function() {
+        // Переменные для отслеживания свайпа
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        // Проверяем, поддерживаются ли сенсорные события
+        if ('ontouchstart' in window) {
+            document.addEventListener('touchstart', function(e) {
+                touchStartX = e.changedTouches[0].screenX;
+            }, {passive: true});
+            
+            document.addEventListener('touchend', function(e) {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, {passive: true});
+        }
+        
+        function handleSwipe() {
+            // Определяем минимальное расстояние для регистрации свайпа (в пикселях)
+            const swipeThreshold = 70;
+            // Определяем максимальное расстояние от левого края экрана для начала свайпа
+            const edgeThreshold = 30;
+            
+            // Проверяем, был ли свайп справа налево от края экрана
+            if (touchStartX < edgeThreshold && (touchEndX - touchStartX) > swipeThreshold) {
+                // Свайп справа налево от края экрана - открываем меню
+                const sidebar = document.querySelector('.sidebar');
+                const sidebarOverlay = document.querySelector('.sidebar-overlay');
+                const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+                
+                if (sidebar && sidebarOverlay) {
+                    sidebar.classList.add('visible');
+                    sidebarOverlay.classList.add('visible');
+                    document.body.classList.add('menu-open');
+                    
+                    // Меняем иконку меню
+                    if (mobileMenuToggle && mobileMenuToggle.querySelector('i')) {
+                        mobileMenuToggle.querySelector('i').className = 'fas fa-times';
+                    }
+                }
+            } else if ((touchStartX - touchEndX) > swipeThreshold) {
+                // Свайп слева направо - закрываем меню
+                const sidebar = document.querySelector('.sidebar');
+                const sidebarOverlay = document.querySelector('.sidebar-overlay');
+                const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+                
+                if (sidebar && sidebar.classList.contains('visible')) {
+                    sidebar.classList.remove('visible');
+                    if (sidebarOverlay) sidebarOverlay.classList.remove('visible');
+                    document.body.classList.remove('menu-open');
+                    
+                    // Меняем иконку меню
+                    if (mobileMenuToggle && mobileMenuToggle.querySelector('i')) {
+                        mobileMenuToggle.querySelector('i').className = 'fas fa-bars';
+                    }
+                }
+            }
+        }
+    });
+</script>
 </body>
 </html>
