@@ -678,11 +678,11 @@ class CommandHandlers:
             import sys
             sys.path.append('webapp')
             from bot_integration import get_webapp_keyboard, get_map_description
-            
+
             # Получаем описание и клавиатуру
             description = get_map_description()
             keyboard = get_webapp_keyboard()
-            
+
             # Обновляем сообщение с информативным описанием и кнопкой для открытия веб-приложения
             query.edit_message_text(
                 description,
@@ -690,10 +690,10 @@ class CommandHandlers:
                 reply_markup=keyboard,
                 disable_web_page_preview=True
             )
-            
+
             # Показываем пользователю, что карта загружается
             context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
-            
+
             self.logger.info(f"Пользователь {user_id} открыл карту через меню")
             return self.TOPIC
 
@@ -1420,16 +1420,16 @@ class CommandHandlers:
         try:
             user_id = update.message.from_user.id
             self.logger.info(f"Пользователь {user_id} запросил карту исторических событий")
-            
+
             # Импортируем функции для взаимодействия с веб-приложением
             import sys
             sys.path.append('webapp')
             from bot_integration import get_webapp_keyboard, get_map_description
-            
+
             # Получаем описание и клавиатуру
             description = get_map_description()
             keyboard = get_webapp_keyboard()
-            
+
             # Отправляем сообщение с информативным описанием и кнопкой для открытия веб-приложения
             sent_msg = update.message.reply_text(
                 description,
@@ -1437,13 +1437,13 @@ class CommandHandlers:
                 reply_markup=keyboard,
                 disable_web_page_preview=True
             )
-            
+
             # Сохраняем ID сообщения
             self.message_manager.save_message_id(update, context, sent_msg.message_id)
-            
+
             # Показываем пользователю, что карта загружается
             context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.ChatAction.TYPING)
-            
+
             self.logger.info(f"Пользователь {user_id} успешно получил доступ к карте")
             return self.TOPIC
         except Exception as e:
@@ -1464,9 +1464,11 @@ class CommandHandlers:
         """
         # Передаем управление в модуль админ-панели
         if hasattr(self, 'admin_panel'):
+            self.logger.info(f"Пользователь {update.effective_user.id} запросил админ-панель")
             self.admin_panel.handle_admin_command(update, context)
         else:
-            update.message.reply_text("Административная панель недоступна")
+            self.logger.warning(f"Пользователь {update.effective_user.id} запросил админ-панель, но она недоступна")
+            update.message.reply_text("Административная панель недоступна. Обратитесь к разработчику бота.")
 
     def clear_chat_command(self, update, context):
         """
@@ -1489,6 +1491,9 @@ class CommandHandlers:
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
+
+        Returns:
+            bool: True если callback был обработан, False в противном случае
         """
         query = update.callback_query
 
@@ -1496,11 +1501,17 @@ class CommandHandlers:
         if hasattr(self, 'admin_panel'):
             # Обрабатываем все callback-запросы, начинающиеся с admin_
             if query.data.startswith('admin_'):
+                self.logger.debug(f"Обработка админ-callback: {query.data}")
+
                 # Проверяем, это удаление админа или нет
                 if query.data.startswith('admin_delete_'):
                     # Извлекаем ID админа для удаления
-                    admin_id = int(query.data.split('_')[2])
-                    self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
+                    try:
+                        admin_id = int(query.data.split('_')[2])
+                        self.admin_panel.handle_delete_admin_callback(update, context, admin_id)
+                    except (ValueError, IndexError) as e:
+                        self.logger.error(f"Ошибка при обработке callback удаления админа: {e}")
+                        query.answer("Ошибка в формате callback данных")
                 else:
                     # Обычный admin callback
                     self.admin_panel.handle_admin_callback(update, context)
