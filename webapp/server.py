@@ -1014,6 +1014,9 @@ def clean_logs():
         return False
 
 def run_server(host='0.0.0.0', port=8080):
+    """Запуск веб-сервера"""
+    logger.info(f"Запуск веб-сервера на {host}:{port}")
+    app.run(host=host, port=port, debug=False)
 
 
 @app.route('/api/admin/get-doc')
