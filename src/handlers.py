@@ -1470,13 +1470,13 @@ class CommandHandlers:
             
     def neadmin_command(self, update, context):
         """
-        Обрабатывает команду /neadmin для быстрого перехода на веб-админку.
+        Обрабатывает команду /neadmin для быстрого перехода на адрес neadmika.
 
         Args:
             update (telegram.Update): Объект обновления Telegram
             context (telegram.ext.CallbackContext): Контекст разговора
         """
-        admin_panel_url = "https://5ff54f10-3551-4b4b-80c0-8778fdd1c7f8-00-hortvjq6og1s.sisko.replit.dev/admin-panel"
+        admin_panel_url = "http://t.me/teach_hisbot/neadmika"
         
         # Формируем кнопку с ссылкой на админ-панель
         keyboard = [[InlineKeyboardButton("🔧 Открыть панель администратора", url=admin_panel_url)]]
@@ -1487,7 +1487,7 @@ class CommandHandlers:
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
-        self.logger.info(f"Пользователь {update.message.from_user.id} запросил доступ к веб-админке через команду /neadmin")
+        self.logger.info(f"Пользователь {update.message.from_user.id} запросил доступ к панели через команду /neadmin")
 
     def clear_chat_command(self, update, context):
         """
