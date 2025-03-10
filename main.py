@@ -91,25 +91,19 @@ def main():
     bot = BotFactory.create_bot(config)
 
     # Проверяем наличие админ-панели в обработчиках
-    if hasattr(bot, 'admin_panel') and bot.admin_panel:
+    if hasattr(bot.handlers, 'admin_panel'):
         logger.info("Админ-панель успешно инициализирована")
     else:
         logger.warning("Админ-панель не инициализирована")
-        
-    # Убедимся, что обработчики корректно настроены
-    if not hasattr(bot, 'handlers') or bot.handlers is None:
-        logger.error("Обработчики команд не инициализированы")
-        sys.exit(1)
 
     try:
         # Запускаем бота
-        logger.info("Запуск бота...")
         bot.run()
     except KeyboardInterrupt:
         logger.info("Бот остановлен пользователем")
     except Exception as e:
         logger.error(f"Неожиданная ошибка при запуске бота: {e}")
-        logger.error(traceback.format_exc())
+        raise
 
 
     # Запуск веб-сервера в отдельном потоке
