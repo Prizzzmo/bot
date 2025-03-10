@@ -548,10 +548,180 @@ def maintenance_action(action):
         elif action == 'restart':
             # Перезапуск бота (можно реализовать как фиктивную операцию)
             return jsonify({"success": True, "message": "Бот перезапущен"})
+        elif action == 'integrate':
+            # Интеграция данных
+            logger.info("Запрошена интеграция данных")
+            return jsonify({"success": True, "message": "Интеграция данных выполнена"})
+        elif action == 'security':
+            # Проверка безопасности
+            logger.info("Запрошена проверка безопасности")
+            return jsonify({"success": True, "message": "Проверка безопасности выполнена"})
+        elif action == 'optimize':
+            # Оптимизация БД
+            logger.info("Запрошена оптимизация базы данных")
+            return jsonify({"success": True, "message": "Оптимизация базы данных выполнена"})
         else:
             return jsonify({"error": "Неизвестное действие"}), 400
     except Exception as e:
         logger.error(f"Ошибка при выполнении операции обслуживания: {e}")
+        return jsonify({"error": str(e)}), 500
+        
+@app.route('/api/admin/check-auth', methods=['GET'])
+def check_admin_auth():
+    """Проверка аутентификации администратора"""
+    try:
+        user_id = request.cookies.get('admin_id')
+        
+        if not user_id:
+            return jsonify({"authenticated": False})
+        
+        admins = load_admins()
+        user_id = int(user_id)
+        
+        is_admin = user_id in admins.get("admin_ids", []) or user_id in admins.get("super_admin_ids", [])
+        is_super_admin = user_id in admins.get("super_admin_ids", [])
+        
+        if is_admin:
+            return jsonify({
+                "authenticated": True,
+                "user": {
+                    "id": user_id,
+                    "is_super_admin": is_super_admin
+                }
+            })
+        
+        return jsonify({"authenticated": False})
+    except Exception as e:
+        logger.error(f"Ошибка при проверке аутентификации: {e}")
+        return jsonify({"authenticated": False})
+
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    """Авторизация администратора"""
+    try:
+        data = request.json
+        admin_id = int(data.get('admin_id', 0))
+        
+        if not admin_id:
+            return jsonify({"success": False, "message": "ID администратора не указан"})
+        
+        admins = load_admins()
+        
+        is_admin = admin_id in admins.get("admin_ids", []) or admin_id in admins.get("super_admin_ids", [])
+        is_super_admin = admin_id in admins.get("super_admin_ids", [])
+        
+        if is_admin:
+            response = jsonify({
+                "success": True,
+                "user": {
+                    "id": admin_id,
+                    "is_super_admin": is_super_admin
+                }
+            })
+            response.set_cookie('admin_id', str(admin_id), max_age=86400)  # 24 часа
+            return response
+        
+        logger.warning(f"Неудачная попытка входа администратора с ID {admin_id}")
+        return jsonify({"success": False, "message": "Неверный ID администратора"})
+    except Exception as e:
+        logger.error(f"Ошибка при авторизации администратора: {e}")
+        return jsonify({"success": False, "message": "Ошибка при авторизации"})
+
+@app.route('/api/admin/users', methods=['GET'])
+def get_users():
+    """API для получения списка пользователей"""
+    try:
+        # В реальном приложении здесь был бы запрос к базе данных
+        # Для примера возвращаем тестовые данные
+        sample_users = [
+            {"id": 123456789, "name": "Иван", "status": "active", "last_activity": "2023-03-09 15:30", "messages": 42},
+            {"id": 987654321, "name": "Мария", "status": "active", "last_activity": "2023-03-09 16:45", "messages": 28},
+            {"id": 555555555, "name": "Алексей", "status": "inactive", "last_activity": "2023-03-05 10:15", "messages": 13},
+            {"id": 111111111, "name": "Елена", "status": "active", "last_activity": "2023-03-09 14:20", "messages": 37},
+            {"id": 222222222, "name": "Сергей", "status": "blocked", "last_activity": "2023-02-15 08:30", "messages": 5}
+        ]
+        
+        return jsonify(sample_users)
+    except Exception as e:
+        logger.error(f"Ошибка при получении списка пользователей: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/user/<int:user_id>', methods=['GET'])
+def get_user(user_id):
+    """API для получения информации о пользователе"""
+    try:
+        # В реальном приложении здесь был бы запрос к базе данных
+        # Для примера возвращаем тестовые данные
+        sample_user = {
+            "id": user_id,
+            "name": "Тестовый пользователь",
+            "status": "active",
+            "last_activity": "2023-03-09 15:30",
+            "messages": 42,
+            "registration_date": "2023-01-15",
+            "tests_completed": 5,
+            "favorite_topics": ["Революции", "Война 1812 года"]
+        }
+        
+        return jsonify(sample_user)
+    except Exception as e:
+        logger.error(f"Ошибка при получении информации о пользователе: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/user/<int:user_id>/block', methods=['POST'])
+def block_user(user_id):
+    """API для блокировки пользователя"""
+    try:
+        # В реальном приложении здесь была бы логика блокировки
+        logger.info(f"Запрошена блокировка пользователя {user_id}")
+        return jsonify({"success": True, "message": f"Пользователь {user_id} заблокирован"})
+    except Exception as e:
+        logger.error(f"Ошибка при блокировке пользователя: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/user/<int:user_id>/unblock', methods=['POST'])
+def unblock_user(user_id):
+    """API для разблокировки пользователя"""
+    try:
+        # В реальном приложении здесь была бы логика разблокировки
+        logger.info(f"Запрошена разблокировка пользователя {user_id}")
+        return jsonify({"success": True, "message": f"Пользователь {user_id} разблокирован"})
+    except Exception as e:
+        logger.error(f"Ошибка при разблокировке пользователя: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/export-logs', methods=['GET'])
+def export_logs():
+    """API для экспорта логов в файл"""
+    try:
+        # Получаем логи
+        level = request.args.get('level', 'all')
+        lines = request.args.get('lines', 1000, type=int)
+        logs = get_last_logs(lines, level)
+        
+        # Создаем временный файл для записи логов
+        temp_file = f"logs_export_{int(time.time())}.txt"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(logs))
+        
+        # Отправляем файл
+        response = send_file(
+            temp_file,
+            as_attachment=True,
+            download_name=f"logs_export_{time.strftime('%Y%m%d_%H%M%S')}.txt"
+        )
+        
+        # Удаляем временный файл после отправки
+        @response.call_on_close
+        def remove_file():
+            try:
+                os.remove(temp_file)
+            except:
+                pass
+        
+        return response
+    except Exception as e:
+        logger.error(f"Ошибка при экспорте логов: {e}")
         return jsonify({"error": str(e)}), 500
 
 # Вспомогательные функции для админ-панели

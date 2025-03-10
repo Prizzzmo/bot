@@ -4,148 +4,411 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель администратора</title>
+    <title>Панель администратора | История России</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/admin_styles.css">
 </head>
 <body>
     <div class="admin-container">
-        <h1>Панель администратора</h1>
+        <header class="admin-header">
+            <h1><i class="fas fa-shield-alt"></i> Панель администратора</h1>
+            <div class="user-info">
+                <span id="user-name">ID: ...</span>
+                <span id="user-role" class="user-role">...</span>
+                <button id="logout-button" class="btn btn-small btn-outline btn-danger">
+                    <i class="fas fa-sign-out-alt"></i> Выход
+                </button>
+            </div>
+        </header>
         
         <div class="admin-tabs">
-            <button class="tab-button active" data-tab="stats">Статистика</button>
-            <button class="tab-button" data-tab="admins">Управление администраторами</button>
-            <button class="tab-button" data-tab="logs">Просмотр логов</button>
-            <button class="tab-button" data-tab="settings">Настройки</button>
-            <button class="tab-button" data-tab="maintenance">Техническое обслуживание</button>
+            <button class="tab-button active" data-tab="dashboard">
+                <i class="fas fa-tachometer-alt"></i> Дашборд
+            </button>
+            <button class="tab-button" data-tab="stats">
+                <i class="fas fa-chart-line"></i> Статистика
+            </button>
+            <button class="tab-button" data-tab="users">
+                <i class="fas fa-users"></i> Пользователи
+            </button>
+            <button class="tab-button" data-tab="events">
+                <i class="fas fa-calendar-alt"></i> События
+            </button>
+            <button class="tab-button" data-tab="admins">
+                <i class="fas fa-user-shield"></i> Администраторы
+            </button>
+            <button class="tab-button" data-tab="logs">
+                <i class="fas fa-file-alt"></i> Логи
+            </button>
+            <button class="tab-button" data-tab="settings">
+                <i class="fas fa-cog"></i> Настройки
+            </button>
+            <button class="tab-button" data-tab="maintenance">
+                <i class="fas fa-tools"></i> Обслуживание
+            </button>
         </div>
         
-        <div class="tab-content active" id="stats-tab">
-            <h2>Статистика бота</h2>
+        <!-- Дашборд -->
+        <div class="tab-content active" id="dashboard-tab">
+            <h2><i class="fas fa-tachometer-alt"></i> Панель мониторинга</h2>
+            <div id="dashboard-data">
+                <div class="loader"></div> Загрузка данных...
+            </div>
+        </div>
+        
+        <!-- Статистика -->
+        <div class="tab-content" id="stats-tab">
+            <h2><i class="fas fa-chart-line"></i> Статистика бота</h2>
             <div class="stats-container">
                 <div id="stats-data" class="stats-data">
-                    <p>Загрузка статистики...</p>
+                    <div class="loader"></div> Загрузка статистики...
                 </div>
                 <div class="stats-chart">
                     <h3>Активность пользователей</h3>
-                    <img src="/api/chart/daily_activity" alt="График активности">
+                    <img src="/api/chart/daily_activity" alt="График активности" width="100%">
                 </div>
             </div>
         </div>
         
+        <!-- Пользователи -->
+        <div class="tab-content" id="users-tab">
+            <h2><i class="fas fa-users"></i> Управление пользователями</h2>
+            
+            <div class="search-filters">
+                <div class="search-input">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="user-search" placeholder="Поиск по ID или имени...">
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Статус:</span>
+                    <select id="user-status-filter">
+                        <option value="all">Все</option>
+                        <option value="active">Активные</option>
+                        <option value="inactive">Неактивные</option>
+                        <option value="blocked">Заблокированные</option>
+                    </select>
+                </div>
+                <button class="btn btn-small" id="refresh-users">
+                    <i class="fas fa-sync-alt"></i> Обновить
+                </button>
+            </div>
+            
+            <div id="users-data" class="users-list">
+                <div class="loader"></div> Загрузка пользователей...
+            </div>
+            
+            <div class="pagination">
+                <button disabled>&laquo;</button>
+                <button class="active">1</button>
+                <button>2</button>
+                <button>3</button>
+                <button>&raquo;</button>
+            </div>
+        </div>
+        
+        <!-- События -->
+        <div class="tab-content" id="events-tab">
+            <h2><i class="fas fa-calendar-alt"></i> Исторические события</h2>
+            
+            <div class="search-filters">
+                <div class="search-input">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="event-search" placeholder="Поиск по названию, дате или категории...">
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Категория:</span>
+                    <select id="event-category-filter">
+                        <option value="all">Все категории</option>
+                        <option value="Войны и сражения">Войны и сражения</option>
+                        <option value="Политические реформы">Политические реформы</option>
+                        <option value="Культура и религия">Культура и религия</option>
+                        <option value="Экономические события">Экономические события</option>
+                    </select>
+                </div>
+                <button class="btn btn-small" id="refresh-events">
+                    <i class="fas fa-sync-alt"></i> Обновить
+                </button>
+            </div>
+            
+            <div id="events-data">
+                <div class="loader"></div> Загрузка событий...
+            </div>
+            
+            <div class="pagination">
+                <button disabled>&laquo;</button>
+                <button class="active">1</button>
+                <button>2</button>
+                <button>3</button>
+                <button>&raquo;</button>
+            </div>
+        </div>
+        
+        <!-- Администраторы -->
         <div class="tab-content" id="admins-tab">
-            <h2>Управление администраторами</h2>
+            <h2><i class="fas fa-user-shield"></i> Управление администраторами</h2>
             <div class="admin-list">
-                <h3>Администраторы</h3>
-                <ul id="admin-list"></ul>
+                <h3><i class="fas fa-star"></i> Супер-администраторы</h3>
+                <ul id="super-admin-list">
+                    <div class="loader"></div> Загрузка списка супер-администраторов...
+                </ul>
                 
-                <h3>Супер-администраторы</h3>
-                <ul id="super-admin-list"></ul>
+                <h3><i class="fas fa-user-tie"></i> Администраторы</h3>
+                <ul id="admin-list">
+                    <div class="loader"></div> Загрузка списка администраторов...
+                </ul>
                 
-                <div class="admin-actions">
-                    <h3>Добавить администратора</h3>
+                <div class="admin-actions super-admin-only">
+                    <h3><i class="fas fa-user-plus"></i> Добавить администратора</h3>
                     <form id="add-admin-form">
-                        <input type="number" id="new-admin-id" placeholder="ID пользователя Telegram" required>
-                        <label>
-                            <input type="checkbox" id="is-super-admin"> Супер-администратор
-                        </label>
-                        <button type="submit" class="btn">Добавить</button>
+                        <div class="form-group">
+                            <label for="new-admin-id">ID пользователя Telegram</label>
+                            <input type="number" id="new-admin-id" placeholder="Введите ID пользователя" required>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="is-super-admin">
+                            <label for="is-super-admin">Супер-администратор</label>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Добавить
+                        </button>
                     </form>
                     
-                    <h3>Удалить администратора</h3>
+                    <h3><i class="fas fa-user-minus"></i> Удалить администратора</h3>
                     <form id="remove-admin-form">
-                        <select id="admin-to-remove">
-                            <option value="">Выберите администратора</option>
-                        </select>
-                        <button type="submit" class="btn btn-danger">Удалить</button>
+                        <div class="form-group">
+                            <label for="admin-to-remove">Выберите администратора</label>
+                            <select id="admin-to-remove" required>
+                                <option value="">Выберите администратора</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt"></i> Удалить
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
         
+        <!-- Логи -->
         <div class="tab-content" id="logs-tab">
-            <h2>Просмотр логов</h2>
+            <h2><i class="fas fa-file-alt"></i> Просмотр логов</h2>
             <div class="logs-filter">
-                <select id="log-level">
-                    <option value="all">Все уровни</option>
-                    <option value="info">Информация</option>
-                    <option value="warning">Предупреждения</option>
-                    <option value="error">Ошибки</option>
-                </select>
-                <input type="number" id="log-limit" value="100" min="10" max="1000">
-                <button id="refresh-logs" class="btn">Обновить</button>
+                <div class="filter-group">
+                    <label for="log-level">Уровень:</label>
+                    <select id="log-level">
+                        <option value="all">Все уровни</option>
+                        <option value="info">Информация</option>
+                        <option value="warning">Предупреждения</option>
+                        <option value="error">Ошибки</option>
+                        <option value="debug">Отладка</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="log-limit">Кол-во строк:</label>
+                    <input type="number" id="log-limit" value="100" min="10" max="1000">
+                </div>
+                
+                <button id="refresh-logs" class="btn">
+                    <i class="fas fa-sync-alt"></i> Обновить
+                </button>
+                
+                <button id="export-logs" class="btn btn-secondary">
+                    <i class="fas fa-file-download"></i> Экспорт
+                </button>
             </div>
             <pre id="logs-container" class="logs-container">Загрузка логов...</pre>
         </div>
         
+        <!-- Настройки -->
         <div class="tab-content" id="settings-tab">
-            <h2>Настройки бота</h2>
+            <h2><i class="fas fa-cog"></i> Настройки бота</h2>
+            
             <form id="bot-settings-form">
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="auto-update-topics"> Автоматическое обновление тем
-                    </label>
+                <div class="settings-container">
+                    <div class="setting-card">
+                        <h3><i class="fas fa-sliders-h"></i> Основные настройки</h3>
+                        
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="auto-update-topics"> Автоматическое обновление тем
+                            </label>
+                            <div class="setting-description">
+                                Автоматически обновлять темы из базы данных
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="collect-statistics"> Сбор статистики
+                            </label>
+                            <div class="setting-description">
+                                Собирать данные об использовании бота
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="developer-mode"> Режим разработчика
+                            </label>
+                            <div class="setting-description">
+                                Включает расширенные возможности отладки
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="private-mode"> Приватный режим
+                            </label>
+                            <div class="setting-description">
+                                Бот доступен только администраторам
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-card super-admin-only">
+                        <h3><i class="fas fa-cloud"></i> Настройки API</h3>
+                        
+                        <div class="setting-item">
+                            <label for="api-request-limit">Лимит запросов API (в день)</label>
+                            <input type="number" id="api-request-limit" min="10" max="1000" value="100">
+                            <div class="setting-description">
+                                Максимальное количество запросов к API в день
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="cache-duration">Продолжительность кэширования (часы)</label>
+                            <input type="number" id="cache-duration" min="1" max="72" value="24">
+                            <div class="setting-description">
+                                Время хранения данных в кэше в часах
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-card super-admin-only">
+                        <h3><i class="fas fa-bell"></i> Уведомления</h3>
+                        
+                        <div class="setting-item">
+                            <label for="notification-level">Уровень уведомлений</label>
+                            <select id="notification-level">
+                                <option value="all">Все сообщения</option>
+                                <option value="important">Только важные</option>
+                                <option value="errors">Только ошибки</option>
+                                <option value="none">Отключить</option>
+                            </select>
+                            <div class="setting-description">
+                                Какие типы уведомлений отправлять администраторам
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="collect-statistics"> Сбор статистики
-                    </label>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Сохранить настройки
+                    </button>
+                    <button type="reset" class="btn btn-secondary">
+                        <i class="fas fa-undo"></i> Сбросить
+                    </button>
                 </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="developer-mode"> Режим разработчика
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="private-mode"> Приватный режим
-                    </label>
-                </div>
-                <button type="submit" class="btn">Сохранить настройки</button>
             </form>
         </div>
         
+        <!-- Техническое обслуживание -->
         <div class="tab-content" id="maintenance-tab">
-            <h2>Техническое обслуживание</h2>
+            <h2><i class="fas fa-tools"></i> Техническое обслуживание</h2>
             <div class="maintenance-actions">
                 <div class="action-card">
-                    <h3>Очистка кэша</h3>
-                    <p>Удаляет временные файлы и кэш бота</p>
-                    <button id="clear-cache" class="btn">Выполнить</button>
+                    <h3><i class="fas fa-trash-alt"></i> Очистка кэша</h3>
+                    <p>Удаляет временные файлы и кэш бота для освобождения памяти</p>
+                    <button id="clear-cache" class="btn maintenance-action" data-action="clear-cache">
+                        <i class="fas fa-broom"></i> Выполнить
+                    </button>
                 </div>
+                
                 <div class="action-card">
-                    <h3>Резервное копирование</h3>
-                    <p>Создает резервную копию данных</p>
-                    <button id="create-backup" class="btn">Выполнить</button>
+                    <h3><i class="fas fa-save"></i> Резервное копирование</h3>
+                    <p>Создает полную резервную копию данных и настроек</p>
+                    <button id="create-backup" class="btn maintenance-action" data-action="backup">
+                        <i class="fas fa-hdd"></i> Выполнить
+                    </button>
                 </div>
+                
                 <div class="action-card">
-                    <h3>Обновление данных API</h3>
-                    <p>Обновляет данные из внешних API</p>
-                    <button id="update-api-data" class="btn">Выполнить</button>
+                    <h3><i class="fas fa-sync-alt"></i> Обновление данных API</h3>
+                    <p>Обновляет данные из внешних API и синхронизирует базу</p>
+                    <button id="update-api-data" class="btn maintenance-action" data-action="update-api">
+                        <i class="fas fa-cloud-download-alt"></i> Выполнить
+                    </button>
                 </div>
+                
                 <div class="action-card">
-                    <h3>Очистка логов</h3>
-                    <p>Удаляет старые файлы логов</p>
-                    <button id="clean-logs" class="btn">Выполнить</button>
+                    <h3><i class="fas fa-file-alt"></i> Очистка логов</h3>
+                    <p>Удаляет старые файлы логов для освобождения дискового пространства</p>
+                    <button id="clean-logs" class="btn maintenance-action" data-action="clean-logs">
+                        <i class="fas fa-eraser"></i> Выполнить
+                    </button>
                 </div>
-                <div class="action-card">
-                    <h3>Перезапуск бота</h3>
-                    <p>Перезапускает бота</p>
-                    <button id="restart-bot" class="btn btn-warning">Выполнить</button>
+                
+                <div class="action-card super-admin-only">
+                    <h3><i class="fas fa-power-off"></i> Перезапуск бота</h3>
+                    <p>Выполняет полный перезапуск бота и всех его компонентов</p>
+                    <button id="restart-bot" class="btn btn-warning maintenance-action" data-action="restart">
+                        <i class="fas fa-redo"></i> Выполнить
+                    </button>
+                </div>
+                
+                <div class="action-card super-admin-only">
+                    <h3><i class="fas fa-database"></i> Интеграция данных</h3>
+                    <p>Сверяет и обновляет данные из различных источников</p>
+                    <button id="integrate-data" class="btn maintenance-action" data-action="integrate">
+                        <i class="fas fa-exchange-alt"></i> Выполнить
+                    </button>
+                </div>
+                
+                <div class="action-card super-admin-only">
+                    <h3><i class="fas fa-shield-alt"></i> Проверка безопасности</h3>
+                    <p>Выполняет проверку системы безопасности и целостности данных</p>
+                    <button id="security-check" class="btn maintenance-action" data-action="security">
+                        <i class="fas fa-tasks"></i> Выполнить
+                    </button>
+                </div>
+                
+                <div class="action-card super-admin-only">
+                    <h3><i class="fas fa-sitemap"></i> Оптимизация БД</h3>
+                    <p>Оптимизирует структуру базы данных и выполняет очистку</p>
+                    <button id="optimize-db" class="btn maintenance-action" data-action="optimize">
+                        <i class="fas fa-wrench"></i> Выполнить
+                    </button>
                 </div>
             </div>
         </div>
     </div>
     
+    <!-- Форма авторизации -->
     <div class="admin-auth" id="admin-auth">
         <div class="auth-container">
-            <h2>Авторизация администратора</h2>
+            <div class="logo-container">
+                <div class="admin-logo">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h2>Вход в административную панель</h2>
+            </div>
+            <div class="auth-error">Неверные данные для входа</div>
             <form id="admin-login-form">
                 <div class="form-group">
                     <label for="admin-id">ID администратора</label>
-                    <input type="number" id="admin-id" required>
+                    <input type="number" id="admin-id" placeholder="Введите ваш Telegram ID" required>
                 </div>
-                <button type="submit" class="btn">Войти</button>
+                <button type="submit" class="btn btn-full">
+                    <i class="fas fa-sign-in-alt"></i> Войти
+                </button>
             </form>
+            <div class="auth-help">
+                <small>Для получения доступа обратитесь к супер-администратору</small>
+            </div>
         </div>
     </div>
 
