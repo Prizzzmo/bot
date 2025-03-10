@@ -1496,6 +1496,12 @@ class CommandHandlers:
             bool: True если callback был обработан, False в противном случае
         """
         query = update.callback_query
+        if not query or not query.data:
+            self.logger.warning("Получен пустой callback query")
+            return False
+
+        # Логируем информацию о callback для отладки
+        self.logger.info(f"Получен callback: {query.data} от пользователя {query.from_user.id}")
 
         # Проверяем наличие и передаем обработку в админ-панель
         if hasattr(self, 'admin_panel'):
@@ -1514,6 +1520,7 @@ class CommandHandlers:
                         query.answer("Ошибка в формате callback данных")
                 else:
                     # Обычный admin callback
+                    self.logger.info(f"Передача callback в handle_admin_callback: {query.data}")
                     self.admin_panel.handle_admin_callback(update, context)
                 return True
         return False

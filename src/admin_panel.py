@@ -5,7 +5,7 @@ import logging
 import time
 import threading
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackContext
+from telegram.ext import CallbackContext, ContextTypes
 import datetime
 import sys
 import signal
