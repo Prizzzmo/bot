@@ -1,3 +1,4 @@
+
 // Initialize Telegram WebApp
 const tgApp = window.Telegram.WebApp;
 tgApp.expand();
@@ -36,7 +37,7 @@ function initMap() {
     // Initialize marker cluster group
     markerCluster = L.markerClusterGroup();
     map.addLayer(markerCluster);
-
+    
     // Load historical data
     loadHistoricalData();
 }
@@ -46,13 +47,13 @@ async function loadHistoricalData() {
     try {
         const response = await fetch('/api/historical-events');
         historicalEvents = await response.json();
-
+        
         // Process events
         processEvents(historicalEvents);
-
+        
         // Initialize filters
         initializeFilters();
-
+        
         // Apply default filters
         applyFilters();
     } catch (error) {
@@ -75,7 +76,7 @@ function processEvents(events) {
 function initializeFilters() {
     // Get unique categories
     const categories = [...new Set(historicalEvents.map(event => event.category))].sort();
-
+    
     // Populate category filter
     categories.forEach(category => {
         const option = document.createElement('option');
@@ -83,7 +84,7 @@ function initializeFilters() {
         option.textContent = category;
         categoryFilter.appendChild(option);
     });
-
+    
     // Get century ranges from dates
     const centuries = new Set();
     historicalEvents.forEach(event => {
@@ -93,7 +94,7 @@ function initializeFilters() {
             centuries.add(century);
         }
     });
-
+    
     // Populate century filter
     Array.from(centuries).sort((a, b) => a - b).forEach(century => {
         const option = document.createElement('option');
@@ -106,13 +107,13 @@ function initializeFilters() {
 // Extract year from various date formats
 function extractYearFromDate(dateStr) {
     if (!dateStr) return null;
-
+    
     // Try extracting 4-digit year
     const yearMatch = dateStr.match(/\b(\d{3,4})\b/);
     if (yearMatch) {
         return parseInt(yearMatch[1]);
     }
-
+    
     return null;
 }
 
@@ -120,14 +121,14 @@ function extractYearFromDate(dateStr) {
 function applyFilters() {
     const selectedCategory = categoryFilter.value;
     const selectedCentury = centuryFilter.value;
-
+    
     // Filter events based on selections
     filteredEvents = historicalEvents.filter(event => {
         // Category filter
         if (selectedCategory !== 'all' && event.category !== selectedCategory) {
             return false;
         }
-
+        
         // Century filter
         if (selectedCentury !== 'all') {
             const year = extractYearFromDate(event.date);
@@ -135,10 +136,10 @@ function applyFilters() {
                 return false;
             }
         }
-
+        
         return true;
     });
-
+    
     // Update markers
     updateMarkers();
 }
@@ -148,11 +149,11 @@ function updateMarkers() {
     // Clear existing markers
     markerCluster.clearLayers();
     markers = [];
-
+    
     // Add new markers
     filteredEvents.forEach(event => {
         let lat, lng;
-
+        
         if (typeof event.location === 'object' && event.location.lat && event.location.lng) {
             lat = event.location.lat;
             lng = event.location.lng;
@@ -160,26 +161,26 @@ function updateMarkers() {
             // Skip events with string locations that don't have coordinates
             return;
         }
-
+        
         // Skip if coordinates are invalid
         if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
             return;
         }
-
+        
         // Create marker
         const marker = L.marker([lat, lng]);
-
+        
         // Add popup with basic info
         marker.bindPopup(`<b>${event.title}</b><br>${event.date}`);
-
+        
         // Add click handler for detailed view
         marker.on('click', () => showEventDetails(event));
-
+        
         // Add to marker cluster
         markerCluster.addLayer(marker);
         markers.push(marker);
     });
-
+    
     // If there are markers, fit bounds to show all markers
     if (markers.length > 0) {
         const group = L.featureGroup(markers);
@@ -209,12 +210,4 @@ closeDetailsBtn.addEventListener('click', () => {
 });
 
 // Initialize the app
-document.addEventListener('DOMContentLoaded', function() {
-    initMap();
-    // Проверяем наличие кнопки администрирования
-    const adminButton = document.getElementById('admin-button');
-    if (adminButton) {
-        adminButton.style.display = 'block';
-        console.log('Кнопка администрирования найдена и отображена');
-    }
-});
+document.addEventListener('DOMContentLoaded', initMap);
