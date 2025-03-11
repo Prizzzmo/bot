@@ -39,10 +39,6 @@
                     </li>
                     <li class="dropdown-nav-item" data-page="logs">
                         <a href="#logs"><i class="fas fa-file-alt"></i> Логи</a>
-
-    <!-- CSRF-токен для защиты запросов -->
-    <meta name="csrf-token" content="" id="csrf-token">
-
                     </li>
                     <li class="dropdown-nav-item" data-page="settings">
                         <a href="#settings"><i class="fas fa-cog"></i> Настройки</a>
@@ -1193,87 +1189,6 @@
                         <span class="docs-item-title">Структура базы данных</span>
                     </a>
                     <a href="javascript:downloadDoc('static/docs/caching_system.md', 'caching_system.md')" class="docs-item">
-
-<script>
-    // Добавляем поддержку жестов свайпа для вызова мобильного меню
-    document.addEventListener('DOMContentLoaded', function() {
-        // Переменные для отслеживания свайпа
-        let touchStartX = 0;
-        let touchEndX = 0;
-        
-        // Проверяем, поддерживаются ли сенсорные события
-        if ('ontouchstart' in window) {
-            document.addEventListener('touchstart', function(e) {
-                touchStartX = e.changedTouches[0].screenX;
-            }, {passive: true});
-            
-            document.addEventListener('touchend', function(e) {
-                touchEndX = e.changedTouches[0].screenX;
-                handleSwipe();
-            }, {passive: true});
-        }
-        
-        function handleSwipe() {
-            // Определяем минимальное расстояние для регистрации свайпа (в пикселях)
-            const swipeThreshold = 70;
-            // Определяем максимальное расстояние от левого края экрана для начала свайпа
-            const edgeThreshold = 30;
-            
-            // Проверяем, был ли свайп справа налево от края экрана
-            if (touchStartX < edgeThreshold && (touchEndX - touchStartX) > swipeThreshold) {
-                // Свайп справа налево от края экрана - открываем меню
-                const sidebar = document.querySelector('.sidebar');
-                const sidebarOverlay = document.querySelector('.sidebar-overlay');
-                const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-                
-                if (sidebar && sidebarOverlay) {
-                    sidebar.classList.add('visible');
-                    sidebarOverlay.classList.add('visible');
-                    document.body.classList.add('menu-open');
-                    
-                    // Меняем иконку меню
-                    if (mobileMenuToggle && mobileMenuToggle.querySelector('i')) {
-                        mobileMenuToggle.querySelector('i').className = 'fas fa-times';
-                    }
-                }
-            } else if ((touchStartX - touchEndX) > swipeThreshold) {
-                // Свайп слева направо - закрываем меню
-                const sidebar = document.querySelector('.sidebar');
-                const sidebarOverlay = document.querySelector('.sidebar-overlay');
-                const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-                
-                if (sidebar && sidebar.classList.contains('visible')) {
-                    sidebar.classList.remove('visible');
-                    if (sidebarOverlay) sidebarOverlay.classList.remove('visible');
-                    document.body.classList.remove('menu-open');
-                    
-                    // Меняем иконку меню
-                    if (mobileMenuToggle && mobileMenuToggle.querySelector('i')) {
-                        mobileMenuToggle.querySelector('i').className = 'fas fa-bars';
-                    }
-                }
-            }
-        }
-        
-        // Индикатор свайпа - показать через 3 секунды, если меню не открыто
-        const swipeIndicator = document.getElementById('swipe-indicator');
-        const sidebar = document.querySelector('.sidebar');
-        
-        if (swipeIndicator && window.innerWidth <= 768) {
-            setTimeout(() => {
-                if (!sidebar.classList.contains('visible')) {
-                    swipeIndicator.classList.add('visible');
-                    
-                    // Скрыть через 5 секунд
-                    setTimeout(() => {
-                        swipeIndicator.classList.remove('visible');
-                    }, 5000);
-                }
-            }, 3000);
-        }
-    });
-</script>
-
                         <i class="fas fa-memory"></i>
                         <span class="docs-item-title">Система кэширования</span>
                     </a>

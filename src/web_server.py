@@ -247,24 +247,6 @@ class WebServer(BaseService):
         @self.app.route('/statistics')
         def statistics():
             """Страница статистики"""
-
-        @self.app.route('/api/admin/csrf-token')
-        def get_csrf_token():
-            """Генерирует CSRF-токен для защиты запросов"""
-            import secrets
-            
-            # Проверка аутентификации
-            user_id = request.cookies.get('admin_id')
-            if not user_id or not self.admin_panel or not self.admin_panel.is_admin(int(user_id)):
-                return jsonify({"error": "Требуется авторизация"}), 403
-            
-            # Генерируем токен
-            token = secrets.token_hex(16)
-            
-            # В реальном приложении токен нужно хранить в сессии или базе данных
-            # Здесь мы просто возвращаем его клиенту
-            return jsonify({"token": token})
-
             return render_template('statistics.html', title="Статистика бота")
 
         @self.app.route('/api/statistics')
@@ -413,97 +395,6 @@ class WebServer(BaseService):
                 is_super = data.get('is_super', False)
                 
                 if not admin_id:
-
-        @self.app.route('/api/admin/get-doc')
-        def api_get_doc():
-            """API для скачивания документации"""
-            # Проверка аутентификации
-            user_id = request.cookies.get('admin_id')
-            if not user_id or not self.admin_panel or not self.admin_panel.is_admin(int(user_id)):
-                return jsonify({"error": "Требуется авторизация"}), 403
-            
-            path = request.args.get('path')
-            if not path:
-                return jsonify({"error": "Путь к документу не указан"}), 400
-            
-            try:
-                # Защита от обхода директории
-                normalized_path = os.path.normpath(path)
-                if '..' in normalized_path:
-                    return jsonify({"error": "Недопустимый путь"}), 403
-                
-                # Проверяем существование файла
-                if not os.path.exists(normalized_path):
-                    return jsonify({"error": "Документ не найден"}), 404
-                
-                # Отправляем файл
-                return send_file(normalized_path, as_attachment=True)
-            except Exception as e:
-                self._logger.log_error(e, "Ошибка при получении документа")
-                return jsonify({"error": str(e)}), 500
-        
-        @self.app.route('/api/admin/view-doc')
-        def api_view_doc():
-            """API для просмотра документации в iframe"""
-            # Проверка аутентификации
-            user_id = request.cookies.get('admin_id')
-            if not user_id or not self.admin_panel or not self.admin_panel.is_admin(int(user_id)):
-                return jsonify({"error": "Требуется авторизация"}), 403
-            
-            path = request.args.get('path')
-            if not path:
-                return jsonify({"error": "Путь к документу не указан"}), 400
-            
-            try:
-                # Защита от обхода директории
-                normalized_path = os.path.normpath(path)
-                if '..' in normalized_path:
-                    return jsonify({"error": "Недопустимый путь"}), 403
-                
-                # Проверяем существование файла
-                if not os.path.exists(normalized_path):
-                    return jsonify({"error": "Документ не найден"}), 404
-                
-                # Определяем тип файла и отправляем соответствующий ответ
-                _, ext = os.path.splitext(normalized_path)
-                
-                if ext.lower() in ['.md', '.markdown']:
-                    # Для Markdown читаем содержимое и конвертируем в HTML
-                    with open(normalized_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    # Простая конвертация Markdown в HTML (в реальности нужно использовать библиотеку)
-                    # Для примера используем очень простую замену
-                    html_content = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="UTF-8">
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <title>Просмотр документа</title>
-                        <style>
-                            body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
-                            h1, h2, h3 {{ color: #333; }}
-                            pre {{ background-color: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; }}
-                            code {{ font-family: monospace; }}
-                        </style>
-                    </head>
-                    <body>
-                        <div class="markdown-content">
-                            {content}
-                        </div>
-                    </body>
-                    </html>
-                    """
-                    
-                    return html_content
-                else:
-                    # Для других файлов просто отправляем их
-                    return send_file(normalized_path)
-            except Exception as e:
-                self._logger.log_error(e, "Ошибка при просмотре документа")
-                return jsonify({"error": str(e)}), 500
-
                     return jsonify({"success": False, "message": "ID администратора не указан"})
                 
                 # Проверяем, не существует ли уже такой админ
