@@ -1,58 +1,59 @@
 
-#!/usr/bin/env python3
-"""
-Скрипт для запуска веб-сервера администратора.
-"""
+# Запуск веб-приложения
 import os
+import sys
 import logging
+from threading import Thread
 import time
-from webapp.admin_server import AdminServer
 
-# Настройка логирования
+# Добавляем путь к корневой директории проекта
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from webapp.admin_server import run_admin_server
+from webapp.server import run_server
+
+# Настраиваем логирование
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
 logging.basicConfig(
-    filename='logs/admin_server.log',
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    handlers=[
+        logging.FileHandler('logs/webapp.log'),
+        logging.StreamHandler()
+    ]
 )
-logger = logging.getLogger("AdminWebApp")
 
-def ensure_directories_exist():
-    """Создает необходимые директории, если они отсутствуют"""
-    dirs = ['logs', 'backups', 'static/docs']
-    for directory in dirs:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            logger.info(f"Создана директория: {directory}")
+logger = logging.getLogger('WebApp')
 
-def run_admin_server():
-    """Запускает сервер администратора"""
-    try:
-        # Создаем необходимые директории
-        ensure_directories_exist()
-        
-        # Запускаем сервер админки
-        logger.info("Запуск веб-сервера администратора...")
-        port = int(os.environ.get('PORT', 8080))
-        admin_server = AdminServer()
-        admin_server.start(host='0.0.0.0', port=port)
-        
-        # Выводим информацию о запуске
-        logger.info(f"Веб-сервер администратора запущен на порту {port}")
-        print(f"Веб-сервер администратора запущен на порту {port}")
-        print(f"Откройте в браузере: http://localhost:{port}/admin-panel")
-        
-        # Ожидаем остановки сервера
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Получен сигнал завершения")
-            admin_server.stop()
-            logger.info("Веб-сервер администратора остановлен")
+def main():
+    """Запускает веб-приложение и админ-панель"""
+    logger.info("Запуск веб-приложения и админ-панели")
     
-    except Exception as e:
-        logger.error(f"Ошибка при запуске веб-сервера администратора: {e}")
-        print(f"Ошибка при запуске веб-сервера администратора: {e}")
+    # Порт для веб-приложения
+    webapp_port = int(os.environ.get('WEBAPP_PORT', 5000))
+    # Порт для админ-панели
+    admin_port = int(os.environ.get('ADMIN_PORT', 8000))
+    
+    # Создаем и запускаем поток для веб-сервера
+    webapp_thread = Thread(target=run_server, args=('0.0.0.0', webapp_port), daemon=True)
+    webapp_thread.start()
+    logger.info(f"Веб-приложение запущено на порту {webapp_port}")
+    
+    # Создаем и запускаем поток для админ-панели
+    admin_thread = Thread(target=run_admin_server, args=('0.0.0.0', admin_port), daemon=True)
+    admin_thread.start()
+    logger.info(f"Админ-панель запущена на порту {admin_port}")
+    
+    logger.info("Все сервисы запущены успешно")
+    
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Завершение работы приложения")
+        sys.exit(0)
 
 if __name__ == "__main__":
-    run_admin_server()
+    main()
