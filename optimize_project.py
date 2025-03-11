@@ -40,38 +40,43 @@ def check_system_resources():
     
     return resources
 
+def get_file_size_mb(file_path):
+    """Получает размер файла в МБ с обработкой ошибок"""
+    try:
+        return os.path.getsize(file_path) / (1024 * 1024)
+    except Exception:
+        return 0
+
 def identify_large_files(min_size_mb=10):
     """Находит большие файлы в проекте"""
-    large_files = []
+    # Пропускаем скрытые директории и виртуальные окружения в списковом включении
+    valid_paths = [(root, files) for root, _, files in os.walk('.') 
+                  if '/.' not in root and '\\.git' not in root]
     
-    for root, _, files in os.walk('.'):
-        # Пропускаем скрытые директории и виртуальные окружения
-        if '/.' in root or '\\.git' in root:
-            continue
-            
-        for file in files:
-            file_path = os.path.join(root, file)
-            try:
-                file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-                if file_size_mb >= min_size_mb:
-                    large_files.append({
-                        "path": file_path,
-                        "size_mb": file_size_mb
-                    })
-            except Exception:
-                continue
+    # Используем списковое включение для создания списка больших файлов
+    large_files = [
+        {"path": os.path.join(root, file), "size_mb": get_file_size_mb(os.path.join(root, file))}
+        for root, files in valid_paths
+        for file in files
+        if get_file_size_mb(os.path.join(root, file)) >= min_size_mb
+    ]
     
     # Сортируем по размеру (от больших к маленьким)
     large_files.sort(key=lambda x: x["size_mb"], reverse=True)
     
-    if large_files:
-        logger.info(f"Найдено {len(large_files)} больших файлов (>= {min_size_mb} MB)")
-        for file in large_files[:5]:  # Показываем топ-5 самых больших файлов
-            logger.info(f"  {file['path']}: {file['size_mb']:.2f} MB")
-    else:
-        logger.info(f"Больших файлов (>= {min_size_mb} MB) не найдено")
+    # Выводим информацию о найденных файлах
+    log_large_files_info(large_files, min_size_mb)
     
     return large_files
+
+def log_large_files_info(large_files, min_size_mb):
+    """Логирует информацию о найденных больших файлах"""
+    if large_files:
+        logger.info(f"Найдено {len(large_files)} больших файлов (>= {min_size_mb} MB)")
+        # Используем списковое включение для логирования
+        [logger.info(f"  {file['path']}: {file['size_mb']:.2f} MB") for file in large_files[:5]]
+    else:
+        logger.info(f"Больших файлов (>= {min_size_mb} MB) не найдено")
 
 def identify_optimization_opportunities():
     """Определяет возможности для оптимизации"""

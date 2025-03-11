@@ -26,7 +26,7 @@ class APIClient(BaseService):
     - Генерации исторического контента
     - Проверки релевантности запросов
     - Создания тестовых заданий
-    
+
     Версионирование API:
     - v1: Базовая версия API с основной функциональностью
     - v2: Добавлены методы для кэширования и повторных попыток
@@ -50,6 +50,11 @@ class APIClient(BaseService):
         self.cache = cache
         self.model = None
         self.initialize_model()
+        # Добавляем кэширование для API запросов
+        self.request_cache = {}
+        self.cache_ttl = 3600  # Время жизни кэша в секундах (1 час)
+        self.cache_hits = 0
+        self.cache_misses = 0
 
     def _do_initialize(self) -> bool:
         """
@@ -90,6 +95,57 @@ class APIClient(BaseService):
         cache_key_data = f"{prompt}:{temperature}:{max_tokens}:{system_prompt}"
         return hashlib.md5(cache_key_data.encode()).hexdigest()
 
+    def _get_cache_key(self, prompt, model=None, max_tokens=None):
+        """Создает ключ для кэширования на основе параметров запроса"""
+        return f"{hash(prompt)}:{model}:{max_tokens}"
+
+    def _get_from_cache(self, key):
+        """Получает данные из кэша с проверкой времени жизни"""
+        if key not in self.request_cache:
+            return None
+
+        cache_entry = self.request_cache[key]
+        # Проверяем, не истекло ли время жизни кэша
+        if time.time() - cache_entry['timestamp'] > self.cache_ttl:
+            # Кэш устарел, удаляем запись
+            del self.request_cache[key]
+            return None
+
+        self.cache_hits += 1
+        return cache_entry['data']
+
+    def _add_to_cache(self, key, data):
+        """Добавляет данные в кэш"""
+        self.request_cache[key] = {
+            'data': data,
+            'timestamp': time.time()
+        }
+
+        # Если размер кэша слишком большой, удаляем старые записи
+        if len(self.request_cache) > 1000:
+            # Используем списковое включение для получения старых ключей
+            old_keys = [k for k, v in self.request_cache.items() 
+                       if time.time() - v['timestamp'] > self.cache_ttl]
+
+            # Если старых записей недостаточно, удаляем самые старые
+            if len(old_keys) < 100:
+                # Сортируем по времени создания и берем 20% самых старых
+                sorted_keys = sorted(self.request_cache.keys(), 
+                                   key=lambda k: self.request_cache[k]['timestamp'])
+                old_keys = sorted_keys[:max(100, len(sorted_keys) // 5)]
+
+            # Удаляем старые записи
+            for key in old_keys:
+                del self.request_cache[key]
+
+    def clear_cache(self):
+        """Очищает кэш API запросов"""
+        cache_size = len(self.request_cache)
+        self.request_cache.clear()
+        self.logger.info(f"API кэш очищен, удалено {cache_size} записей")
+        return cache_size
+
+
     def call_api(self, prompt: str, temperature: float = 0.3, max_tokens: int = 1024, 
                 use_cache: bool = True, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -116,8 +172,8 @@ class APIClient(BaseService):
         """
         # Проверяем кэш, если нужно
         if use_cache:
-            cache_key = self._create_cache_key(prompt, temperature, max_tokens, system_prompt)
-            cached_result = self.cache.get(cache_key)
+            cache_key = self._get_cache_key(prompt, 'gemini-2.0-flash', max_tokens)
+            cached_result = self._get_from_cache(cache_key)
             if cached_result:
                 self._logger.debug(f"Получен ответ из кэша для промпта: {prompt[:50]}...")
                 return cached_result
@@ -141,7 +197,7 @@ class APIClient(BaseService):
 
                 # Добавляем информацию о версии API в запрос
                 api_info = f"API Version: {self.API_VERSION}"
-                
+
                 # Формирование промпта с системной инструкцией если она предоставлена
                 try:
                     if system_prompt:
@@ -174,15 +230,15 @@ class APIClient(BaseService):
 
                 # Сохраняем в кэш
                 if use_cache:
-                    cache_key = self._create_cache_key(prompt, temperature, max_tokens, system_prompt)
-                    self.cache.set(cache_key, result, ttl=24*60*60)  # TTL 24 часа
+                    cache_key = self._get_cache_key(prompt, 'gemini-2.0-flash', max_tokens)
+                    self._add_to_cache(cache_key, result)
 
                 return result
 
             except Exception as e:
                 error_type = type(e).__name__
                 error_details = str(e)
-                
+
                 # Classify error for better handling
                 if "quota" in error_details.lower() or "rate" in error_details.lower():
                     self._logger.warning(f"Превышен лимит запросов к Gemini API (попытка {attempt+1}/{max_retries}): {error_type} - {error_details}")
@@ -196,7 +252,7 @@ class APIClient(BaseService):
                 else:
                     self._logger.warning(f"Ошибка запроса к Gemini API (попытка {attempt+1}/{max_retries}): {error_type} - {error_details}")
                     retry_delay_extended = retry_delay * (2 ** attempt)
-                
+
                 if attempt < max_retries - 1:
                     # Применяем стратегию отступа в зависимости от типа ошибки
                     self._logger.info(f"Повторная попытка через {retry_delay_extended} секунд")
@@ -463,7 +519,7 @@ class APIClient(BaseService):
             int: Количество удаленных записей из кэша
         """
         try:
-            count = self.cache.clear_cache(topic_filter) # Assuming cache object has clear_cache method.
+            count = self.clear_cache() #Using the new clear_cache method.
             self._logger.info(f"Очищено {count} записей из кэша API запросов")
             return count
         except Exception as e:

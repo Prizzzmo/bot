@@ -489,53 +489,85 @@ class AdminPanel:
 
     # Вспомогательные методы для работы с данными
 
+    # Класс для аналитических функций, уменьшает количество глобальных переменных
+    class AnalyticsHelper:
+        @staticmethod
+        def count_users():
+            """Подсчитывает количество уникальных пользователей"""
+            try:
+                # Заглушка, нужно реализовать фактический подсчет из базы данных
+                return 42  # Пример
+            except Exception:
+                return 0
+
+        @staticmethod
+        def count_messages():
+            """Подсчитывает общее количество сообщений"""
+            try:
+                # Заглушка, нужно реализовать фактический подсчет из базы данных
+                return 1337  # Пример
+            except Exception:
+                return 0
+
+        @staticmethod
+        def get_uptime():
+            """Возвращает время работы бота"""
+            try:
+                # Заглушка, нужно реализовать фактический подсчет времени работы
+                return "3 дня 7 часов"  # Пример
+            except Exception:
+                return "Неизвестно"
+
+        @staticmethod
+        def count_bot_starts():
+            """Подсчитывает количество запусков бота за последние 24 часа"""
+            try:
+                # Заглушка, нужно реализовать фактический подсчет из логов
+                return 25  # Пример
+            except Exception:
+                return 0
+
+        @staticmethod
+        def count_topic_requests():
+            """Подсчитывает количество запросов тем за последние 24 часа"""
+            try:
+                # Заглушка, нужно реализовать фактический подсчет из логов
+                return 73  # Пример
+            except Exception:
+                return 0
+
+        @staticmethod
+        def count_completed_tests():
+            """Подсчитывает количество пройденных тестов за последние 24 часа"""
+            try:
+                # Заглушка, нужно реализовать фактический подсчет из логов
+                return 18  # Пример
+            except Exception:
+                return 0
+            
     def _count_users(self):
         """Подсчитывает количество уникальных пользователей"""
-        try:
-            # Заглушка, нужно реализовать фактический подсчет из базы данных
-            return 42  # Пример
-        except Exception:
-            return 0
+        return self.AnalyticsHelper.count_users()
 
     def _count_messages(self):
         """Подсчитывает общее количество сообщений"""
-        try:
-            # Заглушка, нужно реализовать фактический подсчет из базы данных
-            return 1337  # Пример
-        except Exception:
-            return 0
+        return self.AnalyticsHelper.count_messages()
 
     def _get_uptime(self):
         """Возвращает время работы бота"""
-        try:
-            # Заглушка, нужно реализовать фактический подсчет времени работы
-            return "3 дня 7 часов"  # Пример
-        except Exception:
-            return "Неизвестно"
+        return self.AnalyticsHelper.get_uptime()
 
     def _count_bot_starts(self):
         """Подсчитывает количество запусков бота за последние 24 часа"""
-        try:
-            # Заглушка, нужно реализовать фактический подсчет из логов
-            return 25  # Пример
-        except Exception:
-            return 0
+        return self.AnalyticsHelper.count_bot_starts()
 
     def _count_topic_requests(self):
         """Подсчитывает количество запросов тем за последние 24 часа"""
-        try:
-            # Заглушка, нужно реализовать фактический подсчет из логов
-            return 73  # Пример
-        except Exception:
-            return 0
+        return self.AnalyticsHelper.count_topic_requests()
 
     def _count_completed_tests(self):
         """Подсчитывает количество пройденных тестов за последние 24 часа"""
-        try:
-            # Заглушка, нужно реализовать фактический подсчет из логов
-            return 18  # Пример
-        except Exception:
-            return 0
+        return self.AnalyticsHelper.count_completed_tests()
 
     def _get_last_logs(self, lines=100):
         """Получает последние строки из файла логов"""
