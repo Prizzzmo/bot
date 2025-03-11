@@ -1,0 +1,118 @@
+{
+  "timestamp": "2025-03-11T13:04:50.994527",
+  "summary": {
+    "errors": 0,
+    "warnings": 27,
+    "total_issues": 27
+  },
+  "issues": [
+    {
+      "severity": "WARNING",
+      "message": "В событии #7 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #7 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #7 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #8 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #8 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #8 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #9 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #9 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #9 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #10 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #10 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #10 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #11 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #11 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #11 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #12 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #12 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #12 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #13 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #13 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #13 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #14 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #14 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #14 (ID: N/A) отсутствует обязательное поле 'title'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #15 (ID: N/A) отсутствует обязательное поле 'id'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #15 (ID: N/A) отсутствует обязательное поле 'date'"
+    },
+    {
+      "severity": "WARNING",
+      "message": "В событии #15 (ID: N/A) отсутствует обязательное поле 'title'"
+    }
+  ]
+}
