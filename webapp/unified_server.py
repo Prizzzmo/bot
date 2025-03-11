@@ -263,6 +263,36 @@ class UnifiedServer:
         ]
         return demo_events
 
+    def _preload_historical_data(self):
+        """Предварительная загрузка исторических данных"""
+        try:
+            logger.info(f"Попытка загрузки исторических данных из: {HISTORY_DB_PATH}")
+            if os.path.exists(HISTORY_DB_PATH):
+                # Проверяем размер файла
+                file_size = os.path.getsize(HISTORY_DB_PATH)
+                logger.info(f"Файл базы данных найден. Размер: {file_size} байт")
+                
+                if file_size == 0:
+                    logger.warning("Файл базы данных пуст. Использую пустой набор событий.")
+                    self.events_data = {"events": []}
+                    return
+                
+                try:
+                    with open(HISTORY_DB_PATH, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if not content:
+                            logger.warning("Содержимое файла пусто. Использую пустой набор событий.")
+                            self.events_data = {"events": []}
+                            return
+                        
+                        # Пытаемся загрузить JSON
+                        self.events_data = json.loads(content)
+                        events_count = len(self.events_data.get('events', []))
+                        logger.info(f"Успешно загружено {events_count} исторических событий")
+                except json.JSONDecodeError as je:
+                    logger.error(f"Ошибка декодирования JSON: {je}. Первые 100 символов файла: {content[:100]}...")
+                    self.events_data = {"events": []}
+            else:
                 logger.warning(f"Файл базы данных не найден: {HISTORY_DB_PATH}")
                 # Попробуем найти другие JSON файлы с историческими данными
                 for alternative_file in ['historical_events.json', 'history_db_generator/events.json']:
