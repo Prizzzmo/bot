@@ -44,6 +44,7 @@ args = "python main.py"
 [[workflows.workflow]]
 name = "Запуск бота и веб-приложения"
 author = 40317015
+mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
