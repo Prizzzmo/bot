@@ -229,30 +229,118 @@ class PerformanceMonitor(BaseService):
         thread.start()
     
     def _save_metrics(self) -> None:
-        """Сохраняет метрики в файл"""
+        """Сохраняет метрики в файл с оптимизацией производительности"""
         try:
-            # Преобразуем метрики в список словарей
-            metrics_data = [m.to_dict() for m in self.metrics]
+            # Если нет новых метрик для сохранения, просто выходим
+            if not self.metrics:
+                return
+                
+            # Преобразуем метрики в список словарей и сразу группируем по типу
+            metrics_by_type = {}
+            current_time = time.time()
+            retention_period = 7 * 24 * 60 * 60  # Одна неделя в секундах
+            cut_off_time = current_time - retention_period
             
-            # Если файл существует, загружаем существующие метрики
+            metrics_data = []
+            for m in self.metrics:
+                # Добавляем метрику в общий список
+                metrics_data.append(m.to_dict())
+                
+                # Также группируем для агрегирования
+                if m.name not in metrics_by_type:
+                    metrics_by_type[m.name] = []
+                metrics_by_type[m.name].append(m.value)
+            
+            # Проверяем размер файла и оптимизируем при необходимости
+            file_size_mb = 0
             existing_metrics = []
+            
             if os.path.exists(self.metrics_file) and os.path.getsize(self.metrics_file) > 0:
+                file_size_mb = os.path.getsize(self.metrics_file) / (1024 * 1024)
+                
                 try:
-                    with open(self.metrics_file, 'r', encoding='utf-8') as f:
-                        existing_metrics = json.load(f)
-                except json.JSONDecodeError:
-                    self._logger.warning(f"Ошибка чтения файла метрик {self.metrics_file}. Файл будет перезаписан.")
+                    # Если файл слишком большой, загружаем только недавние метрики
+                    if file_size_mb > 20:  # Если файл больше 20 МБ
+                        # Читаем файл построчно и загружаем только последние записи
+                        with open(self.metrics_file, 'r', encoding='utf-8') as f:
+                            file_content = f.read()
+                            # Ищем последнюю квадратную скобку, обрезаем и добавляем закрывающую
+                            last_bracket = file_content.rfind(']')
+                            if last_bracket > 0:
+                                content_to_parse = file_content[:last_bracket+1]
+                                try:
+                                    existing_metrics = json.loads(content_to_parse)
+                                    # Оставляем только метрики за последнюю неделю
+                                    existing_metrics = [m for m in existing_metrics if m.get('timestamp', 0) > cut_off_time]
+                                except json.JSONDecodeError:
+                                    # Если не удалось парсить, создаем новый файл
+                                    self._logger.warning(f"Невозможно прочитать файл метрик. Будет создан новый файл.")
+                                    existing_metrics = []
+                    else:
+                        # Обычное чтение для небольших файлов
+                        with open(self.metrics_file, 'r', encoding='utf-8') as f:
+                            existing_metrics = json.load(f)
+                            # Фильтруем старые метрики
+                            existing_metrics = [m for m in existing_metrics if m.get('timestamp', 0) > cut_off_time]
+                except Exception as e:
+                    self._logger.warning(f"Ошибка при чтении файла метрик: {e}. Создаем новый файл.")
+                    existing_metrics = []
             
             # Объединяем существующие и новые метрики
             all_metrics = existing_metrics + metrics_data
             
-            # Ограничиваем количество сохраняемых метрик (хранить не более 10000)
-            if len(all_metrics) > 10000:
-                all_metrics = all_metrics[-10000:]
+            # Ограничиваем количество сохраняемых метрик и выполняем агрегацию для снижения размера
+            if len(all_metrics) > 10000 or file_size_mb > 15:
+                # Берем только последние метрики и агрегируем старые по часам
+                recent_cutoff = current_time - (24 * 60 * 60)  # Последние 24 часа в деталях
+                recent_metrics = [m for m in all_metrics if m.get('timestamp', 0) > recent_cutoff]
+                
+                # Более старые метрики агрегируем по часам
+                older_metrics = [m for m in all_metrics if m.get('timestamp', 0) <= recent_cutoff]
+                
+                # Группируем по типу метрики и часу
+                aggregated_metrics = {}
+                for m in older_metrics:
+                    hour_bucket = int(m.get('timestamp', 0) / 3600) * 3600
+                    key = f"{m.get('name')}_{hour_bucket}"
+                    
+                    if key not in aggregated_metrics:
+                        aggregated_metrics[key] = {
+                            'name': m.get('name'),
+                            'timestamp': hour_bucket,
+                            'min_value': m.get('value', 0),
+                            'max_value': m.get('value', 0),
+                            'sum_value': m.get('value', 0),
+                            'count': 1
+                        }
+                    else:
+                        agg = aggregated_metrics[key]
+                        value = m.get('value', 0)
+                        agg['min_value'] = min(agg['min_value'], value)
+                        agg['max_value'] = max(agg['max_value'], value)
+                        agg['sum_value'] += value
+                        agg['count'] += 1
+                
+                # Преобразуем агрегированные данные в финальные метрики
+                aggregated_metrics_list = []
+                for agg in aggregated_metrics.values():
+                    # Создаем агрегированную метрику с усредненным значением
+                    aggregated_metrics_list.append({
+                        'name': agg['name'],
+                        'value': agg['sum_value'] / agg['count'],  # Среднее значение
+                        'timestamp': agg['timestamp'],
+                        'aggregated': True,  # Флаг, показывающий что метрика агрегирована
+                        'min': agg['min_value'],
+                        'max': agg['max_value'],
+                        'count': agg['count']
+                    })
+                
+                # Объединяем недавние и агрегированные метрики
+                all_metrics = aggregated_metrics_list + recent_metrics
             
-            # Сохраняем в файл
+            # Сохраняем в файл с оптимизированным форматированием (без отступов для экономии места)
             with open(self.metrics_file, 'w', encoding='utf-8') as f:
-                json.dump(all_metrics, f, ensure_ascii=False, indent=2)
+                json.dump(all_metrics, f, ensure_ascii=False, separators=(',', ':'))
             
             # Очищаем список метрик
             self.metrics = []
