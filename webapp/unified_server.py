@@ -93,15 +93,196 @@ class UnifiedServer:
     def _preload_historical_data(self):
         """Предварительная загрузка исторических данных"""
         try:
+            logger.info(f"Попытка загрузки исторических данных из: {HISTORY_DB_PATH}")
             if os.path.exists(HISTORY_DB_PATH):
-                with open(HISTORY_DB_PATH, 'r', encoding='utf-8') as f:
-                    self.events_data = json.load(f)
-                logger.info(f"Загружено {len(self.events_data.get('events', []))} исторических событий")
+                # Проверяем размер файла
+                file_size = os.path.getsize(HISTORY_DB_PATH)
+                logger.info(f"Файл базы данных найден. Размер: {file_size} байт")
+                
+                if file_size == 0:
+                    logger.warning("Файл базы данных пуст. Использую пустой набор событий.")
+                    self.events_data = {"events": []}
+                    return
+                
+                try:
+                    with open(HISTORY_DB_PATH, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if not content:
+                            logger.warning("Содержимое файла пусто. Использую пустой набор событий.")
+                            self.events_data = {"events": []}
+                            return
+                        
+                        # Пытаемся загрузить JSON
+                        self.events_data = json.loads(content)
+                        events_count = len(self.events_data.get('events', []))
+                        logger.info(f"Успешно загружено {events_count} исторических событий")
+                except json.JSONDecodeError as je:
+                    logger.error(f"Ошибка декодирования JSON: {je}. Первые 100 символов файла: {content[:100]}...")
+                    self.events_data = {"events": []}
             else:
+
+    def _create_demo_events(self):
+        """
+        Создает демонстрационные исторические события, если основная база данных не может быть загружена
+        
+        Returns:
+            List: Список демонстрационных исторических событий
+        """
+        logger.info("Создание демонстрационных исторических событий")
+        demo_events = [
+            {
+                "id": "demo1",
+                "title": "Крещение Руси",
+                "date": "988 год",
+                "description": "Принятие христианства в качестве государственной религии Киевской Руси при князе Владимире.",
+                "location": {
+                    "lat": 50.4501,
+                    "lng": 30.5234,
+                    "name": "Киев"
+                },
+                "category": "Культура и религия",
+                "topic": "Христианизация"
+            },
+            {
+                "id": "demo2",
+                "title": "Куликовская битва",
+                "date": "1380 год",
+                "description": "Сражение между объединённым русским войском под командованием московского князя Дмитрия Донского и войском темника Золотой Орды Мамая.",
+                "location": {
+                    "lat": 53.6764,
+                    "lng": 38.6619,
+                    "name": "Куликово поле"
+                },
+                "category": "Войны и сражения",
+                "topic": "Освобождение от монголо-татарского ига"
+            },
+            {
+                "id": "demo3",
+                "title": "Основание Санкт-Петербурга",
+                "date": "1703 год",
+                "description": "Основание города Санкт-Петербурга Петром I, который впоследствии стал столицей Российской империи.",
+                "location": {
+                    "lat": 59.9343,
+                    "lng": 30.3351,
+                    "name": "Санкт-Петербург"
+                },
+                "category": "Основание городов",
+                "topic": "Петровские реформы"
+            },
+            {
+                "id": "demo4",
+                "title": "Отечественная война 1812 года",
+                "date": "1812 год",
+                "description": "Война между Российской и Французской империями на территории России в 1812 году.",
+                "location": {
+                    "lat": 55.7522,
+                    "lng": 37.6156,
+                    "name": "Москва"
+                },
+                "category": "Войны и сражения",
+                "topic": "Наполеоновские войны"
+            },
+            {
+                "id": "demo5",
+                "title": "Отмена крепостного права",
+                "date": "1861 год",
+                "description": "Крестьянская реформа, начатая в 1861 году, упразднила крепостное право в Российской империи.",
+                "location": {
+                    "lat": 55.7522,
+                    "lng": 37.6156,
+                    "name": "Москва"
+                },
+                "category": "Социальные реформы",
+                "topic": "Великие реформы"
+            },
+            {
+                "id": "demo6",
+                "title": "Октябрьская революция",
+                "date": "1917 год",
+                "description": "Вооружённое восстание, организованное большевиками, в результате которого было свергнуто Временное правительство и к власти пришло правительство, сформированное II Всероссийским съездом Советов.",
+                "location": {
+                    "lat": 59.9343,
+                    "lng": 30.3351,
+                    "name": "Петроград"
+                },
+                "category": "Революции и перевороты",
+                "topic": "Революция 1917 года"
+            },
+            {
+                "id": "demo7",
+                "title": "Великая Отечественная война",
+                "date": "1941-1945 годы",
+                "description": "Война Советского Союза против нацистской Германии и её союзников в рамках Второй мировой войны.",
+                "location": {
+                    "lat": 55.7522,
+                    "lng": 37.6156,
+                    "name": "Москва"
+                },
+                "category": "Войны и сражения",
+                "topic": "Вторая мировая война"
+            },
+            {
+                "id": "demo8",
+                "title": "Первый полёт человека в космос",
+                "date": "1961 год",
+                "description": "Первый в мире полёт человека в космическое пространство, совершенный Юрием Гагариным на корабле «Восток-1».",
+                "location": {
+                    "lat": 51.2754,
+                    "lng": 45.9993,
+                    "name": "Байконур"
+                },
+                "category": "Научные достижения",
+                "topic": "Космическая программа"
+            },
+            {
+                "id": "demo9",
+                "title": "Распад СССР",
+                "date": "1991 год",
+                "description": "Процессы, которые привели к прекращению существования СССР и появлению независимых государств на постсоветском пространстве.",
+                "location": {
+                    "lat": 55.7522,
+                    "lng": 37.6156,
+                    "name": "Москва"
+                },
+                "category": "Политические реформы",
+                "topic": "Перестройка"
+            },
+            {
+                "id": "demo10",
+                "title": "Принятие Конституции РФ",
+                "date": "1993 год",
+                "description": "Принятие всенародным голосованием новой Конституции Российской Федерации.",
+                "location": {
+                    "lat": 55.7522,
+                    "lng": 37.6156,
+                    "name": "Москва"
+                },
+                "category": "Политические реформы",
+                "topic": "Современная Россия"
+            }
+        ]
+        return demo_events
+
                 logger.warning(f"Файл базы данных не найден: {HISTORY_DB_PATH}")
+                # Попробуем найти другие JSON файлы с историческими данными
+                for alternative_file in ['historical_events.json', 'history_db_generator/events.json']:
+                    alternative_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), alternative_file)
+                    if os.path.exists(alternative_path):
+                        logger.info(f"Найден альтернативный файл данных: {alternative_path}")
+                        try:
+                            with open(alternative_path, 'r', encoding='utf-8') as f:
+                                self.events_data = json.load(f)
+                            logger.info(f"Загружено {len(self.events_data.get('events', []))} событий из альтернативного файла")
+                            return
+                        except Exception as alt_e:
+                            logger.error(f"Ошибка при загрузке альтернативного файла: {alt_e}")
+                
+                # Если не нашли альтернативных файлов, используем пустой набор
                 self.events_data = {"events": []}
         except Exception as e:
-            logger.error(f"Ошибка при загрузке исторических данных: {e}")
+            logger.error(f"Ошибка при загрузке исторических данных: {str(e)}")
+            import traceback
+            logger.error(f"Трассировка: {traceback.format_exc()}")
             self.events_data = {"events": []}
     
     def _clean_event_data(self, events):
@@ -326,11 +507,25 @@ class UnifiedServer:
         def get_historical_events():
             """API для получения исторических данных из базы"""
             try:
+                # Проверяем, загружены ли данные
+                if self.events_data is None:
+                    logger.info("Данные не загружены, выполняем загрузку")
+                    self._preload_historical_data()
+                
                 # Получаем события из базы данных
                 events = self.events_data.get('events', [])
+                logger.info(f"Всего событий в базе данных: {len(events)}")
+                
+                # Если событий нет, попробуем загрузить демо-данные
+                if len(events) == 0:
+                    logger.warning("События не найдены, создаем демо-данные")
+                    # Создаем тестовые данные для демонстрации
+                    events = self._create_demo_events()
+                    logger.info(f"Создано {len(events)} демо-событий")
                 
                 # Очищаем и форматируем данные
                 filtered_events = self._clean_event_data(events)
+                logger.info(f"После фильтрации осталось {len(filtered_events)} событий")
                 
                 # Фильтрация по параметрам запроса (если они есть)
                 category = request.args.get('category')
@@ -346,9 +541,12 @@ class UnifiedServer:
                     except ValueError:
                         pass
                 
+                logger.info(f"Отправляется {len(filtered_events)} событий")
                 return jsonify(filtered_events)
             except Exception as e:
                 logger.error(f"Ошибка при получении исторических данных: {e}")
+                import traceback
+                logger.error(f"Трассировка: {traceback.format_exc()}")
                 return jsonify({'error': str(e)}), 500
         
         @self.app.route('/api/categories')
