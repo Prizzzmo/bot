@@ -956,7 +956,7 @@ class UnifiedServer:
         # Здесь добавьте остальные маршруты из оригинального admin_server.py
         # ...
 
-def run_unified_server(host='0.0.0.0', port=8080):
+def run_unified_server(host='0.0.0.0', port=None):
     """
     Запускает объединенный сервер
     
@@ -965,9 +965,24 @@ def run_unified_server(host='0.0.0.0', port=8080):
         port: Порт для запуска сервера
     """
     try:
+        # Получаем порт из переменных окружения Replit или используем значение по умолчанию
+        if port is None:
+            port = int(os.environ.get('PORT', 8080))
+        
         # Создаем и запускаем сервер
         server = UnifiedServer()
-        logger.info(f"Запуск объединенного сервера на {host}:{port}")
+        replit_url = os.environ.get('REPL_SLUG', None)
+        replit_owner = os.environ.get('REPL_OWNER', None)
+        
+        if replit_url and replit_owner:
+            public_url = f"https://{replit_url}.{replit_owner}.repl.co"
+        else:
+            public_url = None
+            
+        logger.info(f"Объединенный веб-сервер запущен на порту {port} с URL: {public_url}")
+        logger.info(f"Карта истории доступна по адресу: /")
+        logger.info(f"Админ-панель доступна по адресу: /admin-panel")
+        
         server.app.run(host=host, port=port, debug=False)
     except Exception as e:
         logger.error(f"Ошибка при запуске объединенного сервера: {e}")

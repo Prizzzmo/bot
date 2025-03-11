@@ -241,34 +241,21 @@ def check_system_resources():
                 file_size_mb = os.path.getsize(cache_file) / (1024 * 1024)
                 total_cache_size += file_size_mb
 
-                # Если файл кэша слишком большой, пометим его для очистки
-                if file_size_mb > 50:  # Более 50 МБ
-                    os.environ[f'CLEAN_{cache_file.upper().replace(".", "_")}'] = 'true'
+                # Если файл кэша слишком большой, пометим его д# Main entry point for the history map application
 
-        # Если общий размер кэш-файлов занимает более 30% свободного места, принудительно очищаем
-        if total_cache_size > (disk_free_mb * 0.3):
-            os.environ['FORCE_CLEAN_ALL_CACHES'] = 'true'
-            logger.warning(f"Кэш-файлы ({total_cache_size:.1f} МБ) занимают слишком много места, будет выполнена принудительная очистка")
+import os
+import sys
+from webapp.unified_server import run_unified_server
 
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка при проверке системных ресурсов: {e}")
-        return False
+def main():
+    """Основная функция запуска сервера"""
+    print("Starting Unified History Map Server...")
+    
+    # Запуск объединенного веб-сервера
+    run_unified_server()
 
-def clear_caches():
-    """Очищает все кэши при запуске проекта"""
-    from src.logger import Logger
-    from src.config import Config
-    import os
-
-    logger = Logger()
-    config = Config()
-
-    # Проверяем, включена ли автоматическая очистка кэша или принудительная очистка
-    force_clean = os.environ.get('FORCE_CLEAN_ALL_CACHES', 'false').lower() == 'true'
-
-    if not force_clean and (not hasattr(config, 'clear_cache_on_startup') or not config.clear_cache_on_startup):
-        logger.info("Автоматическая очистка кэша при запуске отключена в конфигурации")
+if __name__ == "__main__":
+    main()тическая очистка кэша при запуске отключена в конфигурации")
         return
 
     try:
