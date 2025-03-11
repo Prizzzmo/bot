@@ -544,9 +544,8 @@ class AdminServer:
                 
                 # Конвертируем строковые даты в объекты datetime для правильного отображения
                 import matplotlib.dates as mdates
-                from datetime import datetime
                 
-                dates_dt = [datetime.strptime(stat['date'], '%Y-%m-%d') for stat in daily_stats]
+                dates_dt = [datetime.datetime.strptime(stat['date'], '%Y-%m-%d') for stat in daily_stats]
                 requests = [stat['requests'] for stat in daily_stats]
                 users = [stat['unique_users'] for stat in daily_stats]
                 
