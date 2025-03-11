@@ -210,5 +210,14 @@ class AnalyticsService(BaseService):
                     continue
 
         # Сортируем по дате и ограничиваем количество дней
-        sorted_dates = sorted(daily_stats.items(), reverse=True)[:days_limit]
-        return dict(sorted(sorted_dates, key=lambda x: x[0]))
+        from datetime import datetime
+        
+        # Convert string dates to datetime objects for proper sorting
+        date_items = [(datetime.strptime(date, "%Y-%m-%d"), count) 
+                     for date, count in daily_stats.items()]
+        
+        # Sort by date in descending order and limit
+        sorted_dates = sorted(date_items, key=lambda x: x[0], reverse=True)[:days_limit]
+        
+        # Convert back to string format for API response
+        return {date.strftime("%Y-%m-%d"): count for date, count in sorted_dates}
