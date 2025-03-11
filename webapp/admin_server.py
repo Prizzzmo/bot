@@ -340,6 +340,15 @@ class AdminServer:
                 if not user_id:
                     return jsonify({"error": "Требуется авторизация"}), 403
                 
+                # Используем настройки из админ-панели, если она доступна
+                if self.admin_panel:
+                    try:
+                        settings = self.admin_panel._get_bot_settings()
+                        return jsonify(settings)
+                    except Exception as e:
+                        logger.warning(f"Не удалось получить настройки из админ-панели: {e}")
+                
+                # Запасной вариант: загрузка из файла
                 settings = self._load_bot_settings()
                 return jsonify(settings)
             except Exception as e:
@@ -386,8 +395,31 @@ class AdminServer:
                 
                 # Если доступен сервис аналитики, используем его
                 if self.analytics_service:
-                    stats = self.analytics_service.get_overall_stats()
-                    return jsonify(stats)
+                    try:
+                        if hasattr(self.analytics_service, 'get_overall_stats'):
+                            stats = self.analytics_service.get_overall_stats()
+                            logger.info(f"Получена статистика из сервиса аналитики: {stats}")
+                            return jsonify(stats)
+                        else:
+                            logger.warning("Метод get_overall_stats не найден в сервисе аналитики")
+                    except Exception as e:
+                        logger.warning(f"Ошибка при получении статистики из сервиса аналитики: {e}")
+
+                # Если админ-панель доступна, используем ее статистику
+                if self.admin_panel and hasattr(self.admin_panel, '_count_users'):
+                    try:
+                        stats = {
+                            "user_count": self.admin_panel._count_users(),
+                            "message_count": self.admin_panel._count_messages(),
+                            "uptime": self.admin_panel._get_uptime(),
+                            "bot_starts": self.admin_panel._count_bot_starts(),
+                            "topic_requests": self.admin_panel._count_topic_requests(),
+                            "completed_tests": self.admin_panel._count_completed_tests()
+                        }
+                        logger.info(f"Получена статистика из админ-панели: {stats}")
+                        return jsonify(stats)
+                    except Exception as e:
+                        logger.warning(f"Ошибка при получении статистики из админ-панели: {e}")
                 
                 # Иначе возвращаем заглушку статистики
                 stats = {
@@ -399,6 +431,7 @@ class AdminServer:
                     "completed_tests": self._count_completed_tests()
                 }
                 
+                logger.info(f"Использована заглушка статистики: {stats}")
                 return jsonify(stats)
             except Exception as e:
                 logger.error(f"Ошибка при получении статистики: {e}")
@@ -1498,18 +1531,20 @@ class AdminServer:
         else:
             logger.warning("Сервер админки не запущен")
 
-def run_admin_server(host='0.0.0.0', port=8000):
+def run_admin_server(host='0.0.0.0', port=8000, admin_panel=None, analytics_service=None):
     """
     Функция для запуска сервера админки
     
     Args:
         host: Хост для запуска сервера
         port: Порт для запуска сервера
+        admin_panel: Объект панели администратора из основного приложения
+        analytics_service: Сервис аналитики из основного приложения
     """
     logger.info("Инициализация сервера админки")
     
-    # Инициализируем сервер
-    admin_server = AdminServer()
+    # Инициализируем сервер с переданными сервисами
+    admin_server = AdminServer(admin_panel=admin_panel, analytics_service=analytics_service)
     
     # Запускаем сервер
     admin_server.start(host=host, port=port)

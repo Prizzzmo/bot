@@ -237,8 +237,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 }
                 
-                // Загружаем данные панели
-                loadDashboardData();
+                // Загружаем данные панели с небольшой задержкой для завершения авторизации
+                setTimeout(() => {
+                    loadDashboardData();
+                }, 300);
                 
                 showNotification('Вы успешно вошли в систему', 'success');
             } else {

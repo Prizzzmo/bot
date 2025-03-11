@@ -8,8 +8,23 @@ import time
 # Добавляем путь к корневой директории проекта
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from webapp.admin_server import run_admin_server
 from webapp.server import run_server
+#from webapp.admin_server import run_admin_server  # Replaced
+import logging
+import json
+from webapp.admin_server import AdminServer
+
+# Подключаем основные компоненты проекта
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from src.logger import Logger
+from src.analytics import AnalyticsService
+from src.admin_panel import AdminPanel
+from src.config import Config
+
+def load_config():
+    """Загрузка конфигурации проекта"""
+    config = Config()
+    return config
 
 # Настраиваем логирование
 if not os.path.exists('logs'):
@@ -26,6 +41,7 @@ logging.basicConfig(
 
 logger = logging.getLogger('WebApp')
 
+
 def main():
     """Запускает веб-приложение и админ-панель"""
     logger.info("Запуск веб-приложения и админ-панели")
@@ -40,9 +56,23 @@ def main():
     webapp_thread.start()
     logger.info(f"Веб-приложение запущено на порту {webapp_port}")
 
-    # Создаем и запускаем поток для админ-панели
-    admin_thread = Thread(target=run_admin_server, args=('0.0.0.0', admin_port), daemon=True)
-    admin_thread.start()
+    # Создаем экземпляр логгера
+    #logger = Logger() #Already defined above
+    logger.info("Запуск веб-сервера администратора")
+
+    # Загружаем конфигурацию
+    config = load_config()
+
+    # Создаем сервис аналитики
+    analytics_service = AnalyticsService(logger)
+
+    # Создаем админ-панель из основного кода
+    admin_panel = AdminPanel(logger, config)
+
+    # Создаем и запускаем сервер админки
+    admin_server = AdminServer(admin_panel=admin_panel, analytics_service=analytics_service)
+    admin_server.start(host='0.0.0.0', port=admin_port) #using admin_port variable
+
     logger.info(f"Админ-панель запущена на порту {admin_port}")
 
     logger.info("Все сервисы запущены успешно")
@@ -52,6 +82,7 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         logger.info("Завершение работы приложения")
+        admin_server.stop() #added to stop admin server gracefully
         sys.exit(0)
 
 if __name__ == "__main__":
