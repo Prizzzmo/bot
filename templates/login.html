@@ -1,0 +1,137 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в панель администратора</title>
+    <link rel="stylesheet" href="/static/admin_styles.css?v=1.0.1">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <h1>Панель администратора</h1>
+            <h2>Авторизация</h2>
+            
+            <div id="message-container"></div>
+            
+            <form id="login-form" method="post" action="/login">
+                <div class="form-group">
+                    <label for="admin-id">ID администратора:</label>
+                    <input type="number" id="admin-id" name="admin_id" placeholder="Введите ID администратора">
+                </div>
+                
+                <div class="form-separator">или</div>
+                
+                <div class="form-group">
+                    <label for="admin-password">Пароль администратора:</label>
+                    <input type="password" id="admin-password" name="admin_password" placeholder="Введите пароль администратора">
+                </div>
+                
+                <div class="form-group">
+                    <button type="button" class="btn-primary" onclick="loginWithId()">Войти по ID</button>
+                    <button type="button" class="btn-secondary" onclick="loginWithPassword()">Войти по паролю</button>
+                </div>
+            </form>
+            
+            <div class="login-footer">
+                <p>© 2023 История России - Админ-панель</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Показывает сообщение определенного типа
+        function showMessage(type, text) {
+            const messageContainer = document.getElementById('message-container');
+            messageContainer.innerHTML = `<div class="message ${type}">${text}</div>`;
+            
+            // Автоматическое скрытие сообщения через 5 секунд
+            setTimeout(() => {
+                messageContainer.innerHTML = '';
+            }, 5000);
+        }
+        
+        // Функция авторизации через ID
+        async function loginWithId() {
+            const adminId = document.getElementById('admin-id').value;
+            if (!adminId) {
+                showMessage('error', 'Введите ID администратора');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ admin_id: parseInt(adminId) })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('success', 'Авторизация успешна');
+                    setTimeout(() => {
+                        window.location.href = '/admin-panel';
+                    }, 1000);
+                } else {
+                    showMessage('error', result.message || 'Ошибка авторизации');
+                }
+            } catch (error) {
+                console.error('Ошибка при авторизации:', error);
+                showMessage('error', 'Ошибка при выполнении запроса');
+            }
+        }
+        
+        // Функция авторизации через пароль
+        async function loginWithPassword() {
+            const adminPassword = document.getElementById('admin-password').value;
+            if (!adminPassword) {
+                showMessage('error', 'Введите пароль администратора');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ admin_password: adminPassword })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('success', 'Авторизация успешна');
+                    setTimeout(() => {
+                        window.location.href = '/admin-panel';
+                    }, 1000);
+                } else {
+                    showMessage('error', result.message || 'Ошибка авторизации');
+                }
+            } catch (error) {
+                console.error('Ошибка при авторизации:', error);
+                showMessage('error', 'Ошибка при выполнении запроса');
+            }
+        }
+        
+        // Обработка нажатия Enter в полях ввода
+        document.getElementById('admin-id').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                loginWithId();
+            }
+        });
+        
+        document.getElementById('admin-password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                loginWithPassword();
+            }
+        });
+    </script>
+</body>
+</html>

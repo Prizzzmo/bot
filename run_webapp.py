@@ -9,7 +9,6 @@ import time
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from webapp.server import run_server
-#from webapp.admin_server import run_admin_server  # Replaced
 import logging
 import json
 from webapp.admin_server import AdminServer
@@ -73,17 +72,27 @@ def main():
     admin_server = AdminServer(admin_panel=admin_panel, analytics_service=analytics_service)
     admin_server.start(host='0.0.0.0', port=admin_port) #using admin_port variable
 
-    logger.info(f"Админ-панель запущена на порту {admin_port}")
+    # Запускаем Flask Admin Server
+    #admin_server.start(host='0.0.0.0', port=8000)
 
-    logger.info("Все сервисы запущены успешно")
+    # Предупреждение о запуске веб-панели администратора
+    print(f"Админ-сервер запущен на http://0.0.0.0:{admin_port}")
+    print("Для доступа к админ-панели перейдите по адресу: http://0.0.0.0:{admin_port}/admin-panel".format(admin_port=admin_port))
+    print("Для остановки сервера нажмите Ctrl+C")
 
+    # Держим основной поток активным
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        logger.info("Завершение работы приложения")
+        print("Сервер остановлен.")
         admin_server.stop() #added to stop admin server gracefully
         sys.exit(0)
+
+
+    logger.info(f"Админ-панель запущена на порту {admin_port}")
+
+    logger.info("Все сервисы запущены успешно")
 
 if __name__ == "__main__":
     main()

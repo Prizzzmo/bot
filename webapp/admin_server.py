@@ -15,6 +15,10 @@ from flask_cors import CORS
 import re
 
 # Настройка логирования
+import os
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
@@ -45,9 +49,21 @@ class AdminServer:
         self.analytics_service = analytics_service
         
         # Создаем приложение Flask
+        template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
+        static_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+        
+        # Проверяем наличие директорий
+        if not os.path.exists(template_path):
+            logger.warning(f"Директория шаблонов не найдена: {template_path}")
+            os.makedirs(template_path, exist_ok=True)
+            
+        if not os.path.exists(static_path):
+            logger.warning(f"Директория статических файлов не найдена: {static_path}")
+            os.makedirs(static_path, exist_ok=True)
+            
         self.app = Flask(__name__, 
-                         template_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates'),
-                         static_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static'))
+                         template_folder=template_path,
+                         static_folder=static_path)
         
         # Включаем поддержку CORS
         CORS(self.app)
@@ -73,9 +89,20 @@ class AdminServer:
             """Перенаправление на админ-панель"""
             return redirect('/admin-panel')
         
+        @self.app.route('/login')
+        def login_page():
+            """Страница авторизации"""
+            return render_template('login.html', title="Вход в админ-панель")
+        
         @self.app.route('/admin-panel')
         def admin_panel():
             """Главная страница админ-панели"""
+            # Проверка авторизации через cookie
+            user_id = request.cookies.get('admin_id')
+            if not user_id:
+                # Если пользователь не авторизован, перенаправляем на страницу входа
+                return redirect('/login')
+                
             return render_template('admin_panel.html', title="Панель администратора")
         
         # -------------------- Аутентификация --------------------
@@ -133,9 +160,11 @@ class AdminServer:
                     is_admin = admin_id in admins.get("admin_ids", []) or admin_id in admins.get("super_admin_ids", [])
                     is_super_admin = admin_id in admins.get("super_admin_ids", [])
                     
-                    # Для тестирования временно разрешим любой ID
-                    is_admin = True
-                    is_super_admin = True
+                    # Проверка является ли пользователь администратором
+                    # Оставляем проверку реальную, убираем тестовый код
+                    if not is_admin:
+                        logger.warning(f"Неверный ID администратора: {admin_id}")
+                        return jsonify({"success": False, "message": "Неверный ID администратора"})
                     
                     if is_admin:
                         logger.info(f"Пользователь {admin_id} авторизован как {'супер-' if is_super_admin else ''}администратор")
@@ -164,8 +193,9 @@ class AdminServer:
                     # Проверяем пароль (в реальном проекте должно быть безопасное хранение)
                     correct_password = "nnkhqjm"  # Пароль из примера
                     
-                    # Для тестирования временно принимаем любой пароль
-                    correct_password = admin_password
+                    # Используем фиксированный пароль для админ-панели
+                    # В реальном приложении следует использовать хешированный пароль
+                    correct_password = "nnkhqjm"
                     
                     if admin_password == correct_password:
                         # При успешной авторизации используем ID супер-администратора
