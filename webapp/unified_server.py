@@ -299,12 +299,26 @@ class UnifiedServer:
         cleaned_events = []
 
         for event in events:
+            # Проверка типа данных события
+            if not isinstance(event, dict):
+                logger.warning(f"Пропуск события неверного типа: {type(event)}")
+                continue
+
             # Пропускаем события без заголовка или даты
             if not event.get('title') or not event.get('date'):
                 continue
 
-            # Пропускаем события без местоположения, если нет координат
-            if 'location' not in event or not event.get('location', {}).get('lat') or not event.get('location', {}).get('lng'):
+            # Пропускаем события без местоположения или координат
+            if 'location' not in event:
+                continue
+                
+            # Проверка структуры location
+            location = event.get('location')
+            if not isinstance(location, dict):
+                continue
+                
+            # Проверка наличия координат
+            if not location.get('lat') or not location.get('lng'):
                 continue
 
             # Проверяем и очищаем описание
@@ -321,7 +335,7 @@ class UnifiedServer:
                 'title': event.get('title', '').strip(),
                 'date': event.get('date', '').strip(),
                 'description': description,
-                'location': event.get('location', {}),
+                'location': location,
                 'category': event.get('category', '').strip(),
                 'topic': event.get('topic', '').strip(),
                 'century': self._extract_century(event.get('date', ''))
