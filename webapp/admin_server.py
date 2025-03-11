@@ -542,12 +542,19 @@ class AdminServer:
                 fig = Figure(figsize=(10, 5))
                 axis = fig.add_subplot(1, 1, 1)
                 
-                dates = [stat['date'] for stat in daily_stats]
+                # Конвертируем строковые даты в объекты datetime для правильного отображения
+                import matplotlib.dates as mdates
+                from datetime import datetime
+                
+                dates_dt = [datetime.strptime(stat['date'], '%Y-%m-%d') for stat in daily_stats]
                 requests = [stat['requests'] for stat in daily_stats]
                 users = [stat['unique_users'] for stat in daily_stats]
                 
-                axis.plot(dates, requests, 'o-', label='Запросы')
-                axis.plot(dates, users, 's-', label='Пользователи')
+                axis.plot(dates_dt, requests, 'o-', label='Запросы')
+                axis.plot(dates_dt, users, 's-', label='Пользователи')
+                
+                # Форматируем ось X для отображения дат
+                axis.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
                 axis.set_xlabel('Дата')
                 axis.set_ylabel('Количество')
                 axis.set_title('Ежедневная активность')
