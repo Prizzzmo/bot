@@ -1,0 +1,588 @@
+{
+  "timestamp": "2025-03-11 14:06:19",
+  "execution_time_sec": 0.6694955825805664,
+  "system_resources": {
+    "cpu_count": 4,
+    "total_memory_mb": 64312.6953125,
+    "available_memory_mb": 9178.859375,
+    "memory_percent": 85.7,
+    "total_disk_mb": 50301.8359375,
+    "free_disk_mb": 24288.07421875,
+    "disk_percent": 49.6
+  },
+  "large_files": [],
+  "optimization_opportunities": [],
+  "optimizations_applied": [],
+  "code_recommendations": [
+    {
+      "file": "./tests.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (62), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./create_presentation_doc.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (172), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./create_presentation_doc.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./create_presentation_doc.py",
+      "type": "missing_cache",
+      "description": "Рассмотрите добавление кэширования для API запросов и частых операций"
+    },
+    {
+      "file": "./run_combined.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (11), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./run_gemini_generator.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (14), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./analyze_events_db.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (138), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./analyze_events_db.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./analyze_events_db.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./cleanup.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (117), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./gemini_api_keys.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (26), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./gemini_api_keys.py",
+      "type": "missing_cache",
+      "description": "Рассмотрите добавление кэширования для API запросов и частых операций"
+    },
+    {
+      "file": "./clear_cache.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (41), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./run_webapp.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (43), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./clear_all_cache.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (63), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./analyze_project.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (206), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./analyze_project.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./check_data_integrity.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (164), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./check_data_integrity.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./check_data_integrity.py",
+      "type": "large_functions",
+      "description": "Файл содержит 2 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./main.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (234), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./main.py",
+      "type": "large_functions",
+      "description": "Файл содержит 3 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./optimize_project.py",
+      "type": "import_optimization",
+      "description": "Используйте конкретные импорты вместо 'import *' для уменьшения использования памяти"
+    },
+    {
+      "file": "./optimize_project.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (363), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./optimize_project.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./optimize_project.py",
+      "type": "large_functions",
+      "description": "Файл содержит 3 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/base_client.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (109), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/base_client.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/base_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (91), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/class_diagram.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (69), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/class_diagram.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/message_manager.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (81), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/message_manager.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/message_manager.py",
+      "type": "missing_cache",
+      "description": "Рассмотрите добавление кэширования для API запросов и частых операций"
+    },
+    {
+      "file": "./src/text_cache_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (144), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/text_cache_service.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/state_manager.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (170), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/state_manager.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/topic_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (400), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/topic_service.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/topic_service.py",
+      "type": "large_functions",
+      "description": "Файл содержит 4 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/test_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (315), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/test_service.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/test_service.py",
+      "type": "large_functions",
+      "description": "Файл содержит 2 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/distributed_cache.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (345), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/distributed_cache.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/distributed_cache.py",
+      "type": "large_functions",
+      "description": "Файл содержит 2 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/service_container.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (127), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/service_container.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/data_migration.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (271), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/data_migration.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/data_migration.py",
+      "type": "large_functions",
+      "description": "Файл содержит 3 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/conversation_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (305), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/conversation_service.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/conversation_service.py",
+      "type": "large_functions",
+      "description": "Файл содержит 4 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/api_client.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (340), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/api_client.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/api_client.py",
+      "type": "large_functions",
+      "description": "Файл содержит 2 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/content_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (270), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/content_service.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/content_service.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/ui_manager.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (105), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/ui_manager.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/history_map.py",
+      "type": "missing_cache",
+      "description": "Рассмотрите добавление кэширования для API запросов и частых операций"
+    },
+    {
+      "file": "./src/interfaces.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (88), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/logger.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (209), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/logger.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/logger.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/logger.py",
+      "type": "missing_cache",
+      "description": "Рассмотрите добавление кэширования для API запросов и частых операций"
+    },
+    {
+      "file": "./src/task_queue.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (206), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/task_queue.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/telegram_queue.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (77), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/telegram_queue.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/telegram_queue.py",
+      "type": "missing_cache",
+      "description": "Рассмотрите добавление кэширования для API запросов и частых операций"
+    },
+    {
+      "file": "./src/admin_panel.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (466), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/admin_panel.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/admin_panel.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/factory.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (74), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/bot.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (122), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/bot.py",
+      "type": "large_functions",
+      "description": "Файл содержит 2 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/handlers.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (1198), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/handlers.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/handlers.py",
+      "type": "large_functions",
+      "description": "Файл содержит 7 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/web_server.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (390), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/web_server.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/web_server.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./src/analytics.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (154), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/analytics.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/config.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (57), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/api_cache.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (264), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/api_cache.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/performance_monitor.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (300), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./src/performance_monitor.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./src/performance_monitor.py",
+      "type": "large_functions",
+      "description": "Файл содержит 1 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./tests/test_api_cache.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (68), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./tests/test_logger.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (53), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./tests/test_api_client.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (69), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./tests/test_topic_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (33), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./tests/test_conversation_service.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (73), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./tests/test_conversation_service.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./tests/test_topic_service_extended.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (58), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./tests/test_ui_manager.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (51), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./tests/test_ui_manager.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./tests/test_data_migration.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (49), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./history_db_generator/generator.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (585), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./history_db_generator/generator.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./history_db_generator/generator.py",
+      "type": "large_functions",
+      "description": "Файл содержит 5 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./webapp/bot_integration.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (30), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./webapp/server.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (825), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./webapp/server.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./webapp/server.py",
+      "type": "large_functions",
+      "description": "Файл содержит 3 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    },
+    {
+      "file": "./webapp/admin_server.py",
+      "type": "global_vars",
+      "description": "Файл содержит много глобальных переменных (1041), рассмотрите упаковку их в классы или функции"
+    },
+    {
+      "file": "./webapp/admin_server.py",
+      "type": "loop_optimization",
+      "description": "Рассмотрите использование списковых включений вместо циклов с append для построения списков"
+    },
+    {
+      "file": "./webapp/admin_server.py",
+      "type": "large_functions",
+      "description": "Файл содержит 6 больших функций (>50 строк), рассмотрите их разделение на более мелкие"
+    }
+  ]
+}
