@@ -8,7 +8,14 @@ import os
 import ast
 import re
 import json
-import astor
+try:
+    import astor
+except ImportError:
+    print("❌ Ошибка: Пакет astor не установлен. Устанавливаем...")
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "astor"])
+    import astor
 
 class FunctionAnalyzer(ast.NodeVisitor):
     """Анализатор функций для поиска больших функций"""

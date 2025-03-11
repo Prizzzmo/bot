@@ -98,11 +98,24 @@ def start_bot(config, logger):
 
 def main():
     """
-    Основная функция для запуска сервера
+    Основная функция для запуска сервера и бота
     """
-    # Запуск объединенного веб-сервера
     from webapp.unified_server import run_unified_server
-    run_unified_server()
+    import threading
+    
+    # Запускаем веб-сервер в отдельном потоке
+    server_thread = threading.Thread(target=run_unified_server)
+    server_thread.daemon = True
+    server_thread.start()
+    
+    # Загружаем конфигурацию
+    from src.config import Config
+    from src.logger import Logger
+    config = Config()
+    logger = Logger()
+    
+    # Запускаем бота
+    start_bot(config, logger)
 
 
 def check_system_resources():
