@@ -95,43 +95,17 @@ def start_bot(config, logger):
     bot.run()
 
 
-def start_admin_panel():
-    """Запускает админ-панель в отдельном потоке"""
-    from webapp.admin_server import run_admin_server
-    import threading
-
-    # Запускаем админ-сервер в отдельном потоке
-    admin_thread = threading.Thread(target=run_admin_server, kwargs={'host': '0.0.0.0', 'port': 8000})
-    admin_thread.daemon = True
-    admin_thread.start()
-    logging.info("Сервер админ-панели запущен на порту 8000")
-
 def main():
     """
     Основная функция для запуска бота и веб-сервера
     """
-    # Запуск веб-сервера в отдельном потоке
-    import threading
-    from webapp.server import run_server
-
-    # Устанавливаем переменную окружения для вебсервера
-    repl_id = os.environ.get('REPL_ID', '')
-    repl_slug = os.environ.get('REPL_SLUG', '')
-    repl_owner = os.environ.get('REPL_OWNER', '')
-    deployment_id = os.environ.get('REPL_DEPLOYMENT_ID', '')
-
-    # Сохраняем URL в переменной окружения для использования в bot_integration.py
-    if deployment_id:
-        os.environ['WEBAPP_URL'] = f"https://{deployment_id}.deployment.repl.co"
-    elif repl_slug and repl_owner:
-        os.environ['WEBAPP_URL'] = f"https://{repl_slug}.{repl_owner}.repl.co"
-    else:
-        os.environ['WEBAPP_URL'] = f"https://{repl_id}.id.repl.co"
-
-    # Запускаем веб-сервер
-    webapp_thread = threading.Thread(target=run_server, args=('0.0.0.0', 8080), daemon=True)
+    # Запускаем объединенный веб-сервер
+    from webapp.unified_server import run_unified_server
+    webapp_thread = threading.Thread(target=run_unified_server, args=('0.0.0.0', 8080), daemon=True)
     webapp_thread.start()
-    print(f"Веб-сервер запущен на порту 8080 с URL: {os.environ.get('WEBAPP_URL')}")
+    print(f"Объединенный веб-сервер запущен на порту 8080 с URL: {os.environ.get('WEBAPP_URL')}")
+    print("Карта истории доступна по адресу: /")
+    print("Админ-панель доступна по адресу: /admin-panel")
 
     logger = None
 
@@ -170,7 +144,6 @@ def main():
             logger.error("Ошибка в конфигурации! Проверьте .env файл.")
             return
 
-        start_admin_panel()
         start_bot(config, logger)
 
 
@@ -207,33 +180,33 @@ def check_system_resources():
     import psutil
     import os
     from src.logger import Logger
-    
+
     logger = Logger()
-    
+
     try:
         # Проверяем доступную память
         memory = psutil.virtual_memory()
         memory_available_mb = memory.available / (1024 * 1024)
         total_memory_mb = memory.total / (1024 * 1024)
-        
+
         # Проверяем доступное место на диске
         disk = psutil.disk_usage('/')
         disk_free_mb = disk.free / (1024 * 1024)
-        
+
         # Проверяем количество доступных процессоров
         cpu_count = psutil.cpu_count(logical=False) or 1
-        
+
         logger.info(f"Запуск с {cpu_count} CPU, {memory_available_mb:.1f} МБ свободной RAM и {disk_free_mb:.1f} МБ на диске")
-        
+
         # Оптимизации на основе ресурсов
         # 1. Размер кэша на основе доступной памяти
         cache_size_limit = min(int(memory_available_mb * 0.2), 500)  # Не более 20% RAM или 500 МБ
         os.environ['API_CACHE_SIZE_LIMIT'] = str(cache_size_limit)
-        
+
         # 2. Количество рабочих потоков на основе ядер CPU
         worker_count = max(1, min(cpu_count, 4))  # От 1 до 4 рабочих потоков
         os.environ['WORKER_THREAD_COUNT'] = str(worker_count)
-        
+
         # 3. Интервал автосохранения метрик на основе доступного места
         if disk_free_mb < 500:  # Если менее 500 МБ свободного места
             os.environ['METRICS_SAVE_INTERVAL'] = '3600'  # Сохранять метрики раз в час
@@ -242,7 +215,7 @@ def check_system_resources():
         else:
             os.environ['METRICS_SAVE_INTERVAL'] = '900'   # Сохранять метрики каждые 15 минут
             os.environ['METRICS_RETENTION_DAYS'] = '7'    # Хранить метрики за неделю
-        
+
         # 4. Решение об очистке старых логов
         try:
             logs_dir = 'logs'
@@ -250,7 +223,7 @@ def check_system_resources():
                 log_files = [f for f in os.listdir(logs_dir) if f.endswith('.log')]
                 # Сортируем по времени изменения (от старых к новым)
                 log_files.sort(key=lambda x: os.path.getmtime(os.path.join(logs_dir, x)))
-                
+
                 # Оставляем только 3 последних лог-файла если мало места
                 if len(log_files) > 3:
                     for old_log in log_files[:-3]:
@@ -258,25 +231,25 @@ def check_system_resources():
                     logger.info(f"Удалено {len(log_files) - 3} устаревших лог-файлов для освобождения места")
         except Exception as e:
             logger.error(f"Ошибка при очистке старых логов: {e}")
-        
+
         # 5. Проверка и оптимизация размеров кэш-файлов
         cache_files = ['api_cache.json', 'local_cache.json']
         total_cache_size = 0
-        
+
         for cache_file in cache_files:
             if os.path.exists(cache_file):
                 file_size_mb = os.path.getsize(cache_file) / (1024 * 1024)
                 total_cache_size += file_size_mb
-                
+
                 # Если файл кэша слишком большой, пометим его для очистки
                 if file_size_mb > 50:  # Более 50 МБ
                     os.environ[f'CLEAN_{cache_file.upper().replace(".", "_")}'] = 'true'
-        
+
         # Если общий размер кэш-файлов занимает более 30% свободного места, принудительно очищаем
         if total_cache_size > (disk_free_mb * 0.3):
             os.environ['FORCE_CLEAN_ALL_CACHES'] = 'true'
             logger.warning(f"Кэш-файлы ({total_cache_size:.1f} МБ) занимают слишком много места, будет выполнена принудительная очистка")
-        
+
         return True
     except Exception as e:
         logger.error(f"Ошибка при проверке системных ресурсов: {e}")
@@ -287,30 +260,30 @@ def clear_caches():
     from src.logger import Logger
     from src.config import Config
     import os
-    
+
     logger = Logger()
     config = Config()
-    
+
     # Проверяем, включена ли автоматическая очистка кэша или принудительная очистка
     force_clean = os.environ.get('FORCE_CLEAN_ALL_CACHES', 'false').lower() == 'true'
-    
+
     if not force_clean and (not hasattr(config, 'clear_cache_on_startup') or not config.clear_cache_on_startup):
         logger.info("Автоматическая очистка кэша при запуске отключена в конфигурации")
         return
-    
+
     try:
         import gc
         # Запускаем сборщик мусора перед очисткой кэша
         gc.collect()
-        
+
         # Очистка API кэша
         from src.api_cache import APICache
         api_cache = APICache(logger)
-        
+
         # Получаем оптимальный размер кэша из переменной окружения
         if 'API_CACHE_SIZE_LIMIT' in os.environ:
             api_cache.max_size = int(os.environ['API_CACHE_SIZE_LIMIT'])
-        
+
         # Проверяем нужна ли принудительная очистка конкретного кэша
         if force_clean or os.environ.get('CLEAN_API_CACHE_JSON', 'false').lower() == 'true':
             cleared_items = api_cache.clear_cache()
@@ -321,12 +294,12 @@ def clear_caches():
             if stats.get("fill_percentage", 0) > 80:  # Если заполнен более чем на 80%
                 cleared_items = api_cache.clear_cache()
                 logger.info(f"При запуске проекта очищено {cleared_items} записей из API кэша (заполнен на {stats.get('fill_percentage'):.1f}%)")
-        
+
         # Очистка распределенного кэша, если он используется
         try:
             from src.distributed_cache import DistributedCache
             distributed_cache = DistributedCache(logger)
-            
+
             # Проверяем нужна ли принудительная очистка
             if force_clean or os.environ.get('CLEAN_LOCAL_CACHE_JSON', 'false').lower() == 'true':
                 cleared_distributed = distributed_cache.clear_cache()
@@ -338,21 +311,21 @@ def clear_caches():
                     logger.info(f"При запуске проекта очищено {cleared_distributed} записей из распределенного кэша (заполнен на {stats.get('local_fill_percentage'):.1f}%)")
         except Exception as e:
             logger.debug(f"Распределенный кэш не используется или произошла ошибка: {e}")
-        
+
         # Очистка текстового кэша, если он используется
         try:
             from src.text_cache_service import TextCacheService
             text_cache = TextCacheService(logger)
-            
+
             if force_clean:
                 cleared_text = text_cache.clear_cache()
                 logger.info(f"При запуске проекта очищено {cleared_text} записей из текстового кэша (принудительная очистка)")
         except Exception as e:
             logger.debug(f"Текстовый кэш не используется или произошла ошибка: {e}")
-            
+
         # Запускаем сборщик мусора после очистки кэша
         gc.collect()
-        
+
         logger.info("Автоматическая очистка кэша при запуске успешно выполнена")
     except Exception as e:
         logger.error(f"Ошибка при автоматической очистке кэша при запуске: {e}")
@@ -361,17 +334,17 @@ def run_cleanup_if_needed():
     """Запускает скрипт очистки, если это необходимо"""
     import os
     from datetime import datetime, timedelta
-    
+
     try:
         # Проверяем свободное место на диске
         import psutil
         disk = psutil.disk_usage('/')
         disk_free_mb = disk.free / (1024 * 1024)
-        
+
         # Проверяем дату последней очистки
         last_cleanup_file = 'last_cleanup.txt'
         run_cleanup = False
-        
+
         # Запускаем очистку если мало места (менее 500 МБ)
         if disk_free_mb < 500:
             run_cleanup = True
@@ -380,7 +353,7 @@ def run_cleanup_if_needed():
                 with open(last_cleanup_file, 'r') as f:
                     last_date_str = f.readline().strip()
                     last_date = datetime.strptime(last_date_str, '%Y-%m-%d %H:%M:%S')
-                    
+
                     # Запускаем очистку раз в 3 дня
                     if datetime.now() - last_date > timedelta(days=3):
                         run_cleanup = True
@@ -390,11 +363,11 @@ def run_cleanup_if_needed():
         else:
             # Если файл с датой последней очистки не существует
             run_cleanup = True
-        
+
         if run_cleanup:
             import subprocess
             import sys
-            
+
             # Запускаем скрипт очистки в фоновом режиме
             python_executable = sys.executable
             subprocess.Popen([python_executable, 'cleanup_old_backups.py'])
@@ -405,12 +378,12 @@ def run_cleanup_if_needed():
 if __name__ == "__main__":
     # Проверка системных ресурсов и оптимизация
     check_system_resources()
-    
+
     # Запуск очистки старых файлов при необходимости
     run_cleanup_if_needed()
-    
+
     # Очистка кэшей при запуске
     clear_caches()
-    
+
     # Запуск основного приложения
     main()
