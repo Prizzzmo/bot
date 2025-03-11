@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Главный модуль для запуска образовательного Telegram бота по истории России.
 
@@ -97,80 +98,12 @@ def start_bot(config, logger):
 
 def main():
     """
-    Основная функция для запуска бота и веб-сервера
+    Основная функция для запуска сервера
     """
-    # Запускаем объединенный веб-сервер
+    # Запуск объединенного веб-сервера
     from webapp.unified_server import run_unified_server
-    webapp_thread = threading.Thread(target=run_unified_server, args=('0.0.0.0', 8080), daemon=True)
-    webapp_thread.start()
-    print(f"Объединенный веб-сервер запущен на порту 8080 с URL: {os.environ.get('WEBAPP_URL')}")
-    print("Карта истории доступна по адресу: /")
-    print("Админ-панель доступна по адресу: /admin-panel")
+    run_unified_server()
 
-    logger = None
-
-    try:
-        # Проверяем, не запущен ли уже бот
-        if not check_running_bot():
-            print("Бот уже запущен в другом процессе. Завершение работы.")
-            sys.exit(1)
-
-        # Загружаем переменные окружения из .env файла
-        load_dotenv()
-
-        # Настраиваем базовое логирование с оптимизированными параметрами
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.StreamHandler()
-            ]
-        )
-        logger = logging.getLogger(__name__)
-        logger.info("Запуск историчеcкого образовательного бота")
-
-        # Предварительно проверяем наличие всех необходимых директорий
-        # для предотвращения ошибок при параллельной работе
-        for directory in ["logs", "generated_maps"]:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-
-        # Загружаем конфигурацию
-        logger.info("Загрузка конфигурации")
-        config = Config()
-
-        # Проверяем валидность конфигурации
-        if not config.validate():
-            logger.error("Ошибка в конфигурации! Проверьте .env файл.")
-            return
-
-        start_bot(config, logger)
-
-
-    except KeyboardInterrupt:
-        if logger:
-            logger.info("Бот остановлен пользователем")
-        # Удаляем lock-файл при завершении работы
-        if os.path.exists("bot.lock"):
-            os.remove("bot.lock")
-    except Exception as e:
-        if logger:
-            logger.error(f"Критическая ошибка: {e}")
-            logger.error(traceback.format_exc())
-        else:
-            print(f"Критическая ошибка: {e}")
-            print(traceback.format_exc())
-
-        # Удаляем lock-файл при завершении работы с ошибкой
-        if os.path.exists("bot.lock"):
-            os.remove("bot.lock")
-
-        # Завершаем процесс с кодом ошибки
-        sys.exit(1)
-    finally:
-        # Гарантированное удаление lock-файла в любом случае
-        if os.path.exists("bot.lock"):
-            os.remove("bot.lock")
 
 def check_system_resources():
     """
@@ -241,21 +174,34 @@ def check_system_resources():
                 file_size_mb = os.path.getsize(cache_file) / (1024 * 1024)
                 total_cache_size += file_size_mb
 
-                # Если файл кэша слишком большой, пометим его д# Main entry point for the history map application
+                # Если файл кэша слишком большой, пометим его для очистки
+                if file_size_mb > 50:  # Более 50 МБ
+                    os.environ[f'CLEAN_{cache_file.upper().replace(".", "_")}'] = 'true'
 
-import os
-import sys
-from webapp.unified_server import run_unified_server
+        # Если общий размер кэш-файлов занимает более 30% свободного места, принудительно очищаем
+        if total_cache_size > (disk_free_mb * 0.3):
+            os.environ['FORCE_CLEAN_ALL_CACHES'] = 'true'
+            logger.warning(f"Кэш-файлы ({total_cache_size:.1f} МБ) занимают слишком много места, будет выполнена принудительная очистка")
 
-def main():
-    """Основная функция запуска сервера"""
-    print("Starting Unified History Map Server...")
-    
-    # Запуск объединенного веб-сервера
-    run_unified_server()
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при проверке системных ресурсов: {e}")
+        return False
 
-if __name__ == "__main__":
-    main()тическая очистка кэша при запуске отключена в конфигурации")
+def clear_caches():
+    """Очищает все кэши при запуске проекта"""
+    from src.logger import Logger
+    from src.config import Config
+    import os
+
+    logger = Logger()
+    config = Config()
+
+    # Проверяем, включена ли автоматическая очистка кэша или принудительная очистка
+    force_clean = os.environ.get('FORCE_CLEAN_ALL_CACHES', 'false').lower() == 'true'
+
+    if not force_clean and (not hasattr(config, 'clear_cache_on_startup') or not config.clear_cache_on_startup):
+        logger.info("Автоматическая очистка кэша при запуске отключена в конфигурации")
         return
 
     try:
@@ -364,7 +310,8 @@ def run_cleanup_if_needed():
 
 if __name__ == "__main__":
     # Проверка системных ресурсов и оптимизация
-    check_system_resources()
+    if not check_system_resources():
+        sys.exit(1)
 
     # Запуск очистки старых файлов при необходимости
     run_cleanup_if_needed()
