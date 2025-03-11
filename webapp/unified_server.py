@@ -258,8 +258,9 @@ class UnifiedServer:
                         events_count = len(self.events_data.get('events', []))
                         logger.info(f"Успешно загружено {events_count} исторических событий")
                 except json.JSONDecodeError as je:
-                    logger.error(f"Ошибка декодирования JSON: {je}. Первые 100 символов файла: {content[:100]}...")
+                    logger.error(f"Ошибка декодирования JSON: {je}.  File content: {content[:100]}...")
                     self.events_data = {"events": []}
+                    return #Added return to stop further execution after error
             else:
                 logger.warning(f"Файл базы данных не найден: {HISTORY_DB_PATH}")
                 # Попробуем найти другие JSON файлы с историческими данными
@@ -274,6 +275,7 @@ class UnifiedServer:
                             return
                         except Exception as alt_e:
                             logger.error(f"Ошибка при загрузке альтернативного файла: {alt_e}")
+                            return #Added return to stop further execution after error
 
                 # Если не нашли альтернативных файлов, используем пустой набор
                 self.events_data = {"events": []}
@@ -282,6 +284,7 @@ class UnifiedServer:
             import traceback
             logger.error(f"Трассировка: {traceback.format_exc()}")
             self.events_data = {"events": []}
+
 
     def _clean_event_data(self, events):
         """
@@ -802,7 +805,7 @@ class UnifiedServer:
                             # Обычный текст
                             p = doc.add_paragraph(line)
 
-                    # Сохраняем документ в память
+                                        # Сохраняем документ в память
                     file_buffer = BytesIO()
                     doc.save(file_buffer)
                     file_buffer.seek(0)
