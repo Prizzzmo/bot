@@ -1,58 +1,58 @@
 
 #!/usr/bin/env python3
 """
-Скрипт для запуска веб-сервера и админ-панели
+Скрипт для запуска веб-сервера администратора.
 """
-
 import os
-import sys
-import threading
-import time
 import logging
-from webapp.server import run_server
-from webapp.admin_server import run_admin_server
+import time
+from webapp.admin_server import AdminServer
 
 # Настройка логирования
 logging.basicConfig(
+    filename='logs/admin_server.log',
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('logs/webapp.log', encoding='utf-8')
-    ]
+    level=logging.INFO
 )
-logger = logging.getLogger('WebApp')
+logger = logging.getLogger("AdminWebApp")
 
-# Создаем директорию для логов, если её нет
-os.makedirs('logs', exist_ok=True)
+def ensure_directories_exist():
+    """Создает необходимые директории, если они отсутствуют"""
+    dirs = ['logs', 'backups', 'static/docs']
+    for directory in dirs:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            logger.info(f"Создана директория: {directory}")
 
-def main():
-    """Основная функция запуска веб-серверов"""
+def run_admin_server():
+    """Запускает сервер администратора"""
     try:
-        logger.info("Запуск веб-серверов...")
+        # Создаем необходимые директории
+        ensure_directories_exist()
         
-        # Запускаем веб-сервер в отдельном потоке
-        webapp_thread = threading.Thread(target=run_server, kwargs={'host': '0.0.0.0', 'port': 8080})
-        webapp_thread.daemon = True
-        webapp_thread.start()
-        logger.info("Веб-сервер запущен на порту 8080")
+        # Запускаем сервер админки
+        logger.info("Запуск веб-сервера администратора...")
+        port = int(os.environ.get('PORT', 8080))
+        admin_server = AdminServer()
+        admin_server.start(host='0.0.0.0', port=port)
         
-        # Запускаем админ-сервер в отдельном потоке
-        admin_thread = threading.Thread(target=run_admin_server, kwargs={'host': '0.0.0.0', 'port': 8000})
-        admin_thread.daemon = True
-        admin_thread.start()
-        logger.info("Сервер админ-панели запущен на порту 8000")
+        # Выводим информацию о запуске
+        logger.info(f"Веб-сервер администратора запущен на порту {port}")
+        print(f"Веб-сервер администратора запущен на порту {port}")
+        print(f"Откройте в браузере: http://localhost:{port}/admin-panel")
         
-        # Основной поток остается активным, чтобы серверы продолжали работать
-        while True:
-            time.sleep(1)
-            
-    except KeyboardInterrupt:
-        logger.info("Получен сигнал прерывания, остановка серверов...")
-        sys.exit(0)
+        # Ожидаем остановки сервера
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Получен сигнал завершения")
+            admin_server.stop()
+            logger.info("Веб-сервер администратора остановлен")
+    
     except Exception as e:
-        logger.exception(f"Ошибка при запуске серверов: {e}")
-        sys.exit(1)
+        logger.error(f"Ошибка при запуске веб-сервера администратора: {e}")
+        print(f"Ошибка при запуске веб-сервера администратора: {e}")
 
 if __name__ == "__main__":
-    main()
+    run_admin_server()
