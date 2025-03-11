@@ -177,6 +177,11 @@ class APICache(ICache):
     def _save_cache(self) -> None:
         """Сохраняет кэш в файл"""
         try:
+            # Создаем директорию для кэша, если она не существует
+            cache_dir = os.path.dirname(self.cache_file)
+            if cache_dir and not os.path.exists(cache_dir):
+                os.makedirs(cache_dir, exist_ok=True)
+                
             with open(self.cache_file, 'w', encoding='utf-8') as f:
                 json.dump(self.cache, f, ensure_ascii=False, indent=2)
         except Exception as e:
@@ -239,43 +244,41 @@ class APICache(ICache):
         Returns:
             int: Количество удаленных записей из кэша
         """
-        try:
-            # Проверяем существование директории кэша
-            if not os.path.exists(self.cache_dir):
-                return 0
-
-            # Получаем список всех файлов кэша
-            cache_files = [f for f in os.listdir(self.cache_dir) if f.endswith('.json')]
+        with self.lock:
             count = 0
-
-            # Если указан фильтр, проверяем содержимое каждого файла кэша
-            if topic_filter:
-                topic_filter = topic_filter.lower()
-                for file_name in cache_files:
-                    cache_file = os.path.join(self.cache_dir, file_name)
-                    try:
-                        with open(cache_file, 'r', encoding='utf-8') as f:
-                            cache_data = json.load(f)
-                            # Проверяем, содержит ли запрос или ответ указанную тему
-                            if ('query' in cache_data and topic_filter in cache_data['query'].lower()) or \
-                               ('response' in cache_data and topic_filter in cache_data['response'].lower()):
-                                os.remove(cache_file)
-                                count += 1
-                    except:
-                        # Если не удалось прочитать файл, пропускаем его
-                        continue
-            else:
-                # Удаляем все файлы кэша
-                for file_name in cache_files:
-                    os.remove(os.path.join(self.cache_dir, file_name))
-                count = len(cache_files)
-
-            self.logger.info(f"Очищено {count} записей из кэша API запросов")
-            return count
-
-        except Exception as e:
-            self.logger.error(f"Ошибка при очистке кэша API запросов: {e}")
-            return 0
+            
+            try:
+                if topic_filter:
+                    # Фильтруем по теме
+                    topic_filter = topic_filter.lower()
+                    keys_to_delete = []
+                    
+                    for key, item in list(self.cache.items()):
+                        # Преобразуем значение в строку и проверяем наличие темы в ней
+                        value_str = str(item.get("value", "")).lower()
+                        if topic_filter in value_str:
+                            keys_to_delete.append(key)
+                    
+                    # Удаляем найденные ключи
+                    for key in keys_to_delete:
+                        del self.cache[key]
+                        if key in self.access_counter:
+                            del self.access_counter[key]
+                        count += 1
+                else:
+                    # Очищаем весь кэш
+                    count = len(self.cache)
+                    self.cache.clear()
+                    self.access_counter.clear()
+                
+                # Сохраняем изменения в файл
+                self._save_cache()
+                self.logger.info(f"Очищено {count} записей из кэша API запросов")
+                return count
+            
+            except Exception as e:
+                self.logger.error(f"Ошибка при очистке кэша API запросов: {e}")
+                return 0
 
     def _cleanup_cache(self):
         """
@@ -324,11 +327,11 @@ class APICache(ICache):
                                         del self.access_counter[key_to_remove]
                                     self.stats["evictions"] += 1
                         
-                        self._logger.info(f"Очищено {items_to_remove} элементов кэша из-за превышения лимита памяти")
+                        self.logger.info(f"Очищено {items_to_remove} элементов кэша из-за превышения лимита памяти")
                         return
 
             except Exception as e:
-                self._logger.error(f"Ошибка при проверке размера кэша: {e}")
+                self.logger.error(f"Ошибка при проверке размера кэша: {e}")
                 # Если произошла ошибка, используем простую очистку по размеру
                 if len(self.cache) > self.max_size * 0.9:  # 90% заполнения
                     self._evict_lru()
