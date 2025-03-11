@@ -199,5 +199,50 @@ def main():
         if os.path.exists("bot.lock"):
             os.remove("bot.lock")
 
+def clear_caches():
+    """Очищает все кэши при запуске проекта"""
+    from src.logger import Logger
+    from src.config import Config
+    
+    logger = Logger()
+    config = Config()
+    
+    # Проверяем, включена ли автоматическая очистка кэша
+    if not hasattr(config, 'clear_cache_on_startup') or not config.clear_cache_on_startup:
+        logger.info("Автоматическая очистка кэша при запуске отключена в конфигурации")
+        return
+    
+    try:
+        # Очистка API кэша
+        from src.api_cache import APICache
+        api_cache = APICache(logger)
+        cleared_items = api_cache.clear_cache()
+        logger.info(f"При запуске проекта очищено {cleared_items} записей из API кэша")
+        
+        # Очистка распределенного кэша, если он используется
+        try:
+            from src.distributed_cache import DistributedCache
+            distributed_cache = DistributedCache(logger)
+            cleared_distributed = distributed_cache.clear_cache()
+            logger.info(f"При запуске проекта очищено {cleared_distributed} записей из распределенного кэша")
+        except Exception as e:
+            logger.debug(f"Распределенный кэш не используется или произошла ошибка: {e}")
+        
+        # Очистка текстового кэша, если он используется
+        try:
+            from src.text_cache_service import TextCacheService
+            text_cache = TextCacheService(logger)
+            cleared_text = text_cache.clear_cache()
+            logger.info(f"При запуске проекта очищено {cleared_text} записей из текстового кэша")
+        except Exception as e:
+            logger.debug(f"Текстовый кэш не используется или произошла ошибка: {e}")
+            
+        logger.info("Автоматическая очистка кэша при запуске успешно выполнена")
+    except Exception as e:
+        logger.error(f"Ошибка при автоматической очистке кэша при запуске: {e}")
+
 if __name__ == "__main__":
+    # Очистка кэшей при запуске
+    clear_caches()
+    # Запуск основного приложения
     main()

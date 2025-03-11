@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 import json
+import redis
 
 # Загружаем переменные окружения из файла .env
 load_dotenv()
@@ -53,6 +54,14 @@ class Config:
         self.enable_performance_monitoring = os.getenv('ENABLE_PERFORMANCE_MONITORING', 'true').lower() == 'true'
         self.metrics_file = os.getenv('METRICS_FILE', 'performance_metrics.json')
 
+        # Настройки кэширования
+        self.clear_cache_on_startup = os.getenv('CLEAR_CACHE_ON_STARTUP', 'true').lower() == 'true'
+
+        # Настройки для форматирования логов
+        self.log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        self.log_date_format = '%Y-%m-%d %H:%M:%S'
+
+
     def validate(self) -> bool:
         """Проверяет наличие всех необходимых параметров в конфигурации"""
         return self.telegram_token and os.path.exists(self.admin_config_file)
@@ -64,3 +73,21 @@ class Config:
     def get_task_queue(self):
         """Возвращает очередь задач"""
         return getattr(self, 'task_queue', None)
+
+    def clear_cache(self):
+        """Очищает кэш"""
+        if self.use_distributed_cache:
+            try:
+                r = redis.from_url(self.redis_url)
+                r.flushall()
+                print("Redis cache cleared successfully.")
+            except Exception as e:
+                print(f"Error clearing Redis cache: {e}")
+        else:
+            print("Distributed cache is not enabled.")
+
+
+config = Config()
+
+if config.clear_cache_on_startup:
+    config.clear_cache()
