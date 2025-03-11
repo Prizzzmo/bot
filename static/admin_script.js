@@ -192,6 +192,8 @@ document.addEventListener('DOMContentLoaded', function() {
         loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Вход...';
         loginBtn.disabled = true;
         
+        console.log('Отправка данных для авторизации:', loginData);
+        
         fetch('/api/admin/login', {
             method: 'POST',
             headers: {
@@ -241,6 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showNotification('Вы успешно вошли в систему', 'success');
             } else {
                 showNotification(data.message || 'Ошибка при входе', 'error');
+                console.error('Ошибка авторизации:', data.message);
             }
         })
         .catch(error => {
