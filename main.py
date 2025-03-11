@@ -58,6 +58,54 @@ def check_running_bot():
 
     return True
 
+def start_bot(config, logger):
+    """Creates and runs the bot."""
+    logger.info("Создание бота через фабрику")
+    bot = BotFactory.create_bot(config)
+
+    # Проверяем, что бот был успешно создан
+    if not bot:
+        logger.error("Не удалось создать экземпляр бота!")
+        return
+
+    # Настраиваем бота
+    logger.info("Настройка бота")
+    if not bot.setup():
+        logger.error("Ошибка при настройке бота!")
+        return
+
+    logger.info("Бот успешно настроен и готов к запуску")
+
+    # Проверяем необходимость миграции данных
+    data_migration = DataMigration(logger)
+    if data_migration.check_and_migrate():
+        logger.info("Миграция данных успешно завершена или не требовалась")
+    else:
+        logger.warning("Возникли проблемы при миграции данных, проверьте логи")
+
+    # Инициализируем очередь отложенных задач
+    task_queue = TaskQueue(num_workers=2, logger=logger)
+    task_queue.start()
+    logger.info("Инициализирована система отложенных задач")
+
+    # Регистрируем очередь задач в конфигурации для доступа из других модулей
+    config.set_task_queue(task_queue)
+
+    # Запускаем бота напрямую в основном потоке
+    bot.run()
+
+
+def start_admin_panel():
+    """Запускает админ-панель в отдельном потоке"""
+    from webapp.admin_server import run_admin_server
+    import threading
+
+    # Запускаем админ-сервер в отдельном потоке
+    admin_thread = threading.Thread(target=run_admin_server, kwargs={'host': '0.0.0.0', 'port': 8000})
+    admin_thread.daemon = True
+    admin_thread.start()
+    logging.info("Сервер админ-панели запущен на порту 8000")
+
 def main():
     """
     Основная функция для запуска бота и веб-сервера
@@ -65,13 +113,13 @@ def main():
     # Запуск веб-сервера в отдельном потоке
     import threading
     from webapp.server import run_server
-    
+
     # Устанавливаем переменную окружения для вебсервера
     repl_id = os.environ.get('REPL_ID', '')
     repl_slug = os.environ.get('REPL_SLUG', '')
     repl_owner = os.environ.get('REPL_OWNER', '')
     deployment_id = os.environ.get('REPL_DEPLOYMENT_ID', '')
-    
+
     # Сохраняем URL в переменной окружения для использования в bot_integration.py
     if deployment_id:
         os.environ['WEBAPP_URL'] = f"https://{deployment_id}.deployment.repl.co"
@@ -79,7 +127,7 @@ def main():
         os.environ['WEBAPP_URL'] = f"https://{repl_slug}.{repl_owner}.repl.co"
     else:
         os.environ['WEBAPP_URL'] = f"https://{repl_id}.id.repl.co"
-    
+
     # Запускаем веб-сервер
     webapp_thread = threading.Thread(target=run_server, args=('0.0.0.0', 8080), daemon=True)
     webapp_thread.start()
@@ -122,41 +170,9 @@ def main():
             logger.error("Ошибка в конфигурации! Проверьте .env файл.")
             return
 
-        # Создаем экземпляр бота через фабрику
-        logger.info("Создание бота через фабрику")
-        bot = BotFactory.create_bot(config)
+        start_admin_panel()
+        start_bot(config, logger)
 
-        # Проверяем, что бот был успешно создан
-        if not bot:
-            logger.error("Не удалось создать экземпляр бота!")
-            return
-
-        # Настраиваем бота
-        logger.info("Настройка бота")
-        if not bot.setup():
-            logger.error("Ошибка при настройке бота!")
-            return
-
-        logger.info("Бот успешно настроен и готов к запуску")
-
-        # Проверяем необходимость миграции данных
-        data_migration = DataMigration(logger)
-        if data_migration.check_and_migrate():
-            logger.info("Миграция данных успешно завершена или не требовалась")
-        else:
-            logger.warning("Возникли проблемы при миграции данных, проверьте логи")
-
-        # Инициализируем очередь отложенных задач
-        task_queue = TaskQueue(num_workers=2, logger=logger)
-        task_queue.start()
-        logger.info("Инициализирована система отложенных задач")
-
-        # Регистрируем очередь задач в конфигурации для доступа из других модулей
-        config.set_task_queue(task_queue)
-
-
-        # Запускаем бота напрямую в основном потоке
-        bot.run()
 
     except KeyboardInterrupt:
         if logger:
