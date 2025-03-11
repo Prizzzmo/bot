@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="form-group">
                             <label for="admin-id">ID администратора</label>
                             <input type="number" id="admin-id" placeholder="Введите ваш ID" required>
+                            <small class="form-help">Введите ID администратора из Telegram</small>
                         </div>
                     </div>
                     
@@ -93,8 +94,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="form-group">
                             <label for="admin-password">Пароль администратора</label>
                             <input type="password" id="admin-password" placeholder="Введите пароль" required>
+                            <small class="form-help">Введите пароль (для супер-администратора)</small>
                         </div>
                     </div>
+                    
+                    <div class="login-status" id="login-status"></div>
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary login-btn">
@@ -125,6 +129,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.classList.add('active');
                 // Показываем содержимое выбранной вкладки
                 document.getElementById(`${this.dataset.tab}-tab`).classList.add('active');
+                
+                // Очищаем статус логина при переключении вкладок
+                document.getElementById('login-status').innerHTML = '';
             });
         });
         
@@ -142,22 +149,49 @@ document.addEventListener('DOMContentLoaded', function() {
             let loginData = {};
             
             if (activeTab === 'admin-id') {
-                const adminId = document.getElementById('admin-id').value;
+                const adminIdInput = document.getElementById('admin-id');
+                const adminId = adminIdInput.value.trim();
+                
+                if (!adminId) {
+                    document.getElementById('login-status').innerHTML = '<div class="error-message">Введите ID администратора</div>';
+                    adminIdInput.focus();
+                    return;
+                }
+                
                 loginData = { admin_id: parseInt(adminId) };
+                console.log('Отправка данных для входа по ID:', loginData);
             } else {
-                const adminPassword = document.getElementById('admin-password').value;
+                const adminPasswordInput = document.getElementById('admin-password');
+                const adminPassword = adminPasswordInput.value.trim();
+                
+                if (!adminPassword) {
+                    document.getElementById('login-status').innerHTML = '<div class="error-message">Введите пароль</div>';
+                    adminPasswordInput.focus();
+                    return;
+                }
+                
                 loginData = { admin_password: adminPassword };
+                console.log('Отправка данных для входа по паролю:', loginData);
             }
             
             // Отправляем запрос на авторизацию
             loginUser(loginData);
         });
+        
+        // Фокус на первом поле ввода
+        document.getElementById('admin-id').focus();
     }
     
     /**
      * Авторизация пользователя
      */
     function loginUser(loginData) {
+        // Показываем индикатор загрузки
+        const loginBtn = document.querySelector('.login-btn');
+        const originalText = loginBtn.innerHTML;
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Вход...';
+        loginBtn.disabled = true;
+        
         fetch('/api/admin/login', {
             method: 'POST',
             headers: {
@@ -165,9 +199,20 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify(loginData)
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Получен ответ от сервера:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('Данные авторизации:', data);
+            
+            // Восстанавливаем кнопку
+            loginBtn.innerHTML = originalText;
+            loginBtn.disabled = false;
+            
             if (data.success) {
+                console.log('Успешная авторизация. ID:', data.user.id);
+                
                 // Закрываем модальное окно
                 document.getElementById('modal-overlay').classList.remove('active');
                 
@@ -201,6 +246,10 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Ошибка при входе:', error);
             showNotification('Ошибка при входе в систему', 'error');
+            
+            // Восстанавливаем кнопку
+            loginBtn.innerHTML = originalText;
+            loginBtn.disabled = false;
         });
     }
     

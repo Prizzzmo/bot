@@ -115,21 +115,26 @@ class AdminServer:
             """Вход администратора"""
             try:
                 data = request.get_json()
+                logger.info(f"Получен запрос на авторизацию: {data}")
                 
                 # Проверяем тип входа: по ID или паролю
                 if 'admin_id' in data:
                     admin_id = int(data.get('admin_id', 0))
+                    logger.info(f"Попытка входа по ID: {admin_id}")
                     
                     if not admin_id:
+                        logger.warning("ID администратора не указан")
                         return jsonify({"success": False, "message": "ID администратора не указан"})
                     
                     admins = self._load_admins()
+                    logger.info(f"Загруженные данные администраторов: {admins}")
                     
                     # Проверяем, является ли пользователь администратором
                     is_admin = admin_id in admins.get("admin_ids", []) or admin_id in admins.get("super_admin_ids", [])
                     is_super_admin = admin_id in admins.get("super_admin_ids", [])
                     
                     if is_admin:
+                        logger.info(f"Пользователь {admin_id} авторизован как {'супер-' if is_super_admin else ''}администратор")
                         response = jsonify({
                             "success": True,
                             "user": {
@@ -141,12 +146,15 @@ class AdminServer:
                         logger.info(f"Успешный вход администратора по ID: {admin_id}")
                         return response
                     
+                    logger.warning(f"Неверный ID администратора: {admin_id}")
                     return jsonify({"success": False, "message": "Неверный ID администратора"})
                 
                 elif 'admin_password' in data:
                     admin_password = data.get('admin_password', '')
+                    logger.info(f"Попытка входа по паролю")
                     
                     if not admin_password:
+                        logger.warning("Пароль администратора не указан")
                         return jsonify({"success": False, "message": "Пароль администратора не указан"})
                     
                     # Проверяем пароль (в реальном проекте должно быть безопасное хранение)
@@ -172,9 +180,10 @@ class AdminServer:
                     logger.warning(f"Неудачная попытка входа администратора с паролем")
                     return jsonify({"success": False, "message": "Неверный пароль администратора"})
                 
+                logger.warning(f"Неверный запрос авторизации: {data}")
                 return jsonify({"success": False, "message": "Неверный запрос авторизации"})
             except Exception as e:
-                logger.error(f"Ошибка при авторизации администратора: {e}")
+                logger.error(f"Ошибка при авторизации администратора: {e}", exc_info=True)
                 return jsonify({"success": False, "message": f"Ошибка при авторизации: {str(e)}"})
         
         @self.app.route('/api/admin/logout', methods=['POST'])
