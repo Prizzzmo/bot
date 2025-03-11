@@ -292,7 +292,18 @@ class WebServer(BaseService):
                 fig = Figure(figsize=(10, 5))
                 axis = fig.add_subplot(1, 1, 1)
 
-                dates = [stat['date'] for stat in daily_stats]
+                # Преобразуем строковые даты в объекты datetime для правильного отображения
+                from datetime import datetime
+                dates = []
+                for stat in daily_stats:
+                    try:
+                        # Предполагаем формат YYYY-MM-DD
+                        date_obj = datetime.strptime(stat['date'], '%Y-%m-%d')
+                        dates.append(date_obj)
+                    except (ValueError, TypeError):
+                        # Если не удалось преобразовать, используем исходное значение
+                        dates.append(stat['date'])
+                
                 requests = [stat['requests'] for stat in daily_stats]
                 users = [stat['unique_users'] for stat in daily_stats]
 
