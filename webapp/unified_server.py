@@ -804,7 +804,7 @@ class UnifiedServer:
 
                     # Сохраняем документ в память
                     file_buffer = BytesIO()
-                    doc.save(file_buffer)
+                    doc.save(file_buffer))
                     file_buffer.seek(0)
 
                     # Возвращаем файл
