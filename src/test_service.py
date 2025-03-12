@@ -355,30 +355,88 @@ class TestService(BaseService):
                 if 1 <= number <= 4:  # Проверяем, что номер в диапазоне 1-4
                     options.append(f"{number}) {text}")
 
-        # Если варианты не найдены или их меньше 4, генерируем тематические варианты
+        # Если варианты не найдены или их меньше 4, генерируем специфичные варианты на основе вопроса
         if len(options) < 4:
-            # Извлекаем тему из вопроса
-            question_keywords = ' '.join([w for w in main_question.split() if len(w) > 3 and w.lower() not in ['вопрос', 'какой', 'когда', 'где', 'почему', 'каким']])
-
-            # Подготовим 4 тематических варианта ответа на основе вопроса
-            thematic_options = [
-                "Начало исторического периода",
-                "Расцвет империи",
-                "Период реформ",
-                "Революционные изменения",
-                "Военные действия", 
-                "Культурное влияние",
-                "Экономическое развитие",
-                "Международные отношения"
-            ]
-
-            # Перемешиваем варианты для разнообразия
-            import random
-            random.shuffle(thematic_options)
-
+            # Извлекаем ключевые слова из вопроса для более релевантных вариантов
+            question_words = [w for w in main_question.split() if len(w) > 3 and w.lower() not in ['вопрос', 'какой', 'когда', 'где', 'почему', 'каким', 'вопрос:']]
+            question_topic = ' '.join(question_words[-3:]) if len(question_words) > 3 else ' '.join(question_words)
+            
+            # Определяем тип вопроса для генерации контекстно-зависимых вариантов
+            question_type = "общий"
+            if 'год' in main_question.lower() or 'дата' in main_question.lower() or 'когда' in main_question.lower():
+                question_type = "дата"
+            elif 'кто' in main_question.lower() or 'лидер' in main_question.lower() or 'правитель' in main_question.lower():
+                question_type = "личность"
+            elif 'где' in main_question.lower() or 'место' in main_question.lower() or 'территория' in main_question.lower():
+                question_type = "место"
+            elif 'причин' in main_question.lower() or 'почему' in main_question.lower():
+                question_type = "причина"
+            elif 'результат' in main_question.lower() or 'последствия' in main_question.lower() or 'итог' in main_question.lower():
+                question_type = "результат"
+                
+            # Генерируем специфичные для типа вопроса варианты ответов
+            thematic_options = []
+            
+            if question_type == "дата":
+                centuries = ["XVII", "XVIII", "XIX", "XX"]
+                years = [str(random.randint(1700, 1917)) + " год", 
+                         str(random.randint(1700, 1917)) + " год", 
+                         str(random.randint(1700, 1917)) + " год",
+                         str(random.randint(1700, 1917)) + " год"]
+                thematic_options = years
+                
+            elif question_type == "личность":
+                rulers = ["Пётр I", "Екатерина II", "Александр I", "Николай II", 
+                          "Иван Грозный", "Александр II", "Елизавета Петровна", "Александр III"]
+                generals = ["А.В. Суворов", "М.И. Кутузов", "Г.К. Жуков", "К.К. Рокоссовский",
+                           "П.А. Румянцев", "М.Д. Скобелев", "А.М. Василевский", "И.С. Конев"]
+                politicians = ["П.А. Столыпин", "С.Ю. Витте", "В.И. Ленин", "И.В. Сталин",
+                              "А.А. Аракчеев", "М.М. Сперанский", "Н.С. Хрущёв", "Л.И. Брежнев"]
+                
+                # Выбираем наиболее подходящий список для вопроса
+                if "генерал" in main_question.lower() or "военачальник" in main_question.lower():
+                    thematic_options = random.sample(generals, 4)
+                elif "реформ" in main_question.lower() or "политик" in main_question.lower():
+                    thematic_options = random.sample(politicians, 4)
+                else:
+                    thematic_options = random.sample(rulers, 4)
+                    
+            elif question_type == "место":
+                places = ["Москва", "Санкт-Петербург", "Новгород", "Киев", 
+                          "Казань", "Севастополь", "Владивосток", "Архангельск",
+                          "Смоленск", "Бородино", "Полтава", "Сталинград"]
+                thematic_options = random.sample(places, 4)
+                
+            elif question_type == "причина" or question_type == "результат":
+                causes = [
+                    f"Экономический кризис в контексте {question_topic}",
+                    f"Политические противоречия в ходе {question_topic}",
+                    f"Внешнеполитическое давление во время {question_topic}",
+                    f"Социальное напряжение, вызванное {question_topic}",
+                    f"Идеологические разногласия в период {question_topic}",
+                    f"Территориальные споры, связанные с {question_topic}",
+                    f"Военная необходимость в контексте {question_topic}",
+                    f"Личные амбиции правителей в период {question_topic}"
+                ]
+                thematic_options = random.sample(causes, 4)
+            
+            else:
+                # Общие варианты для всех остальных типов вопросов
+                general_options = [
+                    f"Ранний этап {question_topic}",
+                    f"Завершающий период {question_topic}",
+                    f"Кульминационный момент {question_topic}",
+                    f"Важнейшее последствие {question_topic}",
+                    f"Ключевое событие в контексте {question_topic}",
+                    f"Международный аспект {question_topic}",
+                    f"Внутриполитический аспект {question_topic}",
+                    f"Социально-экономический аспект {question_topic}"
+                ]
+                thematic_options = random.sample(general_options, 4)
+            
             # Добавляем недостающие варианты
             for i in range(len(options), 4):
-                options.append(f"{i+1}) {thematic_options[i]}")
+                options.append(f"{i+1}) {thematic_options[i - len(options)]}")
 
         # Ограничиваем до 4 вариантов
         options = options[:4]
