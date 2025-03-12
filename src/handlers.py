@@ -738,6 +738,8 @@ class CommandHandlers:
                         self.message_manager.save_message_id(update, context, sent_ref_docx.message_id)
                 except Exception as pres_err:
                     self.logger.error(f"Ошибка при отправке презентации: {pres_err}")
+                except Exception as pres_err:
+                    self.logger.error(f"Ошибка при отправке презентации: {pres_err}")
                 
                 # Архивируем все файлы документации в один zip-файл
                 try:
