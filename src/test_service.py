@@ -1,6 +1,8 @@
+
 import re
 import random
 import time
+import json
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src.base_service import BaseService
 
@@ -10,6 +12,7 @@ class TestService(BaseService):
     def __init__(self, api_client, logger):
         super().__init__(logger)
         self.api_client = api_client
+        self.topic_facts_cache = {}  # Кэш фактов по темам для разнообразия ответов
 
     def _do_initialize(self) -> bool:
         """
@@ -27,9 +30,185 @@ class TestService(BaseService):
             self._logger.error(f"Ошибка при инициализации TestService: {e}")
             return False
 
+    def _get_topic_facts(self, topic):
+        """
+        Получает факты по теме для создания разнообразных вариантов ответов.
+        
+        Args:
+            topic (str): Тема
+            
+        Returns:
+            list: Список фактов по теме
+        """
+        if topic in self.topic_facts_cache:
+            return self.topic_facts_cache[topic]
+            
+        prompt = f"""Предоставь 30 исторических фактов по теме "{topic}" в формате JSON. 
+Каждый факт должен быть лаконичным и содержать конкретную историческую информацию.
+Структура: [
+  {{"факт": "Конкретный исторический факт 1"}},
+  {{"факт": "Конкретный исторический факт 2"}},
+  ...
+]
+Факты должны затрагивать разные аспекты темы: события, личности, даты, места, последствия.
+"""
+        try:
+            response = self.api_client.ask_grok(prompt, use_cache=True)
+            # Извлекаем JSON из ответа
+            json_pattern = r'\[\s*\{.*\}\s*\]'
+            json_match = re.search(json_pattern, response, re.DOTALL)
+            
+            facts = []
+            if json_match:
+                try:
+                    facts_json = json_match.group(0)
+                    facts_data = json.loads(facts_json)
+                    facts = [item.get("факт", "") for item in facts_data if item.get("факт")]
+                except json.JSONDecodeError:
+                    self._logger.warning(f"Не удалось разобрать JSON с фактами для темы '{topic}'")
+            
+            # Если не удалось получить факты через JSON, пробуем простой подход
+            if not facts:
+                # Извлекаем факты из обычного текста
+                facts = []
+                for line in response.split('\n'):
+                    line = line.strip()
+                    if line and len(line) > 15 and not line.startswith(('[', ']', '{', '}')):
+                        # Убираем номера, маркеры списка и т.д.
+                        clean_line = re.sub(r'^[\d\.\-\*]+\s*', '', line)
+                        if clean_line and len(clean_line) > 15:
+                            facts.append(clean_line)
+            
+            # Сохраняем в кэш
+            self.topic_facts_cache[topic] = facts
+            return facts
+            
+        except Exception as e:
+            self._logger.error(f"Ошибка при получении фактов по теме '{topic}': {e}")
+            return []
+
+    def _generate_diverse_options(self, topic, correct_answer, question_type, question_context):
+        """
+        Генерирует разнообразные варианты ответов на основе типа вопроса.
+        
+        Args:
+            topic (str): Тема теста
+            correct_answer (str): Правильный ответ
+            question_type (str): Тип вопроса (дата, личность, место, причина, результат, общий)
+            question_context (str): Контекст вопроса
+            
+        Returns:
+            list: Список из 4 вариантов ответов (включая правильный)
+        """
+        all_options = [correct_answer]
+        facts = self._get_topic_facts(topic)
+        
+        # Определяем характер правильного ответа для генерации похожих вариантов
+        is_year = bool(re.search(r'\b\d{3,4}\s*(?:год|г\.)\b', correct_answer, re.IGNORECASE))
+        is_person = bool(re.search(r'[А-Я][а-я]+\s+[А-Я][а-я]+(?:\s+[А-Я][а-я]+)?', correct_answer))
+        has_numbers = bool(re.search(r'\d+', correct_answer))
+        
+        # Специализированные опции по типу вопроса
+        if is_year or question_type == "дата":
+            # Для дат - генерируем близкие даты
+            match = re.search(r'(\d{3,4})', correct_answer)
+            if match:
+                year = int(match.group(1))
+                wrong_years = []
+                # Генерируем годы в пределах ±50 лет, но не совпадающие с правильным
+                for _ in range(10):  # генерируем больше, чем нужно, для разнообразия
+                    offset = random.randint(-50, 50)
+                    if offset != 0:
+                        wrong_year = year + offset
+                        if 800 <= wrong_year <= 2023:  # исторически релевантный диапазон
+                            year_str = f"{wrong_year} год"
+                            if year_str not in all_options:
+                                wrong_years.append(year_str)
+                
+                # Добавляем сгенерированные годы
+                for wrong_year in wrong_years[:3]:  # берем только 3 ошибочных варианта
+                    if len(all_options) < 4:
+                        all_options.append(wrong_year)
+        
+        elif is_person or question_type == "личность":
+            # Для личностей - используем исторических деятелей из аналогичного периода
+            historical_figures = [
+                "Пётр I", "Екатерина II", "Александр I", "Николай II", 
+                "Иван Грозный", "Александр II", "Елизавета Петровна", "Александр III",
+                "А.В. Суворов", "М.И. Кутузов", "Г.К. Жуков", "К.К. Рокоссовский",
+                "П.А. Румянцев", "М.Д. Скобелев", "А.М. Василевский", "И.С. Конев",
+                "П.А. Столыпин", "С.Ю. Витте", "В.И. Ленин", "И.В. Сталин",
+                "Н.С. Хрущёв", "Л.И. Брежнев", "М.С. Горбачёв", "Б.Н. Ельцин"
+            ]
+            
+            random.shuffle(historical_figures)
+            for figure in historical_figures:
+                if figure not in all_options and len(all_options) < 4:
+                    all_options.append(figure)
+        
+        elif question_type == "место":
+            # Для мест - используем исторически значимые города и места
+            places = [
+                "Москва", "Санкт-Петербург", "Новгород", "Киев", "Казань", 
+                "Севастополь", "Владивосток", "Архангельск", "Смоленск", 
+                "Бородино", "Полтава", "Сталинград", "Куликово поле",
+                "Ленинград", "Нижний Новгород", "Владимир", "Ярославль", 
+                "Астрахань", "Азов", "Курск", "Псков", "Рязань"
+            ]
+            
+            random.shuffle(places)
+            for place in places:
+                if place not in all_options and len(all_options) < 4:
+                    all_options.append(place)
+        
+        # Если специализированные опции не заполнили 4 варианта, добавляем из фактов
+        while len(all_options) < 4 and facts:
+            # Выбираем случайные факты и делаем из них варианты ответов
+            fact = random.choice(facts)
+            facts.remove(fact)
+            
+            # Извлекаем короткую значимую часть факта (не более 70 символов)
+            if len(fact) > 70:
+                words = fact.split()
+                shortened_fact = ""
+                for word in words:
+                    if len(shortened_fact + word) < 70:
+                        shortened_fact += word + " "
+                    else:
+                        break
+                fact = shortened_fact.strip()
+            
+            if fact and fact not in all_options:
+                all_options.append(fact)
+        
+        # Если всё ещё не хватает вариантов, добавляем общие варианты
+        general_options = [
+            f"Ранний этап в истории {topic}",
+            f"Заключительный период {topic}",
+            f"Важный поворотный момент в {topic}",
+            f"Решающее событие {topic}",
+            f"Второстепенный аспект {topic}",
+            f"Ключевой документ в истории {topic}",
+            f"Основное последствие {topic}",
+            f"Внешнеполитический фактор {topic}",
+            f"Реформа, не связанная с {topic}",
+            f"Побочный результат {topic}"
+        ]
+        
+        random.shuffle(general_options)
+        for option in general_options:
+            if option not in all_options and len(all_options) < 4:
+                all_options.append(option)
+        
+        # Перемешиваем варианты ответов, чтобы правильный был не всегда первым
+        random.shuffle(all_options)
+        
+        # Убеждаемся, что у нас ровно 4 варианта
+        return all_options[:4]
+
     def generate_test(self, topic):
         """
-        Генерирует тест по заданной теме.
+        Генерирует тест по заданной теме с гарантированно разными вариантами ответов.
 
         Args:
             topic (str): Тема для теста
@@ -38,211 +217,158 @@ class TestService(BaseService):
             dict: Данные теста с вопросами
         """
         # Запрашиваем набор из 20 вопросов у API с очень четким форматированием
-        prompt = f"""Создай 20 вопросов для тестирования по теме '{topic}'. 
-Строго следуй следующему формату для каждого вопроса:
+        prompt = f"""Создай ровно 20 вопросов для тестирования по теме '{topic}'. 
+Сосредоточься ТОЛЬКО на вопросе и правильном ответе. 
+Строго следуй формату для каждого вопроса:
 
-Вопрос N: [Текст вопроса]
-1) [Конкретный вариант ответа 1, строго по теме]
-2) [Конкретный вариант ответа 2, строго по теме]
-3) [Конкретный вариант ответа 3, строго по теме]
-4) [Конкретный вариант ответа 4, строго по теме]
-Правильный ответ: [число от 1 до 4]
+Вопрос: [Текст вопроса по теме '{topic}']
+Правильный ответ: [Короткий однозначный ответ]
 
-Важно:
-1. Варианты ответов ВСЕГДА должны быть конкретными и содержательными по теме '{topic}'.
-2. НИКОГДА не используй шаблонные фразы типа "Первый вариант ответа" или "Ответ 1".
-3. Каждый вариант должен быть логичным и реалистичным в контексте вопроса.
-4. Варианты должны быть примерно одинаковой длины.
-5. НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.).
-6. Кратко формулируй варианты для лучшего визуального восприятия.
+ВАЖНО:
+1. Правильный ответ должен быть кратким и содержательным - факт, имя, дата, термин, событие.
+2. НЕ указывай варианты ответов - они будут сгенерированы отдельно.
+3. Вопросы должны быть разнообразными и охватывать разные аспекты темы.
+4. НЕ ИСПОЛЬЗУЙ символы форматирования Markdown (* _ ` и т.д.).
+5. Для вопросов о датах указывай полный год (например, "1812 год").
+6. Не делай нумерацию вопросов. Каждый вопрос начинай со слова "Вопрос:".
 
-Например:
+Пример:
 Вопрос: В каком году произошло Крещение Руси?
-1) 988 год
-2) 980 год
-3) 1054 год
-4) 1147 год
-Правильный ответ: 1"""
+Правильный ответ: 988 год
 
+Вопрос: Кто возглавлял русскую армию в Бородинском сражении?
+Правильный ответ: М.И. Кутузов"""
+
+        # Запрашиваем вопросы из API
         response = self.api_client.ask_grok(prompt, use_cache=False)
 
-        # Разделяем текст на вопросы по паттерну "Вопрос N:" или просто по пустым строкам
-        raw_questions = re.split(r'(?:\n\s*\n)|(?:\nВопрос \d+:)', response)
-
-        processed_questions = []
-
-        for q in raw_questions:
-            q = q.strip()
-            # Проверяем, что строка достаточно длинная и содержит вопрос
-            if q and len(q) > 10 and ('?' in q or 'вопрос' in q.lower()):
-                # Проверяем, есть ли варианты ответов в формате "1) ..."
-                has_options = bool(re.search(r'\n\s*\d\)\s+', q))
-
-                if has_options:
-                    # Убеждаемся, что есть все 4 варианта
-                    options_count = len(re.findall(r'\n\s*\d\)\s+', q))
-                    if options_count >= 4:
-                        # Проверяем, есть ли правильный ответ
-                        if not re.search(r'Правильный ответ:\s*[1-4]', q):
-                            # Если нет, добавляем случайный
-                            correct_answer = random.randint(1, 4)
-                            q += f"\nПравильный ответ: {correct_answer}"
-
-                        # Экранируем специальные символы Markdown
-                        sanitized_q = q.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`')
-                        sanitized_q = sanitized_q.replace('[', '\\[').replace(']', '\\]')
-                        sanitized_q = sanitized_q.replace('(', '\\(').replace(')', '\\)')
-
-                        # Проверяем, нет ли шаблонных ответов
-                        if not re.search(r'\d\)\s+(Первый|Второй|Третий|Четвертый) вариант ответа', q, re.IGNORECASE) and \
-                           not re.search(r'\d\)\s+Вариант \d+', q, re.IGNORECASE) and \
-                           not re.search(r'\d\)\s+Ответ \d+', q, re.IGNORECASE):
-                            processed_questions.append(sanitized_q)
-                        else:
-                            # Если есть шаблонные ответы, пропускаем этот вопрос
-                            self._logger.warning(f"Пропуск вопроса с шаблонными ответами: {q[:50]}...")
-                            continue
-                    else:
-                        # Недостаточное количество вариантов, пропускаем
-                        self._logger.warning(f"Пропуск вопроса с недостаточным количеством вариантов: {q[:50]}...")
-                        continue
-                else:
-                    # Пропускаем вопросы без вариантов ответов
-                    self._logger.warning(f"Пропуск вопроса без вариантов ответов: {q[:50]}...")
-                    continue
-
-        # Если после обработки осталось менее 10 вопросов, запрашиваем еще вопросы
-        attempts = 0
-        while len(processed_questions) < 15 and attempts < 3:
-            self._logger.info(f"Недостаточно вопросов ({len(processed_questions)}), запрашиваем еще")
-            attempts += 1
-
-            additional_prompt = f"""Создай еще 10 вопросов для тестирования по теме '{topic}'. 
-Строго следуй следующему формату и указаниям:
+        # Извлекаем вопросы и ответы из текста
+        questions_data = []
+        raw_questions = response.split("Вопрос:")
+        
+        for raw_q in raw_questions:
+            if not raw_q.strip():
+                continue
+                
+            q_text = "Вопрос: " + raw_q.strip()
+            
+            # Извлекаем правильный ответ
+            answer_match = re.search(r'Правильный ответ:\s*(.*?)(?:\n|$)', q_text)
+            if answer_match:
+                correct_answer = answer_match.group(1).strip()
+                question_text = re.sub(r'Правильный ответ:\s*.*?(?:\n|$)', '', q_text).strip()
+                
+                # Определяем тип вопроса для генерации релевантных вариантов
+                question_type = "общий"
+                question_text_lower = question_text.lower()
+                
+                if 'год' in question_text_lower or 'дат' in question_text_lower or 'когда' in question_text_lower:
+                    question_type = "дата"
+                elif 'кто' in question_text_lower or 'личност' in question_text_lower or 'правитель' in question_text_lower:
+                    question_type = "личность"
+                elif 'где' in question_text_lower or 'мест' in question_text_lower or 'территор' in question_text_lower:
+                    question_type = "место"
+                elif 'причин' in question_text_lower or 'почему' in question_text_lower:
+                    question_type = "причина"
+                elif 'результат' in question_text_lower or 'последств' in question_text_lower or 'итог' in question_text_lower:
+                    question_type = "результат"
+                
+                # Добавляем вопрос с правильным ответом
+                questions_data.append({
+                    "question": question_text,
+                    "correct_answer": correct_answer,
+                    "type": question_type
+                })
+        
+        # Ограничиваем до 20 вопросов
+        questions_data = questions_data[:20]
+        
+        # Если получили менее 20 вопросов, запрашиваем дополнительно
+        if len(questions_data) < 20:
+            additional_count = 20 - len(questions_data)
+            self._logger.info(f"Получено только {len(questions_data)} вопросов, запрашиваем еще {additional_count}")
+            
+            additional_prompt = f"""Создай ровно {additional_count} вопросов для тестирования по теме '{topic}'. 
+Следуй тому же формату, что и раньше:
 
 Вопрос: [Текст вопроса]
-1) [Конкретный вариант ответа, связанный с темой '{topic}']
-2) [Конкретный вариант ответа, связанный с темой '{topic}']
-3) [Конкретный вариант ответа, связанный с темой '{topic}']
-4) [Конкретный вариант ответа, связанный с темой '{topic}']
-Правильный ответ: [число от 1 до 4]
+Правильный ответ: [Короткий однозначный ответ]
 
-ОБЯЗАТЕЛЬНО: все варианты ответов должны быть СОДЕРЖАТЕЛЬНЫМИ и КОНКРЕТНЫМИ, а не абстрактными."""
-
+ВАЖНО: Генерируй только КОНКРЕТНЫЕ и СОДЕРЖАТЕЛЬНЫЕ вопросы с реальными правильными ответами.
+"""
+            
             additional_response = self.api_client.ask_grok(additional_prompt, use_cache=False)
-            # Обрабатываем дополнительные вопросы так же, как основные
-            additional_raw_questions = re.split(r'(?:\n\s*\n)|(?:\nВопрос \d*:?)', additional_response)
-
-            for q in additional_raw_questions:
-                q = q.strip()
-                # Проверяем, что строка достаточно длинная и содержит вопрос
-                if q and len(q) > 10 and ('?' in q or 'вопрос' in q.lower()):
-                    # Проверяем, есть ли варианты ответов в формате "1) ..."
-                    has_options = bool(re.search(r'\n\s*\d\)\s+', q))
-
-                    if has_options:
-                        # Убеждаемся, что есть все 4 варианта
-                        options_count = len(re.findall(r'\n\s*\d\)\s+', q))
-                        if options_count >= 4:
-                            # Проверяем, есть ли правильный ответ
-                            if not re.search(r'Правильный ответ:\s*[1-4]', q):
-                                # Если нет, добавляем случайный
-                                correct_answer = random.randint(1, 4)
-                                q += f"\nПравильный ответ: {correct_answer}"
-
-                            # Экранируем специальные символы Markdown
-                            sanitized_q = q.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`')
-                            sanitized_q = sanitized_q.replace('[', '\\[').replace(']', '\\]')
-                            sanitized_q = sanitized_q.replace('(', '\\(').replace(')', '\\)')
-
-                            # Проверяем, нет ли шаблонных ответов
-                            if not re.search(r'\d\)\s+(Первый|Второй|Третий|Четвертый) вариант ответа', q, re.IGNORECASE) and \
-                               not re.search(r'\d\)\s+Вариант \d+', q, re.IGNORECASE) and \
-                               not re.search(r'\d\)\s+Ответ \d+', q, re.IGNORECASE):
-                                processed_questions.append(sanitized_q)
-
-        # Если по-прежнему меньше 20 вопросов, генерируем только недостающее количество качественных вопросов
-        if len(processed_questions) < 20:
-            # Теперь запрашиваем только точное число нужных вопросов
-            needed_questions = 20 - len(processed_questions)
-            self._logger.info(f"Генерация еще {needed_questions} вопросов для достижения 20")
-
-            final_prompt = f"""Создай ровно {needed_questions} вопросов для тестирования по теме '{topic}'. 
-Это ОЧЕНЬ ВАЖНО - каждый вопрос и ответ должен быть максимально конкретным и содержательным.
-
-Строго следуй формату:
-Вопрос: [Конкретный вопрос по теме]
-1) [Конкретный ответ]
-2) [Конкретный ответ]
-3) [Конкретный ответ]
-4) [Конкретный ответ]
-Правильный ответ: [число от 1 до 4]
-
-ЗАПРЕЩЕНО использовать в вариантах ответов фразы типа:
-- "Первый вариант ответа"
-- "Второй вариант ответа"
-- "Ответ №1", "Ответ 2"
-- "Вариант 1", "Вариант 2"
-
-Каждый вариант ответа должен напрямую относиться к теме и содержать конкретную информацию."""
-
-            final_response = self.api_client.ask_grok(final_prompt, use_cache=False)
-            final_questions = re.split(r'(?:\n\s*\n)|(?:\nВопрос \d*:?)', final_response)
-
-            for q in final_questions:
-                q = q.strip()
-                # Стандартные проверки и форматирование
-                if q and len(q) > 10 and '?' in q and re.search(r'\n\s*\d\)\s+', q):
-                    options_count = len(re.findall(r'\n\s*\d\)\s+', q))
-                    if options_count >= 4:
-                        if not re.search(r'Правильный ответ:\s*[1-4]', q):
-                            correct_answer = random.randint(1, 4)
-                            q += f"\nПравильный ответ: {correct_answer}"
-
-                        sanitized_q = q.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`')
-                        sanitized_q = sanitized_q.replace('[', '\\[').replace(']', '\\]')
-                        sanitized_q = sanitized_q.replace('(', '\\(').replace(')', '\\)')
-
-                        # Строгая проверка на шаблонные ответы
-                        if not re.search(r'\d\)\s+(Первый|Второй|Третий|Четвертый) вариант', q, re.IGNORECASE) and \
-                           not re.search(r'\d\)\s+Вариант \d+', q, re.IGNORECASE) and \
-                           not re.search(r'\d\)\s+Ответ \d+', q, re.IGNORECASE):
-                            if len(processed_questions) < 20:
-                                processed_questions.append(sanitized_q)
-
-        # Ограничиваем количество вопросов до 20
-        processed_questions = processed_questions[:20]
-
-        # Если вопросов все еще менее 20, добавляем специально составленные резервные вопросы
-        reserve_questions = [
-            f"Какой период истории России относится к теме '{topic}'?\n1) IX-X века\n2) XI-XII века\n3) XIII-XV века\n4) XVI-XVII века\nПравильный ответ: {random.randint(1, 4)}",
-            f"Какое историческое событие связано с темой '{topic}'?\n1) Куликовская битва\n2) Отечественная война 1812 года\n3) Крещение Руси\n4) Октябрьская революция\nПравильный ответ: {random.randint(1, 4)}",
-            f"Какой исторический деятель внес значительный вклад в развитие темы '{topic}'?\n1) Петр I\n2) Екатерина II\n3) Александр II\n4) Владимир Ленин\nПравильный ответ: {random.randint(1, 4)}",
-            f"Какое из этих событий произошло в период, связанный с темой '{topic}'?\n1) Смутное время\n2) Дворцовые перевороты\n3) Великая Отечественная война\n4) Перестройка\nПравильный ответ: {random.randint(1, 4)}",
-            f"Какой документ имеет историческое значение для темы '{topic}'?\n1) Русская Правда\n2) Соборное уложение 1649 года\n3) Конституция СССР 1936 года\n4) Манифест об отмене крепостного права\nПравильный ответ: {random.randint(1, 4)}"
-        ]
-
-        while len(processed_questions) < 20:
-            reserve_index = len(processed_questions) - 15  # Выбираем резервный вопрос по порядку
-            if reserve_index < len(reserve_questions):
-                processed_questions.append(reserve_questions[reserve_index])
-            else:
-                # Если резервные вопросы закончились, создаем новый
-                q_num = len(processed_questions) + 1
-                artificial_q = f"Вопрос {q_num}: Какое значение имеет тема '{topic}' для истории России?\n"
-                artificial_q += f"1) Существенное влияние на культурное развитие\n"
-                artificial_q += f"2) Значительное влияние на экономическое развитие\n"
-                artificial_q += f"3) Определяющее влияние на политическое устройство\n"
-                artificial_q += f"4) Важное влияние на международные отношения\n"
-                artificial_q += f"Правильный ответ: {random.randint(1, 4)}"
-                processed_questions.append(artificial_q)
-
-        # Создаем версию для отображения без правильных ответов
+            
+            # Обрабатываем дополнительные вопросы
+            raw_additional = additional_response.split("Вопрос:")
+            for raw_q in raw_additional:
+                if not raw_q.strip() or len(questions_data) >= 20:
+                    continue
+                    
+                q_text = "Вопрос: " + raw_q.strip()
+                
+                # Извлекаем правильный ответ
+                answer_match = re.search(r'Правильный ответ:\s*(.*?)(?:\n|$)', q_text)
+                if answer_match:
+                    correct_answer = answer_match.group(1).strip()
+                    question_text = re.sub(r'Правильный ответ:\s*.*?(?:\n|$)', '', q_text).strip()
+                    
+                    # Определяем тип вопроса
+                    question_type = "общий"
+                    question_text_lower = question_text.lower()
+                    
+                    if 'год' in question_text_lower or 'дат' in question_text_lower or 'когда' in question_text_lower:
+                        question_type = "дата"
+                    elif 'кто' in question_text_lower or 'личност' in question_text_lower or 'правитель' in question_text_lower:
+                        question_type = "личность"
+                    elif 'где' in question_text_lower or 'мест' in question_text_lower or 'территор' in question_text_lower:
+                        question_type = "место"
+                    elif 'причин' in question_text_lower or 'почему' in question_text_lower:
+                        question_type = "причина"
+                    elif 'результат' in question_text_lower or 'последств' in question_text_lower or 'итог' in question_text_lower:
+                        question_type = "результат"
+                    
+                    # Добавляем вопрос с правильным ответом
+                    questions_data.append({
+                        "question": question_text,
+                        "correct_answer": correct_answer,
+                        "type": question_type
+                    })
+        
+        # Формируем финальный тест с вариантами ответов
+        processed_questions = []
         display_questions = []
-        for q in processed_questions:
-            display_q = re.sub(r'Правильный ответ:\s*\d+', '', q).strip()
-            display_questions.append(display_q)
-
+        
+        for q_data in questions_data[:20]:  # Garantee max 20 questions
+            question = q_data["question"]
+            correct_answer = q_data["correct_answer"]
+            question_type = q_data["type"]
+            
+            # Генерируем уникальные варианты ответов для этого вопроса
+            options = self._generate_diverse_options(
+                topic, 
+                correct_answer, 
+                question_type, 
+                question
+            )
+            
+            # Определяем индекс правильного ответа
+            correct_index = options.index(correct_answer) + 1
+            
+            # Форматируем вопрос с вариантами для отображения
+            formatted_question = f"{question}\n"
+            for i, option in enumerate(options, 1):
+                formatted_question += f"{i}) {option}\n"
+            formatted_question += f"Правильный ответ: {correct_index}"
+            
+            # Для отображения - без правильного ответа
+            display_question = f"{question}\n"
+            for i, option in enumerate(options, 1):
+                display_question += f"{i}) {option}\n"
+            
+            processed_questions.append(formatted_question)
+            display_questions.append(display_question)
+        
         return {
             "original_questions": processed_questions,
             "display_questions": display_questions
@@ -284,167 +410,16 @@ class TestService(BaseService):
 
         # Ищем варианты ответов с помощью регулярных выражений
         option_pattern = r'(\d)\s*[\)\.]?\s+(.*)'
-        letter_pattern = r'([A-D])\s*[\)\.]?\s+(.*)'
-
         options = []
-        option_lines = []
 
-        # Сначала проверяем стандартный формат с новой строки "1) Вариант"
+        # Ищем строки с форматом "1) Вариант"
         for line in question_text.split('\n'):
             line = line.strip()
-            match_num = re.match(option_pattern, line)
-            match_letter = re.match(letter_pattern, line)
-
-            if match_num:
-                number = match_num.group(1)
-                text = match_num.group(2).strip()
-
-                # Проверяем, что это не шаблонный ответ
-                if not re.match(r'(Первый|Второй|Третий|Четвертый) вариант ответа', text, re.IGNORECASE) and \
-                   not re.match(r'Вариант \d+', text, re.IGNORECASE) and \
-                   not re.match(r'Ответ \d+', text, re.IGNORECASE) and \
-                   text != "Первый вариант ответа" and \
-                   text != "Второй вариант ответа" and \
-                   text != "Третий вариант ответа" and \
-                   text != "Четвертый вариант ответа" and \
-                   text != "Дополнительный вариант ответа":
-                    option_lines.append((int(number), text))
-                else:
-                    # Если это шаблонный ответ, создаем более конкретный ответ
-                    current_topic = main_question.split()[-3:] if len(main_question.split()) > 3 else main_question.split()
-                    topic_text = " ".join(current_topic)
-
-                    if number == '1':
-                        option_lines.append((int(number), f"Ранний период {topic_text}"))
-                    elif number == '2':
-                        option_lines.append((int(number), f"Средний период {topic_text}"))
-                    elif number == '3':
-                        option_lines.append((int(number), f"Поздний период {topic_text}"))
-                    elif number == '4':
-                        option_lines.append((int(number), f"Современный период {topic_text}"))
-            elif match_letter:
-                letter = match_letter.group(1)
-                number = ord(letter) - ord('A') + 1
-                text = match_letter.group(2).strip()
-
-                # Проверка на шаблонные ответы
-                if not re.match(r'(Первый|Второй|Третий|Четвертый) вариант ответа', text, re.IGNORECASE) and \
-                   not re.match(r'Вариант \d+', text, re.IGNORECASE) and \
-                   not re.match(r'Ответ \d+', text, re.IGNORECASE):
-                    option_lines.append((number, text))
-                else:
-                    # Заменяем шаблонный ответ
-                    current_topic = main_question.split()[-3:] if len(main_question.split()) > 3 else main_question.split()
-                    topic_text = " ".join(current_topic)
-
-                    if number == 1:
-                        option_lines.append((number, f"Раннее развитие {topic_text}"))
-                    elif number == 2:
-                        option_lines.append((number, f"Ключевой этап {topic_text}"))
-                    elif number == 3:
-                        option_lines.append((number, f"Завершающий этап {topic_text}"))
-                    elif number == 4:
-                        option_lines.append((number, f"Последствия {topic_text}"))
-
-        # Если нашли хотя бы 2 варианта ответа в ожидаемом формате
-        if len(option_lines) >= 2:
-            # Сортируем варианты по номеру
-            option_lines.sort(key=lambda x: x[0])
-            # Формируем список вариантов
-            for number, text in option_lines:
-                if 1 <= number <= 4:  # Проверяем, что номер в диапазоне 1-4
-                    options.append(f"{number}) {text}")
-
-        # Если варианты не найдены или их меньше 4, генерируем специфичные варианты на основе вопроса
-        if len(options) < 4:
-            # Извлекаем ключевые слова из вопроса для более релевантных вариантов
-            question_words = [w for w in main_question.split() if len(w) > 3 and w.lower() not in ['вопрос', 'какой', 'когда', 'где', 'почему', 'каким', 'вопрос:']]
-            question_topic = ' '.join(question_words[-3:]) if len(question_words) > 3 else ' '.join(question_words)
-            
-            # Определяем тип вопроса для генерации контекстно-зависимых вариантов
-            question_type = "общий"
-            if 'год' in main_question.lower() or 'дата' in main_question.lower() or 'когда' in main_question.lower():
-                question_type = "дата"
-            elif 'кто' in main_question.lower() or 'лидер' in main_question.lower() or 'правитель' in main_question.lower():
-                question_type = "личность"
-            elif 'где' in main_question.lower() or 'место' in main_question.lower() or 'территория' in main_question.lower():
-                question_type = "место"
-            elif 'причин' in main_question.lower() or 'почему' in main_question.lower():
-                question_type = "причина"
-            elif 'результат' in main_question.lower() or 'последствия' in main_question.lower() or 'итог' in main_question.lower():
-                question_type = "результат"
-                
-            # Генерируем специфичные для типа вопроса варианты ответов
-            thematic_options = []
-            
-            if question_type == "дата":
-                centuries = ["XVII", "XVIII", "XIX", "XX"]
-                years = [str(random.randint(1700, 1917)) + " год", 
-                         str(random.randint(1700, 1917)) + " год", 
-                         str(random.randint(1700, 1917)) + " год",
-                         str(random.randint(1700, 1917)) + " год"]
-                thematic_options = years
-                
-            elif question_type == "личность":
-                rulers = ["Пётр I", "Екатерина II", "Александр I", "Николай II", 
-                          "Иван Грозный", "Александр II", "Елизавета Петровна", "Александр III"]
-                generals = ["А.В. Суворов", "М.И. Кутузов", "Г.К. Жуков", "К.К. Рокоссовский",
-                           "П.А. Румянцев", "М.Д. Скобелев", "А.М. Василевский", "И.С. Конев"]
-                politicians = ["П.А. Столыпин", "С.Ю. Витте", "В.И. Ленин", "И.В. Сталин",
-                              "А.А. Аракчеев", "М.М. Сперанский", "Н.С. Хрущёв", "Л.И. Брежнев"]
-                
-                # Выбираем наиболее подходящий список для вопроса
-                if "генерал" in main_question.lower() or "военачальник" in main_question.lower():
-                    thematic_options = random.sample(generals, 4)
-                elif "реформ" in main_question.lower() or "политик" in main_question.lower():
-                    thematic_options = random.sample(politicians, 4)
-                else:
-                    thematic_options = random.sample(rulers, 4)
-                    
-            elif question_type == "место":
-                places = ["Москва", "Санкт-Петербург", "Новгород", "Киев", 
-                          "Казань", "Севастополь", "Владивосток", "Архангельск",
-                          "Смоленск", "Бородино", "Полтава", "Сталинград"]
-                thematic_options = random.sample(places, 4)
-                
-            elif question_type == "причина" or question_type == "результат":
-                causes = [
-                    f"Экономический кризис в контексте {question_topic}",
-                    f"Политические противоречия в ходе {question_topic}",
-                    f"Внешнеполитическое давление во время {question_topic}",
-                    f"Социальное напряжение, вызванное {question_topic}",
-                    f"Идеологические разногласия в период {question_topic}",
-                    f"Территориальные споры, связанные с {question_topic}",
-                    f"Военная необходимость в контексте {question_topic}",
-                    f"Личные амбиции правителей в период {question_topic}"
-                ]
-                thematic_options = random.sample(causes, 4)
-            
-            else:
-                # Общие варианты для всех остальных типов вопросов
-                general_options = [
-                    f"Ранний этап {question_topic}",
-                    f"Завершающий период {question_topic}",
-                    f"Кульминационный момент {question_topic}",
-                    f"Важнейшее последствие {question_topic}",
-                    f"Ключевое событие в контексте {question_topic}",
-                    f"Международный аспект {question_topic}",
-                    f"Внутриполитический аспект {question_topic}",
-                    f"Социально-экономический аспект {question_topic}"
-                ]
-                thematic_options = random.sample(general_options, 4)
-            
-            # Добавляем недостающие варианты
-            for i in range(len(options), 4):
-                options.append(f"{i+1}) {thematic_options[i - len(options)]}")
-
-        # Ограничиваем до 4 вариантов
-        options = options[:4]
-
-        # Убеждаемся, что все варианты имеют правильный формат "номер) текст"
-        for i in range(len(options)):
-            if not re.match(r'^\d\)', options[i]):
-                options[i] = f"{i+1}) {options[i]}"
+            match = re.match(option_pattern, line)
+            if match:
+                number = match.group(1)
+                text = match.group(2).strip()
+                options.append(f"{number}) {text}")
 
         self._logger.info(f"Сформированы варианты: {len(options)} вариантов")
 
