@@ -17,3 +17,9 @@ pandas
 numpy
 redis
 pymemcache
+astor
+html2text
+markdown
+pillow
+python-docx
+python-pptx
