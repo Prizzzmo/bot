@@ -10,6 +10,7 @@ from io import BytesIO
 from PIL import Image
 import markdown
 import html2text
+import time
 
 def md_to_plaintext(md_text):
     """Конвертирует маркдаун в простой текст"""
@@ -17,6 +18,47 @@ def md_to_plaintext(md_text):
     h = html2text.HTML2Text()
     h.ignore_links = True
     return h.handle(html).strip()
+
+def download_and_verify_image(url, file_path):
+    """
+    Скачивает изображение, проверяет его валидность и возвращает путь к файлу
+    или None в случае ошибки
+    """
+    try:
+        # Если файл уже существует, пробуем сразу его проверить
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            try:
+                img = Image.open(file_path)
+                img.verify()  # Проверка, что файл является изображением
+                return file_path
+            except Exception:
+                print(f"Существующий файл {file_path} поврежден. Пробуем скачать заново.")
+                # Если проверка не удалась, продолжаем и пробуем скачать заново
+                pass
+        
+        # Скачиваем изображение
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            print(f"Ошибка при скачивании изображения: HTTP {response.status_code}")
+            return None
+            
+        # Проверяем скачанное изображение
+        try:
+            img = Image.open(BytesIO(response.content))
+            img.verify()  # Проверка, что данные являются изображением
+            
+            # Сохраняем валидное изображение
+            with open(file_path, 'wb') as f:
+                f.write(response.content)
+            
+            return file_path
+        except Exception as e:
+            print(f"Скачанное изображение не является валидным: {e}")
+            return None
+            
+    except Exception as e:
+        print(f"Ошибка при скачивании/проверке изображения {url}: {e}")
+        return None
 
 def create_presentation(md_file_path, output_pptx_path):
     """
@@ -54,34 +96,19 @@ def create_presentation(md_file_path, output_pptx_path):
     subtitle.text = "Проектная презентация"
     
     # Добавляем изображение для титульного слайда
-    try:
-        image_path = os.path.join(images_dir, "russia_history.jpg")
-        
-        # Проверяем, существует ли изображение, если нет - скачиваем
-        if not os.path.exists(image_path):
-            image_url = "https://histrf.ru/uploads/media/default/0001/02/0e4f4e9d11f6bc76c7c69de95b3ab6f3c6fb7d3b.jpeg"
-            response = requests.get(image_url)
-            
-            # Сохраняем изображение
-            with open(image_path, 'wb') as img_file:
-                img_file.write(response.content)
-        
-        # Проверяем, что файл действительно является изображением
-        if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
-            # Проверяем формат с помощью PIL
-            try:
-                from PIL import Image
-                Image.open(image_path).verify()  # Проверяем, что это валидное изображение
-                
-                # Добавляем изображение на титульный слайд
-                left = Inches(1)
-                top = Inches(3)
-                width = Inches(8)
-                slide.shapes.add_picture(image_path, left, top, width=width)
-            except Exception as img_error:
-                print(f"Ошибка проверки изображения для титульного слайда: {img_error}")
-    except Exception as e:
-        print(f"Ошибка при добавлении изображения на титульный слайд: {e}")
+    image_path = os.path.join(images_dir, "russia_history.jpg")
+    image_url = "https://histrf.ru/uploads/media/default/0001/02/0e4f4e9d11f6bc76c7c69de95b3ab6f3c6fb7d3b.jpeg"
+    
+    verified_image = download_and_verify_image(image_url, image_path)
+    if verified_image:
+        try:
+            left = Inches(1)
+            top = Inches(3)
+            width = Inches(8)
+            slide.shapes.add_picture(verified_image, left, top, width=width)
+            print(f"Изображение для титульного слайда успешно добавлено")
+        except Exception as e:
+            print(f"Ошибка при добавлении изображения на титульный слайд: {e}")
     
     # Создаем слайд с содержанием
     content_slide_layout = prs.slide_layouts[1]
@@ -114,44 +141,40 @@ def create_presentation(md_file_path, output_pptx_path):
         image_url = None
         if "Архитектура" in section_title:
             image_url = "https://miro.medium.com/v2/resize:fit:1200/0*9pGRpgfmnqPEBuFj.png"
+            image_name = "архитектура_системы.jpg"
         elif "ИИ" in section_title or "Gemini" in section_title:
             image_url = "https://storage.googleapis.com/gweb-uniblog-publish-prod/images/Gemini_Features_2.max-1000x1000.png"
+            image_name = "интеграция_с_ии.jpg"
         elif "Компонент" in section_title:
             image_url = "https://cdn-icons-png.flaticon.com/512/2530/2530302.png"
+            image_name = f"компоненты_системы.jpg"
         elif "Карт" in section_title or "Визуализаци" in section_title:
             image_url = "https://cdn-icons-png.flaticon.com/512/854/854878.png"
+            image_name = "карты_и_визуализации.jpg"
         elif "Тестирован" in section_title:
             image_url = "https://cdn-icons-png.flaticon.com/512/2620/2620343.png"
+            image_name = "тестирование.jpg"
         elif "Аналитич" in section_title:
             image_url = "https://cdn-icons-png.flaticon.com/512/1925/1925059.png"
+            image_name = "аналитическая_система.jpg"
+        else:
+            # Для других разделов используем стандартное изображение
+            image_url = "https://cdn-icons-png.flaticon.com/512/4481/4481249.png" 
+            image_name = f"{section_title.lower().replace(' ', '_').replace(':', '_')}.jpg"
         
         if image_url:
-            try:
-                image_name = f"{section_title.lower().replace(' ', '_').replace(':', '_')}.jpg"
-                image_path = os.path.join(images_dir, image_name)
-                
-                # Скачиваем изображение если его еще нет
-                if not os.path.exists(image_path):
-                    response = requests.get(image_url)
-                    with open(image_path, 'wb') as img_file:
-                        img_file.write(response.content)
-                
-                # Проверяем, что файл действительно является изображением
-                if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
-                    # Проверяем формат с помощью PIL
-                    try:
-                        from PIL import Image
-                        Image.open(image_path).verify()  # Проверяем, что это валидное изображение
-                        
-                        # Добавляем изображение на слайд
-                        left = Inches(3)
-                        top = Inches(2.5)
-                        width = Inches(4)
-                        slide.shapes.add_picture(image_path, left, top, width=width)
-                    except Exception as img_error:
-                        print(f"Ошибка проверки изображения для секции '{section_title}': {img_error}")
-            except Exception as e:
-                print(f"Ошибка при добавлении изображения для секции '{section_title}': {e}")
+            image_path = os.path.join(images_dir, image_name)
+            verified_image = download_and_verify_image(image_url, image_path)
+            
+            if verified_image:
+                try:
+                    left = Inches(3)
+                    top = Inches(2.5)
+                    width = Inches(4)
+                    slide.shapes.add_picture(verified_image, left, top, width=width)
+                    print(f"Изображение для секции '{section_title}' успешно добавлено")
+                except Exception as e:
+                    print(f"Ошибка при добавлении изображения для секции '{section_title}': {e}")
         
         # Разбиваем секцию на подсекции и создаем слайды для каждой подсекции
         subsections = re.split(r'### ', section)[1:] if '### ' in section else []
@@ -219,34 +242,20 @@ def create_presentation(md_file_path, output_pptx_path):
     textframe.text = "© 2025 Образовательный бот по истории России"
     textframe.paragraphs[0].alignment = PP_ALIGN.CENTER
     
-    # Добавляем красивый разделитель
-    try:
-        image_path = os.path.join(images_dir, "russia_flag.jpg")
-        
-        # Проверяем, существует ли изображение
-        if not os.path.exists(image_path):
-            image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/800px-Flag_of_Russia.svg.png"
-            response = requests.get(image_url)
-            
-            with open(image_path, 'wb') as img_file:
-                img_file.write(response.content)
-        
-        # Проверяем, что файл действительно является изображением
-        if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
-            # Проверяем формат с помощью PIL
-            try:
-                from PIL import Image
-                Image.open(image_path).verify()  # Проверяем, что это валидное изображение
-                
-                # Добавляем изображение
-                left = Inches(3)
-                top = Inches(4)
-                width = Inches(4)
-                slide.shapes.add_picture(image_path, left, top, width=width)
-            except Exception as img_error:
-                print(f"Ошибка проверки изображения для заключительного слайда: {img_error}")
-    except Exception as e:
-        print(f"Ошибка при добавлении изображения на заключительный слайд: {e}")
+    # Добавляем изображение флага России
+    image_path = os.path.join(images_dir, "russia_flag.jpg")
+    image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/800px-Flag_of_Russia.svg.png"
+    
+    verified_image = download_and_verify_image(image_url, image_path)
+    if verified_image:
+        try:
+            left = Inches(3)
+            top = Inches(4)
+            width = Inches(4)
+            slide.shapes.add_picture(verified_image, left, top, width=width)
+            print(f"Изображение для заключительного слайда успешно добавлено")
+        except Exception as e:
+            print(f"Ошибка при добавлении изображения на заключительный слайд: {e}")
     
     # Сохраняем презентацию
     prs.save(output_pptx_path)
