@@ -62,14 +62,24 @@ def create_presentation(md_file_path, output_pptx_path):
             image_url = "https://histrf.ru/uploads/media/default/0001/02/0e4f4e9d11f6bc76c7c69de95b3ab6f3c6fb7d3b.jpeg"
             response = requests.get(image_url)
             
+            # Сохраняем изображение
             with open(image_path, 'wb') as img_file:
                 img_file.write(response.content)
         
-        # Добавляем изображение на титульный слайд
-        left = Inches(1)
-        top = Inches(3)
-        width = Inches(8)
-        slide.shapes.add_picture(image_path, left, top, width=width)
+        # Проверяем, что файл действительно является изображением
+        if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
+            # Проверяем формат с помощью PIL
+            try:
+                from PIL import Image
+                Image.open(image_path).verify()  # Проверяем, что это валидное изображение
+                
+                # Добавляем изображение на титульный слайд
+                left = Inches(1)
+                top = Inches(3)
+                width = Inches(8)
+                slide.shapes.add_picture(image_path, left, top, width=width)
+            except Exception as img_error:
+                print(f"Ошибка проверки изображения для титульного слайда: {img_error}")
     except Exception as e:
         print(f"Ошибка при добавлении изображения на титульный слайд: {e}")
     
@@ -117,7 +127,7 @@ def create_presentation(md_file_path, output_pptx_path):
         
         if image_url:
             try:
-                image_name = f"{section_title.lower().replace(' ', '_')}.jpg"
+                image_name = f"{section_title.lower().replace(' ', '_').replace(':', '_')}.jpg"
                 image_path = os.path.join(images_dir, image_name)
                 
                 # Скачиваем изображение если его еще нет
@@ -126,11 +136,20 @@ def create_presentation(md_file_path, output_pptx_path):
                     with open(image_path, 'wb') as img_file:
                         img_file.write(response.content)
                 
-                # Добавляем изображение на слайд
-                left = Inches(3)
-                top = Inches(2.5)
-                width = Inches(4)
-                slide.shapes.add_picture(image_path, left, top, width=width)
+                # Проверяем, что файл действительно является изображением
+                if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
+                    # Проверяем формат с помощью PIL
+                    try:
+                        from PIL import Image
+                        Image.open(image_path).verify()  # Проверяем, что это валидное изображение
+                        
+                        # Добавляем изображение на слайд
+                        left = Inches(3)
+                        top = Inches(2.5)
+                        width = Inches(4)
+                        slide.shapes.add_picture(image_path, left, top, width=width)
+                    except Exception as img_error:
+                        print(f"Ошибка проверки изображения для секции '{section_title}': {img_error}")
             except Exception as e:
                 print(f"Ошибка при добавлении изображения для секции '{section_title}': {e}")
         
@@ -212,11 +231,20 @@ def create_presentation(md_file_path, output_pptx_path):
             with open(image_path, 'wb') as img_file:
                 img_file.write(response.content)
         
-        # Добавляем изображение
-        left = Inches(3)
-        top = Inches(4)
-        width = Inches(4)
-        slide.shapes.add_picture(image_path, left, top, width=width)
+        # Проверяем, что файл действительно является изображением
+        if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
+            # Проверяем формат с помощью PIL
+            try:
+                from PIL import Image
+                Image.open(image_path).verify()  # Проверяем, что это валидное изображение
+                
+                # Добавляем изображение
+                left = Inches(3)
+                top = Inches(4)
+                width = Inches(4)
+                slide.shapes.add_picture(image_path, left, top, width=width)
+            except Exception as img_error:
+                print(f"Ошибка проверки изображения для заключительного слайда: {img_error}")
     except Exception as e:
         print(f"Ошибка при добавлении изображения на заключительный слайд: {e}")
     
