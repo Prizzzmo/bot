@@ -810,8 +810,7 @@ class UnifiedServer:
 
                         # Обрабатываем обычный текст
                         if line.startswith('- ') or line.startswith('* '):
-                            # Маркированный список
-                            p = doc.add_paragraph(line[2:], style='List Bullet')
+                            # Маркированный список                            p = doc.add_paragraph(line[2:], style='List Bullet')
                         else:
                             # Обычный текст
                             p = doc.add_paragraph(line)
@@ -832,6 +831,10 @@ class UnifiedServer:
                 except Exception as api_error:
                     logger.error(f"Ошибка при генерации реферата: {api_error}")
                     return jsonify({'error': str(api_error)}), 500
+
+            except Exception as e:
+                logger.error(f"Ошибка при обработке запроса на генерацию реферата: {e}")
+                return jsonify({'error': str(e)}), 500
 
             except Exception as e:
                 logger.error(f"Ошибка при обработке запроса на генерацию реферата: {e}")
