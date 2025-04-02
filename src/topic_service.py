@@ -85,26 +85,11 @@ class TopicService(BaseService):
         Returns:
             list: Список тем
         """
-        try:
-            prompt = "Составь список из 30 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
-            topics_text = self.api_client.ask_grok(prompt, use_cache=use_cache)
-            
-            if not topics_text:
-                self._logger.warning("Получен пустой ответ от API при генерации тем")
-                return self.default_topics
+        prompt = "Составь список из 30 ключевых тем по истории России, которые могут быть интересны для изучения. Каждая тема должна быть емкой и конкретной (не более 6-7 слов). Перечисли их в виде нумерованного списка."
+        topics_text = self.api_client.ask_grok(prompt, use_cache=use_cache)
 
-            # Парсим и возвращаем темы
-            topics = self.parse_topics(topics_text)
-            
-            if not topics:
-                self._logger.warning("Не удалось распарсить темы из ответа API")
-                return self.default_topics
-                
-            return topics
-            
-        except Exception as e:
-            self._logger.error(f"Ошибка при генерации списка тем: {e}")
-            return self.default_topics
+        # Парсим и возвращаем темы
+        return self.parse_topics(topics_text)
 
     def generate_new_topics_list(self):
         """
