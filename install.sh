@@ -19,39 +19,6 @@ check_success() {
     fi
 }
 
-# 0. Клонирование репозитория
-echo -e "${YELLOW}Cloning repository from GitHub...${NC}"
-if [ -d "bot" ]; then
-    rm -rf bot
-fi
-git clone https://github.com/Prizzzmo/bot.git
-cd bot
-check_success "Repository cloning"
-
-# 1. Обновление системы
-echo -e "${YELLOW}Updating system packages...${NC}"
-yum -y update
-check_success "System update"
-
-# 2. Установка базовых зависимостей
-echo -e "${YELLOW}Installing basic dependencies...${NC}"
-yum -y groupinstall "Development Tools"
-yum -y install git openssl-devel
-check_success "Basic dependencies installation"
-
-# 3. Установка системных библиотек
-echo -e "${YELLOW}Installing system libraries...${NC}"
-yum -y install gcc openssl-devel bzip2-devel libffi-devel geos-devel cairo-devel gobject-introspection-devel pkgconfig proj-devel
-check_success "System libraries installation"
-
-# 4. Создание необходимых директорий и файлов
-echo -e "${YELLOW}Creating required directories and files...${NC}"
-mkdir -p logs
-mkdir -p generated_maps
-mkdir -p backups
-mkdir -p history_db_generator/backups
-mkdir -p history_db_generator/temp
-
 # Создание requirements.txt
 cat > requirements.txt << EOL
 python-telegram-bot==13.15
