@@ -44,7 +44,7 @@ class Config:
 
         # Базовая конфигурация с токенами из admins.json
         self.telegram_token = "7574040718:AAEbU8yjJsKT8pYap9Yklt047YbPa79nFf4"
-        self.gemini_api_key = "AIzaSyAuAktN3PCP1EOXHvA4D-4SPvddXSOKNuU"
+        self.gemini_api_key = "AIzaSyDR2MuMWLBzRPiDPg7O8sZuke77CWmzI1U"
 
         self.allow_subscribers = True
         self.admin_config_file = 'admins.json'
