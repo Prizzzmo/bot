@@ -36,7 +36,7 @@ check_success "System update"
 
 # 2. Установка базовых зависимостей
 echo -e "${YELLOW}Installing basic dependencies...${NC}"
-sudo apt install -y python3 python3-pip python3-dev build-essential git
+sudo apt install -y python3-pip build-essential git
 check_success "Basic dependencies installation"
 
 # 3. Установка системных библиотек
