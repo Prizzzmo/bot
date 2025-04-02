@@ -79,14 +79,32 @@ class APIClient(BaseService):
 
     def initialize_model(self) -> None:
         """
-        Инициализация модели Google Gemini.
-
-        Настраивает модель Gemini Pro, которая обеспечивает:
-        - Продвинутое понимание запросов на естественном языке
-        - Генерацию структурированных и информативных ответов
-        - Проверку фактологической точности контента
+        Инициализация модели Google Gemini с повторными попытками.
         """
-        #Moved to _do_initialize for better error handling and initialization flow
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                if not self.api_key:
+                    raise ValueError("API ключ не указан")
+                    
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel('gemini-pro')
+                
+                # Проверяем работоспособность модели
+                test_response = self.model.generate_content("Test connection")
+                if test_response and hasattr(test_response, 'text'):
+                    self._logger.info("Gemini API успешно инициализирован")
+                    return
+                    
+            except Exception as e:
+                self._logger.warning(f"Попытка {attempt + 1}/{max_retries} инициализации модели не удалась: {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (2 ** attempt))
+                else:
+                    self._logger.error("Не удалось инициализировать модель Gemini после всех попыток")
+                    raise
 
     # Хэш-функция для создания ключа кэша
     def _create_cache_key(self, prompt: str, temperature: float, max_tokens: int, system_prompt: Optional[str]) -> str:
@@ -214,8 +232,26 @@ class APIClient(BaseService):
                         versioned_prompt = f"{prompt}\n\n{api_info}"
                         response = self.model.generate_content(versioned_prompt, generation_config=generation_config)
                 except AttributeError:
-                    # Альтернативный метод для новой версии API - сразу используем без лишнего логирования
-                    response = self.model.generate_content(content=prompt, generation_config=generation_config)
+                    try:
+                        # Альтернативный метод для новой версии API с дополнительной обработкой ошибок
+                        response = self.model.generate_content(
+                            content=prompt,
+                            generation_config=generation_config,
+                            safety_settings=[
+                                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+                            ]
+                        )
+                        
+                        if not response or not hasattr(response, 'text'):
+                            raise Exception("Пустой ответ от API")
+                            
+                    except Exception as api_error:
+                        self._logger.error(f"Ошибка при генерации контента: {str(api_error)}")
+                        # Пробуем упрощенный запрос без дополнительных настроек
+                        response = self.model.generate_content(prompt)
 
                 elapsed_time = time.time() - start_time
                 self._logger.debug(f"Ответ получен за {elapsed_time:.2f}с")
