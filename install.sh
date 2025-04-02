@@ -41,7 +41,7 @@ check_success "Basic dependencies installation"
 
 # 3. Установка системных библиотек
 echo -e "${YELLOW}Installing system libraries...${NC}"
-sudo apt install -y libssl-dev libffi-dev python3-setuptools libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev libgirepository1.0-dev pkg-config python3-cairo-dev
+sudo apt install -y libssl-dev libffi-dev libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev libgirepository1.0-dev pkg-config
 check_success "System libraries installation"
 
 # 4. Создание необходимых директорий и файлов
