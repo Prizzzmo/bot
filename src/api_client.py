@@ -353,7 +353,7 @@ class APIClient(BaseService):
                 "error": str(e)
             }
 
-    def ask_grok(self, prompt: str, use_cache: bool = True) -> str:
+    def ask_grok(self, prompt: str, use_cache: bool = True, max_retries: int = 3) -> str:
         """
         Упрощенный метод для отправки запроса к Gemini API и получения текстового ответа.
         Адаптирован для работы с Gemini 2.0 Flash.
@@ -361,28 +361,45 @@ class APIClient(BaseService):
         Args:
             prompt (str): Текст запроса для модели
             use_cache (bool): Использовать ли кэширование для этого запроса
+            max_retries (int): Максимальное количество попыток
 
         Returns:
             str: Текстовый ответ от модели
         """
         try:
-            result = self.call_api(
-                prompt=prompt, 
-                temperature=0.3,
-                max_tokens=1024,
-                use_cache=use_cache
-            )
-            return result.get("text", "")
+            if use_cache:
+                self.logger.info("Проверка кэша...")
+                cached_response = self.cache.get(prompt)
+                if cached_response:
+                    self.logger.info("Найден ответ в кэше")
+                    return cached_response
+
+            self.logger.info("Отправка запроса к API...")
+
+            # Попытки повторного запроса при ошибке
+            for attempt in range(max_retries):
+                try:
+                    response = self.call_api(prompt)
+
+                    if response:
+                        if use_cache:
+                            self.logger.info("Сохранение ответа в кэш")
+                            self.cache.set(prompt, response["text"])
+                        return response["text"]
+
+                except Exception as retry_error:
+                    self.logger.warning(f"Попытка {attempt + 1} не удалась: {str(retry_error)}")
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(2 ** attempt)  # Экспоненциальная задержка
+                    continue
+
+            self.logger.error(f"Все {max_retries} попытки запроса к API не удались")
+            return None
+
         except Exception as e:
-            self._logger.error(f"Ошибка в методе ask_grok: {e}")
-            # Попробуем запасной метод для Gemini 2.0
-            try:
-                self._logger.info("Пробуем альтернативный метод вызова API...")
-                response = self.model.generate_content(content=prompt)
-                return response.text
-            except Exception as e2:
-                self._logger.error(f"Вторая ошибка в методе ask_grok: {e2}")
-                return f"Произошла ошибка при обработке запроса: {str(e)}. Повторная попытка также не удалась: {str(e2)}"
+            self.logger.error(f"Критическая ошибка при запросе к API: {str(e)}", exc_info=True)
+            return None
 
     def generate_historical_test(self, topic: str) -> Dict[str, Any]:
         """
