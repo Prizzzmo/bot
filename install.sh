@@ -44,14 +44,43 @@ echo -e "${YELLOW}Installing system libraries...${NC}"
 sudo apt install -y libssl-dev libffi-dev python3-setuptools libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev libgirepository1.0-dev pkg-config python3-cairo-dev
 check_success "System libraries installation"
 
-# 4. Создание необходимых директорий
-echo -e "${YELLOW}Creating required directories...${NC}"
+# 4. Создание необходимых директорий и файлов
+echo -e "${YELLOW}Creating required directories and files...${NC}"
 mkdir -p logs
 mkdir -p generated_maps
 mkdir -p backups
 mkdir -p history_db_generator/backups
 mkdir -p history_db_generator/temp
-check_success "Directory creation"
+
+# Создание requirements.txt
+cat > requirements.txt << EOL
+python-telegram-bot==13.15
+requests==2.31.0
+python-dotenv==1.0.0
+flask==2.3.3
+google-generativeai==0.3.1
+psutil
+matplotlib
+folium
+selenium
+webdriver-manager
+pillow
+docx
+jinja2
+basemap
+pandas
+numpy
+redis
+pymemcache
+astor
+html2text
+markdown
+pillow
+python-docx
+python-pptx
+EOL
+
+check_success "Directory and files creation"
 
 # 5. Проверка и установка Python зависимостей
 echo -e "${YELLOW}Installing Python dependencies...${NC}"
