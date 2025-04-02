@@ -69,8 +69,8 @@ class APIClient(BaseService):
                 self._logger.error("API ключ не указан")
                 return False
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
-            self._logger.info("Gemini API успешно инициализирован (модель: gemini-2.0-flash)")
+            self.model = genai.GenerativeModel('gemini-pro')
+            self._logger.info("Gemini API успешно инициализирован (модель: gemini-pro)")
             return True
         except Exception as e:
             self._logger.error(f"Ошибка при инициализации APIClient: {e}")
