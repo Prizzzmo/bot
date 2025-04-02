@@ -29,18 +29,18 @@ check_success "Repository cloning"
 
 # 1. Обновление системы
 echo -e "${YELLOW}Updating system packages...${NC}"
-apt-get update
-apt-get upgrade -y
+yum update -y
 check_success "System update"
 
 # 2. Установка базовых зависимостей
 echo -e "${YELLOW}Installing basic dependencies...${NC}"
-apt-get install -y build-essential git
+yum groupinstall -y "Development Tools"
+yum install -y git
 check_success "Basic dependencies installation"
 
 # 3. Установка системных библиотек
 echo -e "${YELLOW}Installing system libraries...${NC}"
-apt-get install -y libssl-dev libffi-dev libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev libgirepository1.0-dev pkg-config
+yum install -y openssl-devel libffi-devel geos-devel proj-devel proj cairo-devel gobject-introspection-devel pkgconfig
 check_success "System libraries installation"
 
 # 4. Создание необходимых директорий и файлов
