@@ -93,7 +93,7 @@ class APIClient(BaseService):
                 self.model = genai.GenerativeModel('gemini-pro')
                 
                 # Проверяем работоспособность модели
-                test_response = self.model.generate_content("Test connection")
+                test_response = self.model.generate_content(contents="Test connection")
                 if test_response and hasattr(test_response, 'text'):
                     self._logger.info("Gemini API успешно инициализирован")
                     return
@@ -251,7 +251,7 @@ class APIClient(BaseService):
                     except Exception as api_error:
                         self._logger.error(f"Ошибка при генерации контента: {str(api_error)}")
                         # Пробуем упрощенный запрос без дополнительных настроек
-                        response = self.model.generate_content(prompt)
+                        response = self.model.generate_content(contents=prompt)
 
                 elapsed_time = time.time() - start_time
                 self._logger.debug(f"Ответ получен за {elapsed_time:.2f}с")
