@@ -43,14 +43,8 @@ class Config:
             pass
 
         # Базовая конфигурация с токенами из admins.json
-        try:
-            with open('admins.json', 'r') as f:
-                admin_data = json.load(f)
-                self.telegram_token = admin_data.get('telegram_token', os.getenv('TELEGRAM_TOKEN', ''))
-                self.gemini_api_key = admin_data.get('gemini_api_key', os.getenv('GEMINI_API_KEY', ''))
-        except:
-            self.telegram_token = os.getenv('TELEGRAM_TOKEN', '')
-            self.gemini_api_key = os.getenv('GEMINI_API_KEY', '')
+        self.telegram_token = "6783318815:AAHjX5fy_CU1NRjO1NjrWvWDQjVa-qG1UkA"
+        self.gemini_api_key = "AIzaSyAuAktN3PCP1EOXHvA4D-4SPvddXSOKNuU"
 
         self.allow_subscribers = True
         self.admin_config_file = 'admins.json'
