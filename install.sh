@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # Цвета для вывода
@@ -30,18 +29,18 @@ check_success "Repository cloning"
 
 # 1. Обновление системы
 echo -e "${YELLOW}Updating system packages...${NC}"
-sudo apt update
-sudo apt upgrade -y
+apt-get update
+apt-get upgrade -y
 check_success "System update"
 
 # 2. Установка базовых зависимостей
 echo -e "${YELLOW}Installing basic dependencies...${NC}"
-sudo apt install -y build-essential git
+apt-get install -y build-essential git
 check_success "Basic dependencies installation"
 
 # 3. Установка системных библиотек
 echo -e "${YELLOW}Installing system libraries...${NC}"
-sudo apt install -y libssl-dev libffi-dev libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev libgirepository1.0-dev pkg-config
+apt-get install -y libssl-dev libffi-dev libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev libgirepository1.0-dev pkg-config
 check_success "System libraries installation"
 
 # 4. Создание необходимых директорий и файлов
@@ -98,7 +97,7 @@ fi
 # 6. Создание и настройка конфигурационных файлов
 echo -e "${YELLOW}Creating configuration files...${NC}"
 
-# Создание .env файла с токенами из проекта
+# Создание .env файла с токенами
 echo -e "${YELLOW}Creating .env file with tokens...${NC}"
 cat > .env << EOL
 # Токен Telegram бота
@@ -124,7 +123,7 @@ check_success "Permissions setup"
 echo -e "${YELLOW}Creating systemd service...${NC}"
 SERVICE_FILE="/etc/systemd/system/history-bot.service"
 
-sudo tee $SERVICE_FILE > /dev/null << EOL
+cat > $SERVICE_FILE << EOL
 [Unit]
 Description=History Educational Telegram Bot
 After=network.target
@@ -147,30 +146,10 @@ check_success "Systemd service creation"
 
 # 9. Активация и запуск службы
 echo -e "${YELLOW}Enabling and starting service...${NC}"
-sudo systemctl daemon-reload
-sudo systemctl enable history-bot.service
-sudo systemctl start history-bot.service
+systemctl daemon-reload
+systemctl enable history-bot.service
+systemctl start history-bot.service
 check_success "Service activation"
-
-# 10. Настройка автоматического обновления
-echo -e "${YELLOW}Setting up auto-update script...${NC}"
-UPDATE_SCRIPT="update.sh"
-
-cat > $UPDATE_SCRIPT << EOL
-#!/bin/bash
-git pull
-pip3 install -r requirements.txt
-sudo systemctl restart history-bot.service
-EOL
-
-chmod +x $UPDATE_SCRIPT
-check_success "Auto-update script creation"
-
-# 11. Проверка статуса службы
-echo -e "${YELLOW}Checking service status...${NC}"
-sudo systemctl status history-bot.service
-check_success "Service status check"
 
 echo -e "${GREEN}Installation completed successfully!${NC}"
 echo -e "${YELLOW}To view logs use: journalctl -u history-bot.service -f${NC}"
-echo -e "${YELLOW}To update the bot use: ./update.sh${NC}"
