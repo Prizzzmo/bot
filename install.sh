@@ -41,7 +41,7 @@ check_success "Basic dependencies installation"
 
 # 3. Установка системных библиотек
 echo -e "${YELLOW}Installing system libraries...${NC}"
-yum -y install gcc openssl-devel bzip2-devel libffi-devel geos-devel cairo-devel gobject-introspection-devel pkgconfig proj-devel
+yum -y install gcc openssl-devel bzip2-devel libffi-devel geos-devel cairo-devel pkgconfig proj-devel
 check_success "System libraries installation"
 
 # 4. Создание необходимых директорий и файлов
