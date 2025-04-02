@@ -69,8 +69,8 @@ class APIClient(BaseService):
                 self._logger.error("API ключ не указан")
                 return False
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
-            self._logger.info("Gemini API успешно инициализирован (модель: gemini-pro)")
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
+            self._logger.info("Gemini API успешно инициализирован (модель: gemini-2.0-flash)")
             return True
         except Exception as e:
             self._logger.error(f"Ошибка при инициализации APIClient: {e}")
@@ -83,21 +83,21 @@ class APIClient(BaseService):
         """
         max_retries = 3
         retry_delay = 2
-        
+
         for attempt in range(max_retries):
             try:
                 if not self.api_key:
                     raise ValueError("API ключ не указан")
-                    
+
                 genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel('gemini-pro')
-                
+                self.model = genai.GenerativeModel('gemini-2.0-flash')
+
                 # Проверяем работоспособность модели
                 test_response = self.model.generate_content(contents="Test connection")
                 if test_response and hasattr(test_response, 'text'):
                     self._logger.info("Gemini API успешно инициализирован")
                     return
-                    
+
             except Exception as e:
                 self._logger.warning(f"Попытка {attempt + 1}/{max_retries} инициализации модели не удалась: {str(e)}")
                 if attempt < max_retries - 1:
@@ -244,10 +244,10 @@ class APIClient(BaseService):
                                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
                             ]
                         )
-                        
+
                         if not response or not hasattr(response, 'text'):
                             raise Exception("Пустой ответ от API")
-                            
+
                     except Exception as api_error:
                         self._logger.error(f"Ошибка при генерации контента: {str(api_error)}")
                         # Пробуем упрощенный запрос без дополнительных настроек
