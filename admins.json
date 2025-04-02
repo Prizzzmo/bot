@@ -1,5 +1,7 @@
 
 {
     "admin_ids": [7225056628],
-    "super_admin_ids": [7225056628]
+    "super_admin_ids": [7225056628],
+    "telegram_token": "YOUR_TELEGRAM_TOKEN_HERE",
+    "gemini_api_key": "YOUR_GEMINI_API_KEY_HERE"
 }

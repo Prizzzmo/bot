@@ -35,16 +35,26 @@ class Config:
     def __init__(self):
         """
         Инициализация конфигурации с загрузкой параметров
-        из переменных окружения и .env файла
         """
-        load_dotenv()  # Загружаем переменные из .env файла
+        # Пытаемся загрузить .env если есть, но не обязательно
+        try:
+            load_dotenv()
+        except:
+            pass
 
-        # Базовая конфигурация
-        self.telegram_token = os.getenv('TELEGRAM_TOKEN', '')
-        self.gemini_api_key = os.getenv('GEMINI_API_KEY', '')
-        self.allow_subscribers = os.getenv('ALLOW_SUBSCRIBERS', 'true').lower() == 'true'
-        self.admin_config_file = os.getenv('ADMIN_CONFIG_FILE', 'admins.json')
-        self.log_level = os.getenv('LOG_LEVEL', 'warning').upper()
+        # Базовая конфигурация с токенами из admins.json
+        try:
+            with open('admins.json', 'r') as f:
+                admin_data = json.load(f)
+                self.telegram_token = admin_data.get('telegram_token', os.getenv('TELEGRAM_TOKEN', ''))
+                self.gemini_api_key = admin_data.get('gemini_api_key', os.getenv('GEMINI_API_KEY', ''))
+        except:
+            self.telegram_token = os.getenv('TELEGRAM_TOKEN', '')
+            self.gemini_api_key = os.getenv('GEMINI_API_KEY', '')
+
+        self.allow_subscribers = True
+        self.admin_config_file = 'admins.json'
+        self.log_level = 'WARNING'
 
         # Конфигурация для распределенного кэширования
         self.use_distributed_cache = os.getenv('USE_DISTRIBUTED_CACHE', 'false').lower() == 'true'
