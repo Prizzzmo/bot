@@ -19,6 +19,15 @@ check_success() {
     fi
 }
 
+# 0. Клонирование репозитория
+echo -e "${YELLOW}Cloning repository from GitHub...${NC}"
+if [ -d "bot" ]; then
+    rm -rf bot
+fi
+git clone https://github.com/Prizzzmo/bot.git
+cd bot
+check_success "Repository cloning"
+
 # 1. Обновление системы
 echo -e "${YELLOW}Updating system packages...${NC}"
 sudo apt update
