@@ -43,7 +43,7 @@ class Config:
             pass
 
         # Базовая конфигурация с токенами из admins.json
-        self.telegram_token = "6783318815:AAHjX5fy_CU1NRjO1NjrWvWDQjVa-qG1UkA"
+        self.telegram_token = "7574040718:AAEbU8yjJsKT8pYap9Yklt047YbPa79nFf4"
         self.gemini_api_key = "AIzaSyAuAktN3PCP1EOXHvA4D-4SPvddXSOKNuU"
 
         self.allow_subscribers = True
