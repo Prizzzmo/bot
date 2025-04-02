@@ -58,6 +58,9 @@ echo -e "${YELLOW}Installing Python dependencies...${NC}"
 if [ -f "requirements.txt" ]; then
     pip3 install -r requirements.txt
     check_success "Python dependencies installation"
+elif [ -f "../requirements.txt" ]; then
+    pip3 install -r ../requirements.txt
+    check_success "Python dependencies installation"
 else
     echo -e "${RED}requirements.txt not found!${NC}"
     exit 1
