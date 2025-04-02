@@ -12,7 +12,6 @@ import threading
 import datetime
 import re
 from flask import Flask, render_template, jsonify, request, send_file, make_response, redirect, url_for
-from flask_cors import CORS
 
 # Настройка логирования
 import os
@@ -76,8 +75,6 @@ class UnifiedServer:
                          template_folder=template_path,
                          static_folder=static_path)
 
-        # Включаем поддержку CORS
-        CORS(self.app)
 
         # Предзагрузка данных
         self.events_data = None
@@ -311,12 +308,12 @@ class UnifiedServer:
             # Пропускаем события без местоположения или координат
             if 'location' not in event:
                 continue
-                
+
             # Проверка структуры location
             location = event.get('location')
             if not isinstance(location, dict):
                 continue
-                
+
             # Проверка наличия координат
             if not location.get('lat') or not location.get('lng'):
                 continue
