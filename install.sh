@@ -30,18 +30,18 @@ check_success "Repository cloning"
 
 # 1. Обновление системы
 echo -e "${YELLOW}Updating system packages...${NC}"
-sudo apt update
-sudo apt upgrade -y
+yum -y update
 check_success "System update"
 
 # 2. Установка базовых зависимостей
 echo -e "${YELLOW}Installing basic dependencies...${NC}"
-sudo apt install -y python3 python3-pip python3-dev build-essential git
+yum -y groupinstall "Development Tools"
+yum -y install git openssl-devel
 check_success "Basic dependencies installation"
 
 # 3. Установка системных библиотек
 echo -e "${YELLOW}Installing system libraries...${NC}"
-sudo apt install -y libssl-dev libffi-dev python3-setuptools libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev libgirepository1.0-dev pkg-config python3-cairo-dev
+yum -y install gcc openssl-devel bzip2-devel libffi-devel geos-devel cairo-devel gobject-introspection-devel pkgconfig proj-devel
 check_success "System libraries installation"
 
 # 4. Создание необходимых директорий и файлов
